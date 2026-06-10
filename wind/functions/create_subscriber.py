@@ -264,14 +264,21 @@ def create_subscriber_view(request):
     from wind.models import ListOfSubscriber
     errors = {}
     
-    user_provided_code = data.get('code')
-    if user_provided_code and user_provided_code.strip():
-        subscriber_code_provided = user_provided_code.strip()
+    user_provided_code = (data.get('code') or data.get('document_number') or "").strip()
+    if user_provided_code:
+        subscriber_code_provided = user_provided_code
         logger.info(f"Validando código proporcionado: '{subscriber_code_provided}'")
         
         if not validate_subscriber_code_uniqueness(subscriber_code_provided):
             errors['code'] = [f'El código "{subscriber_code_provided}" ya está en uso. Por favor, elija otro.']
             logger.warning(f"Código '{subscriber_code_provided}' ya existe en BD")
+
+        # Validar en SubscriberDocumentRegistry
+        from wind.utils.email_validation import validate_document_for_registration
+        doc_valid, doc_message, doc_registry = validate_document_for_registration(subscriber_code_provided)
+        if not doc_valid:
+            errors['document_number'] = [doc_message]
+            logger.warning(f"Documento '{subscriber_code_provided}' no válido según SubscriberDocumentRegistry")
     
     is_valid, validation_message, email_registry = validate_email_for_registration(email_normalized)
     logger.info(f"Validación en SubscriberEmailRegistry: is_valid={is_valid}, message='{validation_message}'")
@@ -487,6 +494,22 @@ def create_subscriber_view(request):
             logger.info(f"Registro de email creado: {email_normalized} -> {subscriber_code}")
         else:
             logger.info(f"Registro de email actualizado: {email_normalized} -> {subscriber_code}")
+
+        # Registrar documento en el registro de unicidad local
+        if user_provided_code:
+            from wind.models import SubscriberDocumentRegistry
+            doc_registry, doc_created = SubscriberDocumentRegistry.objects.update_or_create(
+                document=user_provided_code,
+                defaults={
+                    'subscriber_code': subscriber_code,
+                    'email': email_normalized,
+                    'has_purchased': False,
+                }
+            )
+            if doc_created:
+                logger.info(f"Registro de documento creado: {subscriber_code} -> {email_normalized}")
+            else:
+                logger.info(f"Registro de documento actualizado: {subscriber_code} -> {email_normalized}")
         
         contacts_added = []
         contacts_errors = []
@@ -742,16 +765,18 @@ def create_subscriber_view(request):
         email_b64 = base64.urlsafe_b64encode(email_normalized.encode("utf-8")).decode("ascii")
         payload = f"{subscriber_code}|{int(bool(response_data.get('license_block_added')))}|{license_err_b64}|{email_b64}"
         token = signer.sign(payload)
+        response_data["token"] = token
         response_data["credentials_url"] = f"/wind/credentials/?t={token}"
 
         response_data['assigned_smartcards'] = assigned_smartcards
         response_data['product_add_result'] = product_add_result
         
         # Enviar correo electrónico de verificación asíncronamente
-        # En este paso simulamos la lógica, utilizando Celery si Beat está activo.
         try:
             from wind.tasks import send_verification_email_task
-            send_verification_email_task.delay(email_normalized, subscriber_code)
+            subject = "Verificación de Cuenta - WIND"
+            body = f"Hola, tu código de suscriptor es: {subscriber_code}. Por favor, verifica tu cuenta."
+            send_verification_email_task.delay(email_normalized, subject, body)
         except Exception as e:
             logger.warning(f"No se pudo encolar el email de verificación: {e}")
 

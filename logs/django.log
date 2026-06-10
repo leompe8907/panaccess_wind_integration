@@ -1,0 +1,449 @@
+INFO 2026-06-09 20:35:55,776 log_buffer 19148 5868 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:36:21,045 log_buffer 4888 21172 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:36:44,426 log_buffer 10088 8448 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:37:23,155 log_buffer 9164 27308 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:37:46,353 log_buffer 14028 11364 LogBuffer flush thread started (interval=5s, batch_size=100)
+ERROR 2026-06-09 20:38:11,638 websocket_utils 14028 11364 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
+    sock = self._connect()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
+    raise err
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
+    sock.connect(socket_address)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
+    token_count = redis_client.incr(token_key)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
+    return self.execute_command("INCRBY", name, amount)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
+    connection.connect()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
+    self.retry.call_with_retry(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        lambda: self.connect_check_health(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        lambda error: self.disconnect(error),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
+    lambda: self.connect_check_health(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        check_health=True, retry_socket_connect=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:38:43,824 log_buffer 7444 16596 LogBuffer flush thread started (interval=5s, batch_size=100)
+ERROR 2026-06-09 20:39:21,852 websocket_utils 7444 16596 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
+    sock = self._connect()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
+    raise err
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
+    sock.connect(socket_address)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
+    token_count = redis_client.incr(token_key)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
+    return self.execute_command("INCRBY", name, amount)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
+    connection.connect()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
+    self.retry.call_with_retry(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        lambda: self.connect_check_health(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        lambda error: self.disconnect(error),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
+    lambda: self.connect_check_health(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        check_health=True, retry_socket_connect=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:39:51,564 log_buffer 6012 4368 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:39:53,305 create_subscriber 6012 4368 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
+INFO 2026-06-09 20:39:53,305 create_subscriber 6012 4368 Validando email normalizado: 'duplicate@example.com'
+WARNING 2026-06-09 20:39:53,334 email_validation 6012 4368 Intento de registro duplicado con email duplicate@example.com
+INFO 2026-06-09 20:39:53,334 create_subscriber 6012 4368 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
+WARNING 2026-06-09 20:39:53,335 create_subscriber 6012 4368 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
+INFO 2026-06-09 20:39:53,335 create_subscriber 6012 4368 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
+INFO 2026-06-09 20:39:53,360 create_subscriber 6012 4368 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
+INFO 2026-06-09 20:39:53,360 create_subscriber 6012 4368 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 20:39:53,361 email_validation 6012 4368 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 20:39:53,361 create_subscriber 6012 4368 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 20:39:53,362 create_subscriber 6012 4368 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 20:39:53,362 create_subscriber 6012 4368 Generando código único de suscriptor automáticamente...
+WARNING 2026-06-09 20:39:53,365 panaccess_singleton 6012 4368 No hay sesión activa, obteniendo una...
+WARNING 2026-06-09 20:40:20,141 panaccess_session_store 6012 4368 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+WARNING 2026-06-09 20:40:42,737 panaccess_session_store 6012 4368 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 No hay sesión, autenticando...
+INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 Intento login #1/5
+INFO 2026-06-09 20:40:42,737 panaccess_auth 6012 4368 Iniciando login
+INFO 2026-06-09 20:40:44,184 panaccess_auth 6012 4368 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 20:40:44,186 panaccess_singleton 6012 4368 Login exitoso
+WARNING 2026-06-09 20:41:09,652 panaccess_session_store 6012 4368 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:41:09,653 panaccess_client 6012 4368 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
+ERROR 2026-06-09 20:41:11,144 panaccess_client 6012 4368 Llamada 'getSubscriber' falló: This subscriber does not exist.
+INFO 2026-06-09 20:41:11,146 subscriber_code_generator 6012 4368 Código único generado: AUTO1
+INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Código generado automáticamente: AUTO1
+INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Creando suscriptor: AUTO1
+INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Parámetros a enviar a PanAccess: {'subscriber[code]': 'AUTO1', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
+WARNING 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Código retornado (10001) difiere del enviado (AUTO1)
+INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Suscriptor 10001 creado exitosamente
+INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
+INFO 2026-06-09 20:41:11,147 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:13,281 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:13,282 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:16,100 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:16,102 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:17,273 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 20:41:17,275 create_subscriber 6012 4368 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess después de crearlo
+INFO 2026-06-09 20:41:17,276 create_subscriber 6012 4368 Registro de email creado: john.doe@example.com -> 10001
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Agregando email john.doe@example.com al suscriptor 10001
+ERROR 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Error al agregar email: Mock error for addContactToSubscriber
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Agregando teléfono +18095551234 al suscriptor 10001
+ERROR 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Error al agregar teléfono: Mock error for addContactToSubscriber
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
+INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
+INFO 2026-06-09 20:41:17,277 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:18,894 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:18,895 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:19,818 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:19,820 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:21,018 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 20:41:21,020 create_subscriber 6012 4368 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess para actualizar smartcards
+WARNING 2026-06-09 20:41:21,075 create_subscriber 6012 4368 No se pudo encolar el email de verificación: send_verification_email_task() missing 1 required positional argument: 'body'
+ERROR 2026-06-09 20:41:40,508 websocket_utils 6012 4368 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
+    sock = self._connect()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
+    raise err
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
+    sock.connect(socket_address)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
+    token_count = redis_client.incr(token_key)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
+    return self.execute_command("INCRBY", name, amount)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
+    connection.connect()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
+    self.retry.call_with_retry(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        lambda: self.connect_check_health(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        lambda error: self.disconnect(error),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
+    lambda: self.connect_check_health(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        check_health=True, retry_socket_connect=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:54:27,915 log_buffer 19656 23244 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:55:24,283 log_buffer 17424 8836 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 20:55:26,022 create_subscriber 17424 8836 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
+INFO 2026-06-09 20:55:26,022 create_subscriber 17424 8836 Validando email normalizado: 'duplicate@example.com'
+WARNING 2026-06-09 20:55:26,033 email_validation 17424 8836 Intento de registro duplicado con email duplicate@example.com
+INFO 2026-06-09 20:55:26,033 create_subscriber 17424 8836 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
+WARNING 2026-06-09 20:55:26,033 create_subscriber 17424 8836 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
+INFO 2026-06-09 20:55:26,034 create_subscriber 17424 8836 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
+INFO 2026-06-09 20:55:26,057 create_subscriber 17424 8836 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
+INFO 2026-06-09 20:55:26,057 create_subscriber 17424 8836 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 20:55:26,058 email_validation 17424 8836 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 20:55:26,058 create_subscriber 17424 8836 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 20:55:26,059 create_subscriber 17424 8836 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 20:55:26,059 create_subscriber 17424 8836 Generando código único de suscriptor automáticamente...
+WARNING 2026-06-09 20:55:26,061 panaccess_singleton 17424 8836 No hay sesión activa, obteniendo una...
+WARNING 2026-06-09 20:55:48,105 panaccess_session_store 17424 8836 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+WARNING 2026-06-09 20:56:14,359 panaccess_session_store 17424 8836 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 No hay sesión, autenticando...
+INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 Intento login #1/5
+INFO 2026-06-09 20:56:14,360 panaccess_auth 17424 8836 Iniciando login
+INFO 2026-06-09 20:56:16,412 panaccess_auth 17424 8836 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 20:56:16,413 panaccess_singleton 17424 8836 Login exitoso
+WARNING 2026-06-09 20:56:39,283 panaccess_session_store 17424 8836 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 20:56:39,283 panaccess_client 17424 8836 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
+ERROR 2026-06-09 20:56:40,648 panaccess_client 17424 8836 Llamada 'getSubscriber' falló: This subscriber does not exist.
+INFO 2026-06-09 20:56:40,650 subscriber_code_generator 17424 8836 Código único generado: AUTO1
+INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Código generado automáticamente: AUTO1
+INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Creando suscriptor: AUTO1
+INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Parámetros a enviar a PanAccess: {'subscriber[code]': 'AUTO1', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
+WARNING 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Código retornado (10001) difiere del enviado (AUTO1)
+INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Suscriptor 10001 creado exitosamente
+INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
+INFO 2026-06-09 20:56:40,650 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:42,326 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:42,327 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:43,620 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:43,621 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:45,041 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 20:56:45,043 create_subscriber 17424 8836 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess después de crearlo
+INFO 2026-06-09 20:56:45,044 create_subscriber 17424 8836 Registro de email creado: john.doe@example.com -> 10001
+INFO 2026-06-09 20:56:45,044 create_subscriber 17424 8836 Agregando email john.doe@example.com al suscriptor 10001
+ERROR 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Error al agregar email: Mock error for addContactToSubscriber
+INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Agregando teléfono +18095551234 al suscriptor 10001
+ERROR 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Error al agregar teléfono: Mock error for addContactToSubscriber
+INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
+INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
+INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
+INFO 2026-06-09 20:56:45,045 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:46,426 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:46,428 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:47,548 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:47,549 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:48,689 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 20:56:48,690 create_subscriber 17424 8836 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess para actualizar smartcards
+WARNING 2026-06-09 20:56:48,710 create_subscriber 17424 8836 No se pudo encolar el email de verificación: send_verification_email_task() missing 1 required positional argument: 'body'
+ERROR 2026-06-09 20:57:10,561 websocket_utils 17424 8836 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+Traceback (most recent call last):
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
+    sock = self._connect()
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1515, in _connect
+    raise err
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1499, in _connect
+    sock.connect(socket_address)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
+    token_count = redis_client.incr(token_key)
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
+    return self.execute_command("INCRBY", name, amount)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\client.py", line 716, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\client.py", line 722, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\utils.py", line 236, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 3041, in get_connection
+    connection.connect()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 976, in connect
+    self.retry.call_with_retry(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        lambda: self.connect_check_health(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        lambda error: self.disconnect(error),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 977, in <lambda>
+    lambda: self.connect_check_health(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        check_health=True, retry_socket_connect=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:00:17,696 log_buffer 12312 7792 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:00:20,893 create_subscriber 12312 7792 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:00:20,894 create_subscriber 12312 7792 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:00:20,905 create_subscriber 12312 7792 Validando código proporcionado: '40200000000'
+WARNING 2026-06-09 21:00:20,906 panaccess_singleton 12312 7792 No hay sesión activa, obteniendo una...
+WARNING 2026-06-09 21:00:43,408 panaccess_session_store 12312 7792 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+WARNING 2026-06-09 21:01:07,255 panaccess_session_store 12312 7792 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 No hay sesión, autenticando...
+INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 Intento login #1/5
+INFO 2026-06-09 21:01:07,255 panaccess_auth 12312 7792 Iniciando login
+INFO 2026-06-09 21:01:08,587 panaccess_auth 12312 7792 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:01:08,588 panaccess_singleton 12312 7792 Login exitoso
+INFO 2026-06-09 21:01:42,855 log_buffer 11968 27444 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:01:46,907 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:01:46,907 create_subscriber 11968 27444 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:01:46,934 create_subscriber 11968 27444 Validando código proporcionado: '40200000000'
+WARNING 2026-06-09 21:01:46,936 email_validation 11968 27444 Intento de registro duplicado con documento 40200000000
+WARNING 2026-06-09 21:01:46,938 create_subscriber 11968 27444 Documento '40200000000' no válido según SubscriberDocumentRegistry
+INFO 2026-06-09 21:01:46,939 email_validation 11968 27444 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:01:46,940 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:01:46,943 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:01:46,990 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:01:46,991 create_subscriber 11968 27444 Validando email normalizado: 'duplicate@example.com'
+INFO 2026-06-09 21:01:46,991 create_subscriber 11968 27444 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:01:46,993 email_validation 11968 27444 Documento 40212345678 no registrado previamente, permitiendo registro
+WARNING 2026-06-09 21:01:46,994 email_validation 11968 27444 Intento de registro duplicado con email duplicate@example.com
+INFO 2026-06-09 21:01:46,995 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
+WARNING 2026-06-09 21:01:46,995 create_subscriber 11968 27444 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
+INFO 2026-06-09 21:01:46,996 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
+INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:01:47,036 email_validation 11968 27444 Documento 40212345678 no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:01:47,036 email_validation 11968 27444 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:01:47,037 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:01:47,041 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:01:47,045 create_subscriber 11968 27444 Usando código proporcionado: 40212345678
+INFO 2026-06-09 21:01:47,048 create_subscriber 11968 27444 Creando suscriptor: 40212345678
+INFO 2026-06-09 21:01:47,052 create_subscriber 11968 27444 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
+WARNING 2026-06-09 21:01:47,053 create_subscriber 11968 27444 Código retornado (10001) difiere del enviado (40212345678)
+INFO 2026-06-09 21:01:47,053 create_subscriber 11968 27444 Suscriptor 10001 creado exitosamente
+INFO 2026-06-09 21:01:47,053 create_subscriber 11968 27444 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
+INFO 2026-06-09 21:01:47,054 create_subscriber 11968 27444 [DB] Suscriptor 10001 encontrado en PanAccess
+INFO 2026-06-09 21:01:47,054 create_subscriber 11968 27444 [DB] Encontradas 2 smartcards asociadas
+INFO 2026-06-09 21:01:47,064 create_subscriber 11968 27444 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
+INFO 2026-06-09 21:01:47,065 create_subscriber 11968 27444 Registro de email creado: john.doe@example.com -> 10001
+INFO 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Registro de documento creado: 10001 -> john.doe@example.com
+INFO 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Agregando email john.doe@example.com al suscriptor 10001
+ERROR 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Error al agregar email: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:01:47,068 create_subscriber 11968 27444 Agregando teléfono +18095551234 al suscriptor 10001
+ERROR 2026-06-09 21:01:47,068 create_subscriber 11968 27444 Error al agregar teléfono: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
+INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
+INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
+INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Iniciando proceso para agregar productos a 2 smartcards
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Agregando producto 4639 a 2 smartcards
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Fecha de expiración: 2026-07-10 00:01:47 (30 días desde creación)
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Respuesta recibida - success=True
+INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Producto 4639 agregado exitosamente a 2 smartcards
+INFO 2026-06-09 21:01:47,228 tasks 11968 27444 Enviando email de verificación a john.doe@example.com
+INFO 2026-06-09 21:01:47,244 tasks 11968 27444 Email enviado exitosamente a john.doe@example.com
+INFO 2026-06-09 21:04:52,743 log_buffer 5212 5424 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:04:55,865 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:04:55,865 create_subscriber 5212 5424 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:04:55,875 create_subscriber 5212 5424 Validando código proporcionado: '40200000000'
+WARNING 2026-06-09 21:04:55,876 email_validation 5212 5424 Intento de registro duplicado con documento 40200000000
+WARNING 2026-06-09 21:04:55,876 create_subscriber 5212 5424 Documento '40200000000' no válido según SubscriberDocumentRegistry
+INFO 2026-06-09 21:04:55,877 email_validation 5212 5424 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:04:55,877 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:04:55,878 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:04:55,900 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:04:55,900 create_subscriber 5212 5424 Validando email normalizado: 'duplicate@example.com'
+INFO 2026-06-09 21:04:55,901 create_subscriber 5212 5424 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:04:55,901 email_validation 5212 5424 Documento 40212345678 no registrado previamente, permitiendo registro
+WARNING 2026-06-09 21:04:55,902 email_validation 5212 5424 Intento de registro duplicado con email duplicate@example.com
+INFO 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
+WARNING 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
+INFO 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
+INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:04:55,928 email_validation 5212 5424 Documento 40212345678 no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:04:55,929 email_validation 5212 5424 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:04:55,929 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Usando código proporcionado: 40212345678
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Creando suscriptor: 40212345678
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
+WARNING 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Código retornado (10001) difiere del enviado (40212345678)
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Suscriptor 10001 creado exitosamente
+INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
+INFO 2026-06-09 21:04:55,931 create_subscriber 5212 5424 [DB] Suscriptor 10001 encontrado en PanAccess
+INFO 2026-06-09 21:04:55,931 create_subscriber 5212 5424 [DB] Encontradas 2 smartcards asociadas
+INFO 2026-06-09 21:04:55,937 create_subscriber 5212 5424 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
+INFO 2026-06-09 21:04:55,938 create_subscriber 5212 5424 Registro de email creado: john.doe@example.com -> 10001
+INFO 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Registro de documento creado: 10001 -> john.doe@example.com
+INFO 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Agregando email john.doe@example.com al suscriptor 10001
+ERROR 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Error al agregar email: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 Agregando teléfono +18095551234 al suscriptor 10001
+ERROR 2026-06-09 21:04:55,940 create_subscriber 5212 5424 Error al agregar teléfono: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
+INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Iniciando proceso para agregar productos a 2 smartcards
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Agregando producto 4639 a 2 smartcards
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Fecha de expiración: 2026-07-10 00:04:55 (30 días desde creación)
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Respuesta recibida - success=True
+INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Producto 4639 agregado exitosamente a 2 smartcards
+INFO 2026-06-09 21:04:56,054 tasks 5212 5424 Enviando email de verificación a john.doe@example.com
+INFO 2026-06-09 21:04:56,065 tasks 5212 5424 Email enviado exitosamente a john.doe@example.com

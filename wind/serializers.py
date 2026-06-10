@@ -155,6 +155,8 @@ class CreateSubscriberSerializer(serializers.Serializer):
         max_length=100,
         help_text="Código del suscriptor (documento)."
     )
+    document_number = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
+    document_type = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=50)
     
     phone = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=50)
     hcId = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)

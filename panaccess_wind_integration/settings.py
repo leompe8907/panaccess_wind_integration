@@ -221,15 +221,22 @@ ASGI_APPLICATION = 'panaccess_wind_integration.asgi.application'
 # ============================================================================
 # CHANNELS (WebSockets)
 # ============================================================================
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            # Usar db 2 para evitar colisión con caché o Celery Beat
-            "hosts": [RedisConfig.build_url(db=2)],
+if 'test' in sys.argv:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                # Usar db 2 para evitar colisión con caché o Celery Beat
+                "hosts": [RedisConfig.build_url(db=2)],
+            },
+        },
+    }
 
 
 # ============================================================================
@@ -402,7 +409,7 @@ if _FULL_SYNC_ENABLED:
 # ============================================================================
 REDIS_CACHE_DB = RedisConfig.CACHE_DB
 
-if CacheConfig.USE_LOCMEM:
+if 'test' in sys.argv or CacheConfig.USE_LOCMEM:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',

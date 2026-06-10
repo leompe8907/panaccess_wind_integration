@@ -1,0 +1,46 @@
+WARNING 2026-06-09 20:39:53,365 panaccess_singleton 6012 4368 No hay sesión activa, obteniendo una...
+INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 No hay sesión, autenticando...
+INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 Intento login #1/5
+INFO 2026-06-09 20:40:42,737 panaccess_auth 6012 4368 Iniciando login
+INFO 2026-06-09 20:40:44,184 panaccess_auth 6012 4368 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 20:40:44,186 panaccess_singleton 6012 4368 Login exitoso
+INFO 2026-06-09 20:41:09,653 panaccess_client 6012 4368 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
+ERROR 2026-06-09 20:41:11,144 panaccess_client 6012 4368 Llamada 'getSubscriber' falló: This subscriber does not exist.
+INFO 2026-06-09 20:41:11,147 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:13,281 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:13,282 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:16,100 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:16,102 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:17,273 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:17,277 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:18,894 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:18,895 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:19,818 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:41:19,820 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:41:21,018 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 20:55:26,061 panaccess_singleton 17424 8836 No hay sesión activa, obteniendo una...
+INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 No hay sesión, autenticando...
+INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 Intento login #1/5
+INFO 2026-06-09 20:56:14,360 panaccess_auth 17424 8836 Iniciando login
+INFO 2026-06-09 20:56:16,412 panaccess_auth 17424 8836 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 20:56:16,413 panaccess_singleton 17424 8836 Login exitoso
+INFO 2026-06-09 20:56:39,283 panaccess_client 17424 8836 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
+ERROR 2026-06-09 20:56:40,648 panaccess_client 17424 8836 Llamada 'getSubscriber' falló: This subscriber does not exist.
+INFO 2026-06-09 20:56:40,650 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:42,326 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:42,327 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:43,620 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:43,621 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:45,041 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:45,045 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:46,426 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:46,428 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:47,548 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+INFO 2026-06-09 20:56:47,549 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-09 20:56:48,689 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
+WARNING 2026-06-09 21:00:20,906 panaccess_singleton 12312 7792 No hay sesión activa, obteniendo una...
+INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 No hay sesión, autenticando...
+INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 Intento login #1/5
+INFO 2026-06-09 21:01:07,255 panaccess_auth 12312 7792 Iniciando login
+INFO 2026-06-09 21:01:08,587 panaccess_auth 12312 7792 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:01:08,588 panaccess_singleton 12312 7792 Login exitoso

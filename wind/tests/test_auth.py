@@ -21,12 +21,20 @@ class SubscriberRegistrationTestCase(APITestCase):
             'document_number': '40212345678',
             'phone': '8095551234'
         }
+        # Mock global de _code_exists_in_panaccess
+        self.code_exists_patcher = patch('wind.utils.subscriber_code_generator._code_exists_in_panaccess', return_value=False)
+        self.code_exists_patcher.start()
+
+    def tearDown(self):
+        self.code_exists_patcher.stop()
 
     @patch('wind.functions.create_subscriber.get_panaccess')
-    def test_successful_registration(self, mock_get_panaccess):
+    @patch('wind.functions.getSubscriber.get_panaccess')
+    def test_successful_registration(self, mock_get_subscriber_panaccess, mock_get_panaccess):
         # Configurar mocks de PanAccess
         mock_client = MagicMock()
         mock_get_panaccess.return_value = mock_client
+        mock_get_subscriber_panaccess.return_value = mock_client
         
         # Mocks para llamadas consecutivas en create_subscriber
         # 1. addSubscriber (creación) -> responde success
@@ -36,6 +44,21 @@ class SubscriberRegistrationTestCase(APITestCase):
             'addSubscriber': {'success': True, 'answer': '10001'},
             'addLicenseBlockToSubscriber': {'success': True, 'answer': True},
             'resetSubscriberPassword': {'success': True, 'answer': True},
+            'getListOfExtendedSubscribers': {
+                'success': True,
+                'answer': {
+                    'extendedSubscriberEntries': [
+                        {
+                            'subscriberCode': '10001',
+                            'firstName': 'John',
+                            'lastName': 'Doe',
+                            'emails': ['john.doe@example.com'],
+                            'smartcards': ['123456789012345', '123456789012346']
+                        }
+                    ]
+                }
+            },
+            'addProductToSmartcards': {'success': True, 'answer': True}
         }.get(method, {'success': False, 'errorMessage': f'Mock error for {method}'})
 
         response = self.client.post(
@@ -50,7 +73,7 @@ class SubscriberRegistrationTestCase(APITestCase):
 
         # Verificar que se crearon registros de unicidad local
         self.assertTrue(SubscriberEmailRegistry.objects.filter(email='john.doe@example.com').exists())
-        self.assertTrue(SubscriberDocumentRegistry.objects.filter(document_number='40212345678').exists())
+        self.assertTrue(SubscriberDocumentRegistry.objects.filter(document='40212345678').exists())
 
     @patch('wind.functions.create_subscriber.get_panaccess')
     def test_duplicate_email_validation(self, mock_get_panaccess):
@@ -71,14 +94,13 @@ class SubscriberRegistrationTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data.get('success', True))
-        self.assertIn('email', response.data)
+        self.assertIn('email', response.data['errors'])
 
     @patch('wind.functions.create_subscriber.get_panaccess')
     def test_duplicate_document_validation(self, mock_get_panaccess):
         # Crear un registro de documento previo
         SubscriberDocumentRegistry.objects.create(
-            document_number='40200000000',
-            document_type='cedula',
+            document='40200000000',
             subscriber_code='WND0002'
         )
 
@@ -93,7 +115,7 @@ class SubscriberRegistrationTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data.get('success', True))
-        self.assertIn('document_number', response.data)
+        self.assertIn('document_number', response.data['errors'])
 
 
 class SubscriberAuthTestCase(APITestCase):
@@ -118,7 +140,7 @@ class SubscriberAuthTestCase(APITestCase):
         response = self.client.post(
             '/api/auth/login/',
             data={
-                'email': self.email,
+                'username': self.email,
                 'password': self.password
             }
         )
