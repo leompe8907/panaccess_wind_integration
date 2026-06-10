@@ -528,3 +528,28 @@ INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Respuesta r
 INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Producto 4639 agregado exitosamente a 2 smartcards
 INFO 2026-06-09 21:24:51,363 tasks 25772 8172 Enviando email de verificación a john.doe@example.com
 INFO 2026-06-09 21:24:51,376 tasks 25772 8172 Email enviado exitosamente a john.doe@example.com
+INFO 2026-06-09 21:26:56,999 apps 20880 20312 Inicializando PanAccess singleton...
+WARNING 2026-06-09 21:27:23,572 panaccess_session_store 20880 20312 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+WARNING 2026-06-09 21:27:46,892 panaccess_session_store 20880 20312 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:27:46,893 panaccess_singleton 20880 20312 No hay sesión, autenticando...
+INFO 2026-06-09 21:27:46,894 panaccess_singleton 20880 20312 Intento login #1/5
+INFO 2026-06-09 21:27:46,894 panaccess_auth 20880 20312 Iniciando login
+INFO 2026-06-09 21:27:50,533 panaccess_auth 20880 20312 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:27:50,534 panaccess_singleton 20880 20312 Login exitoso
+WARNING 2026-06-09 21:28:13,644 panaccess_session_store 20880 20312 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:28:13,644 panaccess_singleton 20880 20312 PanAccess inicializado y autenticado
+INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 11396 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 20312 Thread de validación periódica iniciado
+INFO 2026-06-09 21:28:13,686 autoreload 20880 20312 Watching for file changes with StatReloader
+INFO 2026-06-09 21:28:13,921 log_buffer 20880 20312 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:28:14,133 server 20880 17472 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-09 21:28:14,137 server 20880 17472 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-09 21:28:14,138 server 20880 17472 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-09 21:28:28,510 runserver 20880 17472 [mHTTP GET /wind/register/ 200 [0.05, 127.0.0.1:56913][0m
+INFO 2026-06-09 21:28:28,687 runserver 20880 17472 [mHTTP GET /static/wind/images/backgroundalt.webp 200 [0.06, 127.0.0.1:56913][0m
+INFO 2026-06-09 21:28:35,102 runserver 20880 17472 [mHTTP GET /wind/login/ 200 [0.02, 127.0.0.1:56913][0m
+INFO 2026-06-09 21:28:35,207 runserver 20880 17472 [mHTTP GET /static/wind/css/app.css 200 [0.01, 127.0.0.1:56913][0m
+INFO 2026-06-09 21:28:35,236 runserver 20880 17472 [mHTTP GET /static/wind/js/auth-store.js 200 [0.01, 127.0.0.1:58029][0m
+ERROR 2026-06-09 21:28:44,897 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.15, 127.0.0.1:58029][0m
+ERROR 2026-06-09 21:30:20,492 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.12, 127.0.0.1:60786][0m
+WARNING 2026-06-09 21:32:21,992 runserver 20880 17472 [31;1mHTTP GET /wind/sync-subscribers/ 401 [0.01, 127.0.0.1:54919][0m

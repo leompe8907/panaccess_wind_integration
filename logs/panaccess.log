@@ -52,3 +52,11 @@ INFO 2026-06-09 21:17:25,594 panaccess_singleton 21556 23636 Login exitoso
 INFO 2026-06-09 21:17:45,119 panaccess_singleton 21556 23636 PanAccess inicializado y autenticado
 INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 14172 Validación periódica iniciada (intervalo: 900s)
 INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 23636 Thread de validación periódica iniciado
+INFO 2026-06-09 21:27:46,893 panaccess_singleton 20880 20312 No hay sesión, autenticando...
+INFO 2026-06-09 21:27:46,894 panaccess_singleton 20880 20312 Intento login #1/5
+INFO 2026-06-09 21:27:46,894 panaccess_auth 20880 20312 Iniciando login
+INFO 2026-06-09 21:27:50,533 panaccess_auth 20880 20312 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:27:50,534 panaccess_singleton 20880 20312 Login exitoso
+INFO 2026-06-09 21:28:13,644 panaccess_singleton 20880 20312 PanAccess inicializado y autenticado
+INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 11396 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 20312 Thread de validación periódica iniciado
