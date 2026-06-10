@@ -553,3 +553,12 @@ INFO 2026-06-09 21:28:35,236 runserver 20880 17472 [mHTTP GET /static/wind/js/a
 ERROR 2026-06-09 21:28:44,897 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.15, 127.0.0.1:58029][0m
 ERROR 2026-06-09 21:30:20,492 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.12, 127.0.0.1:60786][0m
 WARNING 2026-06-09 21:32:21,992 runserver 20880 17472 [31;1mHTTP GET /wind/sync-subscribers/ 401 [0.01, 127.0.0.1:54919][0m
+INFO 2026-06-09 21:35:50,720 runserver 20880 17472 [mHTTP GET /wind/ 200 [0.01, 127.0.0.1:64296][0m
+WARNING 2026-06-09 21:36:00,296 runserver 20880 17472 [33mHTTP GET / 404 [0.01, 127.0.0.1:64296][0m
+INFO 2026-06-09 21:43:15,627 panaccess_singleton 20880 11396 Sesión caducada, refrescando...
+WARNING 2026-06-09 21:43:37,459 panaccess_session_store 20880 11396 No se pudo borrar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:43:37,459 panaccess_singleton 20880 11396 Intento login #1/5
+INFO 2026-06-09 21:43:37,460 panaccess_auth 20880 11396 Iniciando login
+INFO 2026-06-09 21:43:39,121 panaccess_auth 20880 11396 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:43:39,122 panaccess_singleton 20880 11396 Login exitoso
+WARNING 2026-06-09 21:44:02,504 panaccess_session_store 20880 11396 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
