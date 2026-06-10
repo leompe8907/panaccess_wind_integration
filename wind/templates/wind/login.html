@@ -1,0 +1,219 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iniciar sesión | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </head>
+  <body class="app-body">
+    <div class="app-wrap">
+      <div class="app-card">
+        <header class="app-header">
+          <div class="app-brand">
+            <div class="app-logo" aria-hidden="true"></div>
+            <div>
+              <h1>Bienvenido</h1>
+              <p>Accede a tu cuenta Wind</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="app-content">
+          <div id="alert" class="app-alert" role="alert"></div>
+
+          <form id="login-form" class="app-form app-panel">
+            <div class="app-field">
+              <label for="username">Usuario</label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                inputmode="text"
+                autocomplete="username"
+                placeholder="Código, email o texto"
+                required
+              />
+            </div>
+            <div class="app-field">
+              <label for="password">Contraseña</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required />
+            </div>
+            <button type="submit" class="app-btn primary" id="btn-login">Iniciar sesión</button>
+            <p style="text-align: center; margin: 0">
+              ¿No tienes cuenta?
+              <a class="app-link" href="{% url 'register_web' %}">Regístrate</a>
+            </p>
+          </form>
+
+          <div class="app-divider" style="margin: 16px 0">o continúa con</div>
+
+          <div class="social-row app-panel">
+            <div id="google-btn-container"></div>
+            <button type="button" class="app-btn" id="btn-facebook" style="background: #1877f2; color: #fff; border-color: #1877f2">
+              Iniciar sesión con Facebook
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="{% static 'wind/js/auth-store.js' %}"></script>
+    <script>
+      const GOOGLE_CLIENT_ID = "{{ google_client_id|escapejs }}";
+      const FACEBOOK_APP_ID = "{{ facebook_app_id|escapejs }}";
+
+      const alertEl = document.getElementById("alert");
+
+      function showAlert(message, type) {
+        alertEl.textContent = message;
+        alertEl.className = "app-alert show " + (type || "error");
+      }
+
+      function clearAlert() {
+        alertEl.className = "app-alert";
+        alertEl.textContent = "";
+      }
+
+      function goDashboard() {
+        window.location.href = "{% url 'dashboard' %}";
+      }
+
+      if (WindAuth.isLoggedIn()) {
+        goDashboard();
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("session") === "expired") {
+        showAlert("Tu sesión expiró. Inicia sesión de nuevo.", "error");
+      }
+
+      async function handleAuthSuccess(data) {
+        WindAuth.saveFromApiResponse(data);
+        goDashboard();
+      }
+
+      document.getElementById("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearAlert();
+        const btn = document.getElementById("btn-login");
+        btn.disabled = true;
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        try {
+          const res = await fetch("/api/auth/login/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username, password: password }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg =
+              data.non_field_errors?.[0] ||
+              data.detail ||
+              data.message ||
+              "Credenciales incorrectas.";
+            throw new Error(msg);
+          }
+          await handleAuthSuccess(data);
+        } catch (err) {
+          showAlert(err.message || "No se pudo iniciar sesión.", "error");
+          btn.disabled = false;
+        }
+      });
+
+      let googleInitialized = false;
+
+      function onGoogleCredential(response) {
+        clearAlert();
+        fetch("/wind/auth/google/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: response.credential }),
+        })
+          .then((res) => res.json().then((data) => ({ res, data })))
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.detail || data.message || "Error con Google");
+            return handleAuthSuccess(data);
+          })
+          .catch((err) => showAlert(err.message, "error"));
+      }
+
+      function initGoogle() {
+        if (googleInitialized || !window.google || !google.accounts) return;
+        googleInitialized = true;
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: onGoogleCredential,
+        });
+        google.accounts.id.renderButton(document.getElementById("google-btn-container"), {
+          theme: "outline",
+          size: "large",
+          width: 320,
+          text: "signin_with",
+        });
+      }
+
+      window.addEventListener("load", () => {
+        initGoogle();
+        const t = setInterval(() => {
+          if (window.google && google.accounts) {
+            clearInterval(t);
+            initGoogle();
+          }
+        }, 200);
+      });
+
+      window.fbAsyncInit = function () {
+        FB.init({ appId: FACEBOOK_APP_ID, cookie: true, xfbml: false, version: "v20.0" });
+      };
+
+      function onFacebookLoginResponse(response) {
+        const btn = document.getElementById("btn-facebook");
+        if (!response || !response.authResponse) {
+          showAlert("Inicio de sesión con Facebook cancelado.", "error");
+          btn.disabled = false;
+          return;
+        }
+        fetch("/wind/auth/facebook/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: response.authResponse.accessToken }),
+        })
+          .then((res) => res.json().then((data) => ({ res, data })))
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.detail || data.message || "Error con Facebook");
+            return handleAuthSuccess(data);
+          })
+          .catch((err) => {
+            showAlert(err.message, "error");
+            btn.disabled = false;
+          });
+      }
+
+      document.getElementById("btn-facebook").addEventListener("click", () => {
+        clearAlert();
+        const btn = document.getElementById("btn-facebook");
+        btn.disabled = true;
+        if (typeof FB === "undefined") {
+          showAlert("Facebook SDK no cargó. Recarga la página.", "error");
+          btn.disabled = false;
+          return;
+        }
+        if (window.location.protocol !== "https:") {
+          showAlert(
+            "Facebook exige HTTPS. En local: ejecuta .\\scripts\\setup_local_https.ps1 y .\\scripts\\run_local_https.ps1, luego abre https://localhost:8444/wind/login/ (ver docs/LOGIN_SOCIAL_LOCAL_HTTPS.md).",
+            "error"
+          );
+          btn.disabled = false;
+          return;
+        }
+        FB.login(onFacebookLoginResponse, { scope: "email,public_profile" });
+      });
+    </script>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/es_ES/sdk.js"></script>
+  </body>
+</html>

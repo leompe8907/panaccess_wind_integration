@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba: Login con Facebook (REST API)</title>
+    <script>
+        // Cargamos el SDK de Facebook de forma dinámica
+        window.fbAsyncInit = function () {
+            FB.init({
+                appId: '{{ facebook_app_id }}',
+                cookie: true,
+                xfbml: false,
+                version: 'v20.0'
+            });
+        };
+    </script>
+    <script async defer crossorigin="anonymous"
+            src="https://connect.facebook.net/es_ES/sdk.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; text-align: center; }
+        p { color: #666; margin-bottom: 1.5rem; text-align: center; }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+        #response-container {
+            margin-top: 2rem;
+            width: 100%;
+            display: none;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .success { color: #0f9d58; }
+        .error { color: #d23f31; }
+        button {
+            padding: 0.7rem 1.2rem;
+            border-radius: 8px;
+            border: 0;
+            background: #1877f2;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+<h1>Prueba: API REST Facebook Login</h1>
+<p>
+    Esta página hace un login con Facebook (SDK JS) y envía el token al backend en
+    <code>/wind/auth/facebook/</code>.
+</p>
+
+<div class="container">
+    <button id="fb-login-btn" onclick="loginWithFacebook()" type="button">
+        Iniciar sesión con Facebook
+    </button>
+
+    <div id="response-container">
+        <div class="status" id="status-text">Cargando respuesta del backend...</div>
+        <pre id="json-result"></pre>
+    </div>
+</div>
+
+<script>
+    async function loginWithFacebook() {
+        const btn = document.getElementById('fb-login-btn');
+        btn.disabled = true;
+
+        const container = document.getElementById('response-container');
+        const statusText = document.getElementById('status-text');
+        const jsonResult = document.getElementById('json-result');
+
+        container.style.display = 'block';
+        statusText.textContent = 'Abriendo Facebook...';
+        statusText.className = 'status';
+        jsonResult.textContent = 'Procesando...';
+
+        FB.login(function (response) {
+            if (!response || !response.authResponse) {
+                statusText.textContent = 'Login cancelado o sin permisos';
+                statusText.className = 'status error';
+                jsonResult.textContent = JSON.stringify(response, null, 2);
+                btn.disabled = false;
+                return;
+            }
+
+            const accessToken = response.authResponse.accessToken;
+            console.log("Access Token de Facebook obtenido:", accessToken);
+
+            statusText.textContent = 'Enviando token al backend Django...';
+            statusText.className = 'status';
+            jsonResult.textContent = 'Procesando...';
+
+            fetch('/wind/auth/facebook/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ access_token: accessToken })
+            })
+            .then(async res => {
+                if (!res.ok) {
+                    statusText.textContent = 'Error HTTP: ' + res.status;
+                    statusText.className = 'status error';
+                } else {
+                    statusText.textContent = '¡Éxito! Respuesta recibida:';
+                    statusText.className = 'status success';
+                }
+
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    return res.json();
+                }
+
+                const text = await res.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return { error: res.status, body: text.slice(0, 500) };
+                }
+            })
+            .then(data => {
+                jsonResult.textContent = typeof data === 'object'
+                    ? JSON.stringify(data, null, 4)
+                    : String(data);
+                btn.disabled = false;
+            })
+            .catch(error => {
+                statusText.textContent = 'Error de red';
+                statusText.className = 'status error';
+                jsonResult.textContent = String(error);
+                console.error('Error:', error);
+                btn.disabled = false;
+            });
+        }, { scope: 'email,public_profile' });
+    }
+</script>
+
+</body>
+</html>

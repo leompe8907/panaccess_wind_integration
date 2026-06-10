@@ -1,0 +1,222 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prueba suscriptor | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}" />
+    <style>
+      .test-wrap { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+      .test-panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .test-row {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--line-2);
+        font-size: 14px;
+      }
+      .test-row:last-child { border-bottom: none; }
+      .test-key { color: var(--muted); font-family: monospace; }
+      .test-val { font-weight: 600; word-break: break-all; }
+      .test-log {
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 12px;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 280px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .test-err { color: var(--bad); font-weight: 600; }
+      .test-ok { color: var(--ok); font-weight: 600; }
+    </style>
+  </head>
+  <body class="app-body">
+    <div class="test-wrap">
+      <div class="test-panel">
+        <h1 style="margin: 0 0 8px; font-size: 20px">Prueba: datos del suscriptor</h1>
+        <p style="margin: 0 0 16px; color: var(--muted); font-size: 14px">
+          Solo llama a <code>GET /api/v1/profile/me/</code> y muestra <code>subscriber</code>.
+          Abre la consola (F12) para ver los <code>console.log</code> de cada campo.
+        </p>
+        <p id="status" class="test-ok">Iniciando…</p>
+        <p style="margin: 12px 0">
+          <a href="{% url 'login' %}">Login</a> ·
+          <a href="{% url 'dashboard' %}">Dashboard</a> ·
+          <button type="button" class="app-btn" id="btn-reload">Recargar</button>
+          <button type="button" class="app-btn ghost" id="btn-logout">Cerrar sesión</button>
+        </p>
+      </div>
+
+      <div class="test-panel">
+        <h2 style="margin: 0 0 12px; font-size: 15px">Campos de subscriber</h2>
+        <div id="fields">—</div>
+      </div>
+
+      <div class="test-panel">
+        <h2 style="margin: 0 0 12px; font-size: 15px">Log en pantalla</h2>
+        <pre id="log" class="test-log">(vacío)</pre>
+      </div>
+
+      <div class="test-panel">
+        <h2 style="margin: 0 0 12px; font-size: 15px">JSON crudo</h2>
+        <pre id="raw" class="test-log">(vacío)</pre>
+      </div>
+    </div>
+
+    <script src="{% static 'wind/js/auth-store.js' %}"></script>
+    <script>
+      (function () {
+        var statusEl = document.getElementById("status");
+        var fieldsEl = document.getElementById("fields");
+        var logEl = document.getElementById("log");
+        var rawEl = document.getElementById("raw");
+        var lines = [];
+
+        function log(msg) {
+          var line = "[" + new Date().toLocaleTimeString() + "] " + msg;
+          lines.push(line);
+          console.log(line);
+          logEl.textContent = lines.join("\n");
+        }
+
+        function showError(msg) {
+          statusEl.textContent = msg;
+          statusEl.className = "test-err";
+          log("ERROR: " + msg);
+        }
+
+        function showOk(msg) {
+          statusEl.textContent = msg;
+          statusEl.className = "test-ok";
+          log("OK: " + msg);
+        }
+
+        function renderValue(v) {
+          if (v === null) return "(null)";
+          if (v === undefined) return "(undefined)";
+          if (typeof v === "object") return JSON.stringify(v);
+          return String(v);
+        }
+
+        function renderFields(sub) {
+          var keys = [
+            "code",
+            "firstName",
+            "lastName",
+            "fullName",
+            "emails",
+            "phones",
+            "mobiles",
+            "login1",
+            "login2",
+            "uniqueLogin",
+            "smartcards_count",
+            "smartcard_sns",
+            "countryCode",
+            "regionId",
+            "supervisor",
+            "created",
+            "firstOrderTime",
+            "lastExpiryTime",
+            "newsletterAccepted",
+            "comment",
+            "address",
+            "caf",
+          ];
+          var html = "";
+          var i;
+          for (i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var val = sub[k];
+            log("subscriber." + k + " = " + renderValue(val));
+            html +=
+              '<div class="test-row"><div class="test-key">' +
+              k +
+              '</div><div class="test-val">' +
+              renderValue(val) +
+              "</div></div>";
+          }
+          fieldsEl.innerHTML = html;
+        }
+
+        function run() {
+          lines = [];
+          logEl.textContent = "";
+          fieldsEl.innerHTML = "Cargando…";
+          rawEl.textContent = "(cargando)";
+
+          if (!window.WindAuth || !WindAuth.isLoggedIn()) {
+            showError("No hay JWT. Ve a /wind/login/ e inicia sesión.");
+            window.location.href = "/wind/login/";
+            return;
+          }
+
+          log("Token presente: " + (WindAuth.getAccessToken() ? "sí" : "no"));
+          log("GET /api/v1/profile/me/ …");
+
+          fetch("/api/v1/profile/me/", { headers: WindAuth.authHeaders(false) })
+            .then(function (res) {
+              log("HTTP status = " + res.status);
+              return res.json().then(function (data) {
+                return { res: res, data: data };
+              });
+            })
+            .then(function (out) {
+              rawEl.textContent = JSON.stringify(out.data, null, 2);
+              log("Respuesta completa guardada en #raw");
+
+              if (!out.res.ok) {
+                showError("HTTP " + out.res.ok + " — " + (out.data.message || "error"));
+                return;
+              }
+
+              log("data.success = " + out.data.success);
+
+              if (out.data.profile) {
+                log("AVISO: la respuesta aún trae 'profile' (formato antiguo)");
+                log("profile keys = " + Object.keys(out.data.profile).join(", "));
+              }
+
+              var sub = out.data.subscriber;
+              if (!sub && out.data.profile) {
+                sub = out.data.profile.subscriber;
+                log("subscriber tomado de data.profile.subscriber");
+              }
+
+              if (!sub) {
+                showError("No hay objeto subscriber en la respuesta");
+                return;
+              }
+
+              log("subscriber keys = " + Object.keys(sub).join(", "));
+              showOk("Suscriptor cargado: " + (sub.code || "?"));
+              renderFields(sub);
+            })
+            .catch(function (err) {
+              showError(err.message || String(err));
+              console.error(err);
+            });
+        }
+
+        document.getElementById("btn-reload").addEventListener("click", run);
+        document.getElementById("btn-logout").addEventListener("click", function () {
+          WindAuth.logout();
+          window.location.href = "/wind/login/";
+        });
+
+        run();
+      })();
+    </script>
+  </body>
+</html>

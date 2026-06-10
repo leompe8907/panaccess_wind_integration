@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba: Login con Google (REST API)</title>
+    <!-- Incluimos el nuevo SDK de Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; text-align: center; }
+        p { color: #666; margin-bottom: 1.5rem; text-align: center; }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+        #response-container {
+            margin-top: 2rem;
+            width: 100%;
+            display: none;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .success { color: #0f9d58; }
+        .error { color: #d23f31; }
+    </style>
+</head>
+<body>
+    <h1>Prueba: API REST Google Login</h1>
+    <p>Esta página simula lo que haría tu frontend (Angular/React). Obtendrá un Token de Google y lo enviará por POST a <code>/wind/auth/google/</code>.</p>
+
+    <div class="container">
+        <!-- Contenedor donde Google renderizará el botón -->
+        <div id="g_id_onload"
+             data-client_id="{{ google_client_id }}"
+             data-context="signin"
+             data-ux_mode="popup"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left">
+        </div>
+
+        <div id="response-container">
+            <div class="status" id="status-text">Cargando respuesta del backend...</div>
+            <pre id="json-result"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Esta función es llamada automáticamente por Google cuando el usuario se loguea exitosamente en el popup
+        function handleCredentialResponse(response) {
+            console.log("Token JWT de Google obtenido:", response.credential);
+            
+            const container = document.getElementById('response-container');
+            const statusText = document.getElementById('status-text');
+            const jsonResult = document.getElementById('json-result');
+            
+            container.style.display = 'block';
+            statusText.textContent = 'Enviando token al backend Django...';
+            statusText.className = 'status';
+            jsonResult.textContent = 'Procesando...';
+
+            // Enviamos el token al endpoint de Django usando fetch
+            fetch('/wind/auth/google/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Si tienes protección CSRF, podrías necesitar enviarlo aquí
+                },
+                body: JSON.stringify({
+                    // dj-rest-auth acepta el JWT de Google bajo el nombre 'access_token' o 'id_token'
+                    access_token: response.credential 
+                })
+            })
+            .then(async res => {
+                if (!res.ok) {
+                    statusText.textContent = 'Error HTTP: ' + res.status;
+                    statusText.className = 'status error';
+                } else {
+                    statusText.textContent = '¡Éxito! Respuesta recibida:';
+                    statusText.className = 'status success';
+                }
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    return res.json();
+                }
+                const text = await res.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return { error: res.status, body: text.slice(0, 500) };
+                }
+            })
+            .then(data => {
+                jsonResult.textContent = typeof data === 'object'
+                    ? JSON.stringify(data, null, 4)
+                    : String(data);
+            })
+            .catch(error => {
+                statusText.textContent = 'Error de red';
+                statusText.className = 'status error';
+                jsonResult.textContent = String(error);
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

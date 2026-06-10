@@ -449,3 +449,82 @@ INFO 2026-06-09 21:04:56,054 tasks 5212 5424 Enviando email de verificación a j
 INFO 2026-06-09 21:04:56,065 tasks 5212 5424 Email enviado exitosamente a john.doe@example.com
 INFO 2026-06-09 21:12:57,022 log_buffer 3404 16252 LogBuffer flush thread started (interval=5s, batch_size=100)
 INFO 2026-06-09 21:13:08,481 log_buffer 10524 25108 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:16:43,900 apps 21556 23636 Inicializando PanAccess singleton...
+WARNING 2026-06-09 21:17:04,019 panaccess_session_store 21556 23636 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+WARNING 2026-06-09 21:17:22,299 panaccess_session_store 21556 23636 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:17:22,300 panaccess_singleton 21556 23636 No hay sesión, autenticando...
+INFO 2026-06-09 21:17:22,301 panaccess_singleton 21556 23636 Intento login #1/5
+INFO 2026-06-09 21:17:22,301 panaccess_auth 21556 23636 Iniciando login
+INFO 2026-06-09 21:17:25,592 panaccess_auth 21556 23636 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-09 21:17:25,594 panaccess_singleton 21556 23636 Login exitoso
+WARNING 2026-06-09 21:17:45,119 panaccess_session_store 21556 23636 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-09 21:17:45,119 panaccess_singleton 21556 23636 PanAccess inicializado y autenticado
+INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 14172 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 23636 Thread de validación periódica iniciado
+INFO 2026-06-09 21:17:45,173 autoreload 21556 23636 Watching for file changes with StatReloader
+INFO 2026-06-09 21:17:45,389 log_buffer 21556 28320 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:17:45,586 server 21556 28320 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-09 21:17:45,588 server 21556 28320 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-09 21:17:45,589 server 21556 28320 Listening on TCP address 127.0.0.1:8000
+WARNING 2026-06-09 21:17:58,098 runserver 21556 28320 [33mHTTP GET / 404 [0.04, 127.0.0.1:50256][0m
+WARNING 2026-06-09 21:17:58,368 runserver 21556 28320 [33mHTTP GET /favicon.ico 404 [0.01, 127.0.0.1:50256][0m
+INFO 2026-06-09 21:18:13,156 runserver 21556 28320 [32mHTTP GET /health 301 [0.01, 127.0.0.1:50256][0m
+ERROR 2026-06-09 21:18:17,259 runserver 21556 28320 [35;1mHTTP GET /health/ 503 [4.09, 127.0.0.1:50256][0m
+ERROR 2026-06-09 21:18:39,445 runserver 21556 28320 [35;1mHTTP GET /ready/ 503 [4.10, 127.0.0.1:50256][0m
+WARNING 2026-06-09 21:19:17,011 runserver 21556 28320 [33mHTTP GET /api/auth/ 404 [0.01, 127.0.0.1:50256][0m
+ERROR 2026-06-09 21:19:49,726 runserver 21556 28320 [35;1mHTTP GET /api/auth/registration/ 500 [4.16, 127.0.0.1:50256][0m
+ERROR 2026-06-09 21:20:10,067 runserver 21556 28320 [35;1mHTTP GET /api/auth/registration/ 500 [4.13, 127.0.0.1:50256][0m
+WARNING 2026-06-09 21:20:29,103 runserver 21556 28320 [33mHTTP GET /api/v1/ 404 [0.02, 127.0.0.1:50256][0m
+ERROR 2026-06-09 21:20:41,832 runserver 21556 28320 [35;1mHTTP GET /wind/ 500 [0.11, 127.0.0.1:50256][0m
+INFO 2026-06-09 21:24:47,827 log_buffer 25772 8172 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:24:51,096 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:24:51,096 create_subscriber 25772 8172 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:24:51,108 create_subscriber 25772 8172 Validando código proporcionado: '40200000000'
+WARNING 2026-06-09 21:24:51,110 email_validation 25772 8172 Intento de registro duplicado con documento 40200000000
+WARNING 2026-06-09 21:24:51,110 create_subscriber 25772 8172 Documento '40200000000' no válido según SubscriberDocumentRegistry
+INFO 2026-06-09 21:24:51,111 email_validation 25772 8172 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:24:51,111 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:24:51,112 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Validando email normalizado: 'duplicate@example.com'
+INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:24:51,147 email_validation 25772 8172 Documento 40212345678 no registrado previamente, permitiendo registro
+WARNING 2026-06-09 21:24:51,150 email_validation 25772 8172 Intento de registro duplicado con email duplicate@example.com
+INFO 2026-06-09 21:24:51,150 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
+WARNING 2026-06-09 21:24:51,150 create_subscriber 25772 8172 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
+INFO 2026-06-09 21:24:51,151 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
+INFO 2026-06-09 21:24:51,190 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
+INFO 2026-06-09 21:24:51,191 create_subscriber 25772 8172 Validando email normalizado: 'john.doe@example.com'
+INFO 2026-06-09 21:24:51,191 create_subscriber 25772 8172 Validando código proporcionado: '40212345678'
+INFO 2026-06-09 21:24:51,192 email_validation 25772 8172 Documento 40212345678 no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:24:51,193 email_validation 25772 8172 Email john.doe@example.com no registrado previamente, permitiendo registro
+INFO 2026-06-09 21:24:51,193 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
+INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Usando código proporcionado: 40212345678
+INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Creando suscriptor: 40212345678
+INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
+WARNING 2026-06-09 21:24:51,195 create_subscriber 25772 8172 Código retornado (10001) difiere del enviado (40212345678)
+INFO 2026-06-09 21:24:51,195 create_subscriber 25772 8172 Suscriptor 10001 creado exitosamente
+INFO 2026-06-09 21:24:51,195 create_subscriber 25772 8172 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
+INFO 2026-06-09 21:24:51,196 create_subscriber 25772 8172 [DB] Suscriptor 10001 encontrado en PanAccess
+INFO 2026-06-09 21:24:51,196 create_subscriber 25772 8172 [DB] Encontradas 2 smartcards asociadas
+INFO 2026-06-09 21:24:51,206 create_subscriber 25772 8172 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
+INFO 2026-06-09 21:24:51,208 create_subscriber 25772 8172 Registro de email creado: john.doe@example.com -> 10001
+INFO 2026-06-09 21:24:51,212 create_subscriber 25772 8172 Registro de documento creado: 10001 -> john.doe@example.com
+INFO 2026-06-09 21:24:51,213 create_subscriber 25772 8172 Agregando email john.doe@example.com al suscriptor 10001
+ERROR 2026-06-09 21:24:51,213 create_subscriber 25772 8172 Error al agregar email: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:24:51,214 create_subscriber 25772 8172 Agregando teléfono +18095551234 al suscriptor 10001
+ERROR 2026-06-09 21:24:51,215 create_subscriber 25772 8172 Error al agregar teléfono: Mock error for addContactToSubscriber
+INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
+INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
+INFO 2026-06-09 21:24:51,216 create_subscriber 25772 8172 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
+INFO 2026-06-09 21:24:51,216 create_subscriber 25772 8172 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
+INFO 2026-06-09 21:24:51,218 create_subscriber 25772 8172 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
+INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Iniciando proceso para agregar productos a 2 smartcards
+INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Agregando producto 4639 a 2 smartcards
+INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Fecha de expiración: 2026-07-10 00:24:51 (30 días desde creación)
+INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Respuesta recibida - success=True
+INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Producto 4639 agregado exitosamente a 2 smartcards
+INFO 2026-06-09 21:24:51,363 tasks 25772 8172 Enviando email de verificación a john.doe@example.com
+INFO 2026-06-09 21:24:51,376 tasks 25772 8172 Email enviado exitosamente a john.doe@example.com

@@ -1,0 +1,476 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mi cuenta | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}" />
+  </head>
+  <body class="app-body">
+    <div class="app-wrap dash-page">
+      <div class="app-card wide dash-shell">
+        <header class="app-header dash-header">
+          <div class="app-brand">
+            <div class="app-logo" aria-hidden="true"></div>
+            <div>
+              <h1>Mi cuenta</h1>
+              <p id="user-greeting" class="dash-greeting">Cargando…</p>
+            </div>
+          </div>
+          <button type="button" class="app-btn ghost" id="btn-logout">Cerrar sesión</button>
+        </header>
+
+        <div class="app-content dash-content">
+          <section class="dash-account module-card" id="account-panel">
+            <p id="account-status" class="account-status" hidden></p>
+
+            <div class="account-layout">
+              <div class="account-column">
+                <h3 class="account-section-title">Tu cuenta</h3>
+                <div class="account-block account-summary">
+              <p class="account-line">
+                <span class="account-line-label">Código de suscriptor:</span>
+                <span id="field-code" class="account-line-value">—</span>
+              </p>
+              <div class="account-line-row">
+                <p class="account-line">
+                  <span class="account-line-label">Nombre:</span>
+                  <span id="field-name" class="account-line-value">—</span>
+                </p>
+                <p class="account-line">
+                  <span class="account-line-label">Correo:</span>
+                  <span id="field-email" class="account-line-value">—</span>
+                </p>
+              </div>
+                </div>
+              </div>
+
+              <div class="account-column">
+                <h3 class="account-section-title">Detalles de la cuenta</h3>
+                <div class="account-block account-details-block">
+              <p class="account-line">
+                <span class="account-line-label">Usuario de acceso:</span>
+                <span id="field-login1" class="account-line-value">—</span>
+              </p>
+              <p class="account-line">
+                <span class="account-line-label">Usuario de acceso alternativo:</span>
+                <span id="field-login2" class="account-line-value">—</span>
+              </p>
+              <p class="account-line">
+                <span class="account-line-label">Número de pantallas:</span>
+                <span id="field-screens" class="account-line-value">—</span>
+              </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="dash-module module-card" id="password-module" hidden>
+            <h3 class="account-section-title">Cambiar contraseña</h3>
+            <p class="module-desc">
+              Se actualizará la contraseña de acceso en PanAccess para tu suscriptor.
+            </p>
+            <form id="password-form" class="app-form password-form" novalidate>
+              <div class="app-field">
+                <label for="new-password">Nueva contraseña</label>
+                <input
+                  id="new-password"
+                  name="newPass"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="4"
+                  required
+                />
+              </div>
+              <div class="app-field">
+                <label for="confirm-password">Confirmar contraseña</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="4"
+                  required
+                />
+              </div>
+              <p id="password-msg" class="app-alert" role="status"></p>
+              <button type="submit" class="app-btn primary" id="btn-password-submit">
+                Actualizar contraseña
+              </button>
+            </form>
+          </section>
+
+          <section class="dash-module module-card" id="products-module" hidden>
+            <h3 class="account-section-title">Productos y pantallas</h3>
+            <p class="module-desc">Smartcards vinculadas a tu suscriptor y productos activos en cada una.</p>
+            <p id="products-status" class="app-alert" role="status"></p>
+            <div id="products-list" class="products-list">
+              <p class="products-placeholder">Cargando productos…</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="password-confirm-modal" class="dash-modal" hidden aria-hidden="true">
+      <div class="dash-modal-backdrop" data-modal-close></div>
+      <div class="dash-modal-card" role="dialog" aria-labelledby="pwd-modal-title" aria-modal="true">
+        <h3 id="pwd-modal-title" class="account-section-title">¿Cambiar contraseña?</h3>
+        <p class="dash-modal-text">
+          Se actualizará la contraseña de acceso en PanAccess para tu cuenta. ¿Deseas continuar?
+        </p>
+        <div class="dash-modal-actions">
+          <button type="button" class="app-btn ghost" id="pwd-modal-cancel">Cancelar</button>
+          <button type="button" class="app-btn primary" id="pwd-modal-confirm">Sí, cambiar contraseña</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="{% static 'wind/js/auth-store.js' %}"></script>
+    <script>
+      (function () {
+        var greetingEl = document.getElementById("user-greeting");
+        var statusEl = document.getElementById("account-status");
+        var panelEl = document.getElementById("account-panel");
+        var subscriberCode = null;
+        var fieldEls = {
+          code: document.getElementById("field-code"),
+          name: document.getElementById("field-name"),
+          email: document.getElementById("field-email"),
+          login1: document.getElementById("field-login1"),
+          login2: document.getElementById("field-login2"),
+          screens: document.getElementById("field-screens"),
+        };
+        var passwordModule = document.getElementById("password-module");
+        var passwordForm = document.getElementById("password-form");
+        var newPasswordInput = document.getElementById("new-password");
+        var confirmPasswordInput = document.getElementById("confirm-password");
+        var passwordMsg = document.getElementById("password-msg");
+        var passwordSubmitBtn = document.getElementById("btn-password-submit");
+        var passwordModal = document.getElementById("password-confirm-modal");
+        var passwordModalConfirm = document.getElementById("pwd-modal-confirm");
+        var passwordModalCancel = document.getElementById("pwd-modal-cancel");
+        var pendingNewPassword = null;
+        var productsModule = document.getElementById("products-module");
+        var productsList = document.getElementById("products-list");
+        var productsStatus = document.getElementById("products-status");
+
+        function escapeHtml(text) {
+          return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
+        function displayName(sub) {
+          var first = sub.firstName || "";
+          var last = sub.lastName || "";
+          var combined = (first + " " + last).trim();
+          return combined || sub.fullName || "";
+        }
+
+        function displayValue(value) {
+          if (value === null || value === undefined || value === "") return "—";
+          return String(value);
+        }
+
+        function setField(el, value) {
+          if (el) el.textContent = displayValue(value);
+        }
+
+        function setLoading(loading) {
+          if (panelEl) panelEl.classList.toggle("is-loading", loading);
+        }
+
+        function getSubscriber(data) {
+          if (data.subscriber) return data.subscriber;
+          if (data.profile && data.profile.subscriber) return data.profile.subscriber;
+          return null;
+        }
+
+        function renderAccount(sub) {
+          var name = displayName(sub);
+
+          subscriberCode = sub.code ? String(sub.code) : null;
+          greetingEl.textContent = "Hola, " + (name || "usuario");
+          setField(fieldEls.code, sub.code);
+          setField(fieldEls.name, name);
+          setField(fieldEls.email, sub.emails);
+          setField(fieldEls.login1, sub.login1);
+          setField(fieldEls.login2, sub.login2);
+          setField(fieldEls.screens, sub.smartcards_count);
+
+          if (passwordModule) {
+            passwordModule.hidden = !subscriberCode;
+          }
+          if (productsModule) {
+            productsModule.hidden = !subscriberCode;
+          }
+          if (subscriberCode) {
+            loadProducts();
+          }
+        }
+
+        function showProductsMsg(text, type) {
+          if (!productsStatus) return;
+          productsStatus.textContent = text;
+          productsStatus.className = "app-alert show " + (type || "error");
+        }
+
+        function clearProductsMsg() {
+          if (!productsStatus) return;
+          productsStatus.textContent = "";
+          productsStatus.className = "app-alert";
+        }
+
+        function renderProducts(data) {
+          if (!productsList) return;
+          clearProductsMsg();
+
+          var cards = data.smartcards || [];
+          if (!cards.length) {
+            productsList.innerHTML =
+              '<p class="products-placeholder">No hay pantallas registradas para tu suscriptor.</p>';
+            return;
+          }
+
+          var html = "";
+          var i;
+          for (i = 0; i < cards.length; i++) {
+            var card = cards[i];
+            var title = card.alias || card.sn || "Pantalla";
+            var meta = [];
+            if (card.sn) meta.push("SN: " + card.sn);
+            if (card.stbModel) meta.push(card.stbModel);
+            if (card.disabled) meta.push("Deshabilitada");
+            if (card.blacklisted) meta.push("En lista negra");
+            if (card.pending_sync) meta.push("Sincronización pendiente");
+
+            html += '<article class="smartcard-card">';
+            html += '<header class="smartcard-card-header">';
+            html += "<h4>" + escapeHtml(title) + "</h4>";
+            if (meta.length) {
+              html += '<p class="smartcard-meta">' + escapeHtml(meta.join(" · ")) + "</p>";
+            }
+            html += "</header>";
+
+            var products = card.products || [];
+            if (!products.length) {
+              html += '<p class="products-empty">Sin productos asociados.</p>';
+            } else {
+              html += '<ul class="product-items">';
+              var j;
+              for (j = 0; j < products.length; j++) {
+                var prod = products[j];
+                var prodName = prod.name || ("Producto " + (prod.productId || j + 1));
+                html += "<li>";
+                html += "<strong>" + escapeHtml(prodName) + "</strong>";
+                if (prod.description) {
+                  html += '<span class="product-desc">' + escapeHtml(prod.description) + "</span>";
+                }
+                html += "</li>";
+              }
+              html += "</ul>";
+            }
+            html += "</article>";
+          }
+
+          productsList.innerHTML = html;
+        }
+
+        function loadProducts() {
+          if (!subscriberCode || !productsList) return;
+
+          productsList.innerHTML = '<p class="products-placeholder">Cargando productos…</p>';
+
+          WindAuth.fetchApi("/api/v1/profile/products/", { method: "GET" })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok || !out.data.success) {
+                throw new Error(out.data.message || "No se pudieron cargar los productos");
+              }
+              renderProducts(out.data);
+            })
+            .catch(function (err) {
+              productsList.innerHTML = "";
+              showProductsMsg(err.message || "Error al cargar productos", "error");
+            });
+        }
+
+        function showPasswordMsg(text, type) {
+          if (!passwordMsg) return;
+          passwordMsg.textContent = text;
+          passwordMsg.className = "app-alert show " + (type || "error");
+        }
+
+        function clearPasswordMsg() {
+          if (!passwordMsg) return;
+          passwordMsg.textContent = "";
+          passwordMsg.className = "app-alert";
+        }
+
+        function openPasswordModal() {
+          if (!passwordModal) return;
+          passwordModal.hidden = false;
+          passwordModal.setAttribute("aria-hidden", "false");
+        }
+
+        function closePasswordModal() {
+          if (!passwordModal) return;
+          passwordModal.hidden = true;
+          passwordModal.setAttribute("aria-hidden", "true");
+          pendingNewPassword = null;
+        }
+
+        function submitPasswordChange() {
+          if (!subscriberCode || !pendingNewPassword) {
+            showPasswordMsg("No se pudo identificar tu suscriptor.", "error");
+            return;
+          }
+
+          clearPasswordMsg();
+          if (passwordSubmitBtn) passwordSubmitBtn.disabled = true;
+          if (passwordModalConfirm) passwordModalConfirm.disabled = true;
+
+          WindAuth.fetchApi("/api/v1/profile/password/", {
+            method: "POST",
+            body: JSON.stringify({
+              code: subscriberCode,
+              newPass: pendingNewPassword,
+            }),
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok || !out.data.success) {
+                var errMsg =
+                  out.data.message ||
+                  (out.data.errors && JSON.stringify(out.data.errors)) ||
+                  "No se pudo actualizar la contraseña";
+                throw new Error(errMsg);
+              }
+              closePasswordModal();
+              if (passwordForm) passwordForm.reset();
+              showPasswordMsg(out.data.message || "Contraseña actualizada correctamente.", "success");
+            })
+            .catch(function (err) {
+              showPasswordMsg(err.message || "Error al cambiar la contraseña", "error");
+            })
+            .finally(function () {
+              pendingNewPassword = null;
+              if (passwordSubmitBtn) passwordSubmitBtn.disabled = false;
+              if (passwordModalConfirm) passwordModalConfirm.disabled = false;
+            });
+        }
+
+        function showError(msg) {
+          greetingEl.textContent = "Error";
+          statusEl.hidden = false;
+          statusEl.textContent = msg;
+          statusEl.className = "account-status account-status-error";
+        }
+
+        function loadAccount() {
+          if (!window.WindAuth || !WindAuth.isLoggedIn()) {
+            window.location.href = "/wind/login/";
+            return;
+          }
+
+          setLoading(true);
+
+          fetch("/api/v1/profile/me/", { headers: WindAuth.authHeaders(false) })
+            .then(function (res) {
+              if (res.status === 401) {
+                WindAuth.logout();
+                window.location.href = "/wind/login/?session=expired";
+                throw new Error("Sesión expirada");
+              }
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok || !out.data.success) {
+                throw new Error(out.data.message || "No se pudo cargar la cuenta");
+              }
+              var sub = getSubscriber(out.data);
+              if (!sub) {
+                throw new Error("La API no devolvió subscriber");
+              }
+              statusEl.hidden = true;
+              renderAccount(sub);
+              setLoading(false);
+            })
+            .catch(function (err) {
+              showError(err.message || "Error al cargar");
+              setLoading(false);
+            });
+        }
+
+        document.getElementById("btn-logout").addEventListener("click", function () {
+          WindAuth.logout();
+          window.location.href = "/wind/login/";
+        });
+
+        if (passwordForm) {
+          passwordForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            clearPasswordMsg();
+
+            if (!subscriberCode) {
+              showPasswordMsg("Espera a que cargue tu cuenta.", "error");
+              return;
+            }
+
+            var newPass = newPasswordInput ? newPasswordInput.value : "";
+            var confirmPass = confirmPasswordInput ? confirmPasswordInput.value : "";
+
+            if (!newPass || newPass.length < 4) {
+              showPasswordMsg("La contraseña debe tener al menos 4 caracteres.", "error");
+              return;
+            }
+            if (newPass !== confirmPass) {
+              showPasswordMsg("Las contraseñas no coinciden.", "error");
+              return;
+            }
+
+            pendingNewPassword = newPass;
+            openPasswordModal();
+          });
+        }
+
+        if (passwordModalConfirm) {
+          passwordModalConfirm.addEventListener("click", function () {
+            submitPasswordChange();
+          });
+        }
+
+        if (passwordModalCancel) {
+          passwordModalCancel.addEventListener("click", closePasswordModal);
+        }
+
+        if (passwordModal) {
+          passwordModal.querySelectorAll("[data-modal-close]").forEach(function (el) {
+            el.addEventListener("click", closePasswordModal);
+          });
+        }
+
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && passwordModal && !passwordModal.hidden) {
+            closePasswordModal();
+          }
+        });
+
+        loadAccount();
+      })();
+    </script>
+  </body>
+</html>
