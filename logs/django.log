@@ -447,3 +447,5 @@ INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Respuesta re
 INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Producto 4639 agregado exitosamente a 2 smartcards
 INFO 2026-06-09 21:04:56,054 tasks 5212 5424 Enviando email de verificación a john.doe@example.com
 INFO 2026-06-09 21:04:56,065 tasks 5212 5424 Email enviado exitosamente a john.doe@example.com
+INFO 2026-06-09 21:12:57,022 log_buffer 3404 16252 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-09 21:13:08,481 log_buffer 10524 25108 LogBuffer flush thread started (interval=5s, batch_size=100)

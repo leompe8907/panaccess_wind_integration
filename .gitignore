@@ -1,0 +1,126 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+*.cover
+*.py,cover
+.hypothesis/
+nosetests.xml
+coverage.xml
+
+# =============================================================================
+# Entornos virtuales
+# =============================================================================
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# =============================================================================
+# Django
+# =============================================================================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+staticfiles/
+
+# Migraciones locales opcionales (descomenta si no quieres versionar migraciones)
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# =============================================================================
+# Secretos y configuración local
+# =============================================================================
+.env
+.env.*
+!.env.example
+
+# =============================================================================
+# Logs del proyecto
+# =============================================================================
+logs/
+*.log
+
+# =============================================================================
+# Celery
+# =============================================================================
+celerybeat-schedule
+celerybeat.pid
+
+# =============================================================================
+# Redis / caché local
+# =============================================================================
+dump.rdb
+
+# =============================================================================
+# IDEs y editores
+# =============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# Sistema operativo
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# =============================================================================
+# Herramientas / CI local
+# =============================================================================
+.sentry-cli
+*.pem
+*.key
+*.p12
