@@ -17,6 +17,40 @@ from wind.exceptions import PanAccessException
 
 logger = logging.getLogger(__name__)
 
+_CHAR_FIELD_MAX_LENGTHS: dict[str, int] | None = None
+
+
+def _smartcard_char_max_lengths() -> dict[str, int]:
+    global _CHAR_FIELD_MAX_LENGTHS
+    if _CHAR_FIELD_MAX_LENGTHS is None:
+        _CHAR_FIELD_MAX_LENGTHS = {
+            f.name: f.max_length
+            for f in ListOfSmartcards._meta.get_fields()
+            if getattr(f, "max_length", None)
+        }
+    return _CHAR_FIELD_MAX_LENGTHS
+
+
+def normalize_smartcard_row(item: dict) -> dict:
+    """Filtra campos del modelo y trunca strings que excedan max_length."""
+    model_fields = {f.name for f in ListOfSmartcards._meta.get_fields()}
+    normalized = {k: v for k, v in item.items() if k in model_fields}
+    for key, max_len in _smartcard_char_max_lengths().items():
+        value = normalized.get(key)
+        if value is None:
+            continue
+        text = str(value)
+        if len(text) > max_len:
+            logger.warning(
+                "Smartcard %s: campo '%s' truncado (%s -> %s caracteres)",
+                normalized.get("sn"),
+                key,
+                len(text),
+                max_len,
+            )
+            normalized[key] = text[:max_len]
+    return normalized
+
 
 def DataBaseEmpty():
     """
@@ -44,14 +78,12 @@ def store_all_smartcards_in_chunks(data_batch, chunk_size=100):
         return
     logger.info(f"Almacenando {total} smartcards")
     
-    model_fields = {f.name for f in ListOfSmartcards._meta.get_fields()}
-    
     for i in range(0, total, chunk_size):
         chunk = data_batch[i:i + chunk_size]
         try:
             registros = []
             for item in chunk:
-                filtered_item = {k: v for k, v in item.items() if k in model_fields}
+                filtered_item = normalize_smartcard_row(item)
                 if filtered_item.get('sn'):
                     registros.append(ListOfSmartcards(**filtered_item))
             
@@ -141,7 +173,6 @@ def _update_smartcard_from_remote(local_obj, remote: dict) -> list[str]:
 
 def compare_and_update_all_smartcards(session_id=None, limit=100):
     logger.info("Reconciliando smartcards desde PanAccess")
-    model_fields = _smartcard_model_fields()
     local_data = {
         obj.sn: obj
         for obj in ListOfSmartcards.objects.exclude(sn__isnull=True).exclude(sn="")
@@ -166,6 +197,7 @@ def compare_and_update_all_smartcards(session_id=None, limit=100):
         for remote in remote_list:
             if not isinstance(remote, dict):
                 continue
+            remote = normalize_smartcard_row(remote)
             sn = remote.get("sn")
             if not sn or not str(sn).strip():
                 continue
@@ -181,9 +213,8 @@ def compare_and_update_all_smartcards(session_id=None, limit=100):
                     except Exception as e:
                         logger.error("Error actualizando smartcard SN %s: %s", sn, e)
             else:
-                filtered = {k: v for k, v in remote.items() if k in model_fields}
-                if filtered.get("sn"):
-                    new_rows.append(filtered)
+                if remote.get("sn"):
+                    new_rows.append(remote)
 
         offset += limit
         if remote_total_count and len(remote_sns) >= remote_total_count:

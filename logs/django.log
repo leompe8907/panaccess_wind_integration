@@ -1,564 +1,950 @@
-INFO 2026-06-09 20:35:55,776 log_buffer 19148 5868 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:36:21,045 log_buffer 4888 21172 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:36:44,426 log_buffer 10088 8448 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:37:23,155 log_buffer 9164 27308 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:37:46,353 log_buffer 14028 11364 LogBuffer flush thread started (interval=5s, batch_size=100)
-ERROR 2026-06-09 20:38:11,638 websocket_utils 14028 11364 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
-    sock = self._connect()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
-    raise err
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
-    sock.connect(socket_address)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
-ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+INFO 2026-06-10 09:31:01,070 log_buffer 9596 8844 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:31:18,551 log_buffer 18704 9960 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:31:45,166 apps 19992 23464 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:31:45,377 panaccess_singleton 19992 23464 No hay sesión, autenticando...
+INFO 2026-06-10 09:31:45,380 panaccess_singleton 19992 23464 Intento login #1/5
+INFO 2026-06-10 09:31:45,381 panaccess_auth 19992 23464 Iniciando login
+INFO 2026-06-10 09:31:46,901 panaccess_auth 19992 23464 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-10 09:31:46,903 panaccess_singleton 19992 23464 Login exitoso
+INFO 2026-06-10 09:31:46,918 panaccess_singleton 19992 23464 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:31:46,920 panaccess_singleton 19992 9300 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:31:46,920 panaccess_singleton 19992 23464 Thread de validación periódica iniciado
+INFO 2026-06-10 09:31:47,007 autoreload 19992 23464 Watching for file changes with StatReloader
+INFO 2026-06-10 09:31:47,304 log_buffer 19992 23464 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:31:47,778 server 19992 8016 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 09:31:47,779 server 19992 8016 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 09:31:47,780 server 19992 8016 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 09:41:34,447 log_buffer 19300 26880 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:44:03,623 log_buffer 6268 444 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:44:07,306 log_buffer 20624 28188 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:44:13,215 log_buffer 21904 6524 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:46:52,356 apps 26856 9836 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:46:52,471 panaccess_singleton 26856 9836 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:46:52,473 panaccess_singleton 26856 4608 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:46:52,473 panaccess_singleton 26856 9836 Thread de validación periódica iniciado
+INFO 2026-06-10 09:46:52,533 autoreload 26856 9836 Watching for file changes with StatReloader
+INFO 2026-06-10 09:46:52,740 log_buffer 26856 9836 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:46:53,047 server 26856 8980 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 09:46:53,048 server 26856 8980 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 09:46:53,050 server 26856 8980 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 09:48:59,500 runserver 26856 8980 [mHTTP POST /api/auth/login/ 200 [2.04, 127.0.0.1:57834][0m
+INFO 2026-06-10 09:50:03,941 runserver 26856 8980 [mHTTP GET /wind/sync-subscribers/ 200 [0.15, 127.0.0.1:57971][0m
+INFO 2026-06-10 09:50:10,854 tasks 26856 24892 [RETRY] [Celery] Iniciando sync_subscribers_task con limit=100
+INFO 2026-06-10 09:50:10,855 getSubscriber 26856 24892 Sincronizando suscriptores
+INFO 2026-06-10 09:50:10,868 panaccess_client 26856 24892 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:12,236 panaccess_client 26856 24892 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 09:50:12,264 panaccess_client 26856 24892 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:13,662 panaccess_client 26856 24892 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 09:50:13,677 panaccess_client 26856 24892 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:14,783 panaccess_client 26856 24892 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 09:50:15,778 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1523564846'}
+INFO 2026-06-10 09:50:15,779 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '125484584584'}
+INFO 2026-06-10 09:50:15,780 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123456'}
+INFO 2026-06-10 09:50:15,781 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'KSTEST2'}
+INFO 2026-06-10 09:50:15,786 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara7'}
+INFO 2026-06-10 09:50:15,782 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara8'}
+INFO 2026-06-10 09:50:15,782 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'LeoTestAire'}
+INFO 2026-06-10 09:50:15,788 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara6'}
+INFO 2026-06-10 09:50:15,790 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'AriChang'}
+INFO 2026-06-10 09:50:15,793 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara5'}
+INFO 2026-06-10 09:50:18,049 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,065 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara3'}
+INFO 2026-06-10 09:50:18,073 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,077 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara2'}
+INFO 2026-06-10 09:50:18,113 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,116 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara'}
+INFO 2026-06-10 09:50:18,129 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,133 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'pela'}
+INFO 2026-06-10 09:50:18,142 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,145 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111158'}
+INFO 2026-06-10 09:50:18,187 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,191 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111157'}
+INFO 2026-06-10 09:50:18,260 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,263 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111156'}
+INFO 2026-06-10 09:50:18,273 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,278 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111155'}
+INFO 2026-06-10 09:50:18,293 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,295 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111154'}
+INFO 2026-06-10 09:50:18,311 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:18,316 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111153'}
+INFO 2026-06-10 09:50:20,073 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,077 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111152'}
+INFO 2026-06-10 09:50:20,100 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,102 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111151'}
+INFO 2026-06-10 09:50:20,105 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,112 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111150'}
+INFO 2026-06-10 09:50:20,138 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,143 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111149'}
+INFO 2026-06-10 09:50:20,169 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,172 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111148'}
+INFO 2026-06-10 09:50:20,471 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,476 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111147'}
+INFO 2026-06-10 09:50:20,485 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,491 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111146'}
+INFO 2026-06-10 09:50:20,505 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,510 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111145'}
+INFO 2026-06-10 09:50:20,512 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,520 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:20,529 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111144'}
+INFO 2026-06-10 09:50:20,535 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111143'}
+INFO 2026-06-10 09:50:21,972 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:21,975 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111142'}
+INFO 2026-06-10 09:50:22,072 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,076 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111141'}
+INFO 2026-06-10 09:50:22,103 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,106 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111140'}
+INFO 2026-06-10 09:50:22,125 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,130 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111139'}
+INFO 2026-06-10 09:50:22,185 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,188 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111138'}
+INFO 2026-06-10 09:50:22,580 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,584 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111137'}
+INFO 2026-06-10 09:50:22,620 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,625 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111136'}
+INFO 2026-06-10 09:50:22,714 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,718 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111135'}
+INFO 2026-06-10 09:50:22,733 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,738 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111134'}
+INFO 2026-06-10 09:50:22,742 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:22,758 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111133'}
+INFO 2026-06-10 09:50:23,480 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:23,486 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111132'}
+INFO 2026-06-10 09:50:24,063 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,069 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111131'}
+INFO 2026-06-10 09:50:24,196 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,198 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111130'}
+INFO 2026-06-10 09:50:24,213 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,217 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111129'}
+INFO 2026-06-10 09:50:24,460 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,465 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111128'}
+INFO 2026-06-10 09:50:24,590 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,657 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111127'}
+INFO 2026-06-10 09:50:24,869 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,872 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111126'}
+INFO 2026-06-10 09:50:24,874 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,879 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111125'}
+INFO 2026-06-10 09:50:24,884 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,891 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111124'}
+INFO 2026-06-10 09:50:24,896 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:24,905 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111123'}
+INFO 2026-06-10 09:50:25,029 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:25,034 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111122'}
+INFO 2026-06-10 09:50:25,880 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:25,885 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111121'}
+INFO 2026-06-10 09:50:26,162 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:26,173 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111120'}
+INFO 2026-06-10 09:50:26,230 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:26,240 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111119'}
+INFO 2026-06-10 09:50:26,434 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:26,437 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111118'}
+INFO 2026-06-10 09:50:26,812 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:26,817 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111117'}
+INFO 2026-06-10 09:50:27,012 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,016 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111116'}
+INFO 2026-06-10 09:50:27,030 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,032 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,044 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,048 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111115'}
+INFO 2026-06-10 09:50:27,057 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '9'}
+INFO 2026-06-10 09:50:27,058 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,062 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '8'}
+INFO 2026-06-10 09:50:27,074 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '347'}
+INFO 2026-06-10 09:50:27,673 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:27,682 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '342'}
+INFO 2026-06-10 09:50:28,075 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:28,081 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '341'}
+INFO 2026-06-10 09:50:28,114 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:28,126 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '340'}
+INFO 2026-06-10 09:50:28,472 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:28,476 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '339'}
+INFO 2026-06-10 09:50:28,855 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:28,864 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '338'}
+INFO 2026-06-10 09:50:29,601 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,606 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '337'}
+INFO 2026-06-10 09:50:29,729 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,733 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '336'}
+INFO 2026-06-10 09:50:29,937 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,940 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '335'}
+INFO 2026-06-10 09:50:29,946 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,950 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '334'}
+INFO 2026-06-10 09:50:29,966 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,967 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:29,974 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '333'}
+INFO 2026-06-10 09:50:29,976 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '332'}
+INFO 2026-06-10 09:50:30,010 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:30,013 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '331'}
+INFO 2026-06-10 09:50:30,044 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:30,049 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '330'}
+INFO 2026-06-10 09:50:30,280 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:30,287 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111114'}
+INFO 2026-06-10 09:50:30,503 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:30,511 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '321'}
+INFO 2026-06-10 09:50:31,803 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:31,810 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '302'}
+INFO 2026-06-10 09:50:32,102 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,106 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '297'}
+INFO 2026-06-10 09:50:32,136 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,139 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111113'}
+INFO 2026-06-10 09:50:32,145 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,148 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111112'}
+INFO 2026-06-10 09:50:32,220 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,224 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '2560'}
+INFO 2026-06-10 09:50:32,407 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,411 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111111'}
+INFO 2026-06-10 09:50:32,418 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,426 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,431 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'test'}
+INFO 2026-06-10 09:50:32,437 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,439 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '4444'}
+INFO 2026-06-10 09:50:32,446 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'Gonzalo'}
+INFO 2026-06-10 09:50:32,514 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:32,528 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MDP'}
+INFO 2026-06-10 09:50:34,402 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,415 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'CAVS94'}
+INFO 2026-06-10 09:50:34,549 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,553 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST24'}
+INFO 2026-06-10 09:50:34,556 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,569 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST23'}
+INFO 2026-06-10 09:50:34,573 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,595 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST22'}
+INFO 2026-06-10 09:50:34,673 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,679 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST21'}
+INFO 2026-06-10 09:50:34,718 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,724 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST20'}
+INFO 2026-06-10 09:50:34,959 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:34,963 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST19'}
+INFO 2026-06-10 09:50:35,205 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:35,209 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST18'}
+INFO 2026-06-10 09:50:35,272 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:35,278 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST17'}
+INFO 2026-06-10 09:50:35,298 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:35,306 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST16'}
+INFO 2026-06-10 09:50:36,923 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:36,932 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST15'}
+INFO 2026-06-10 09:50:37,208 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,214 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,231 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST14'}
+INFO 2026-06-10 09:50:37,237 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST13'}
+INFO 2026-06-10 09:50:37,261 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,269 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST12'}
+INFO 2026-06-10 09:50:37,287 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,301 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST11'}
+INFO 2026-06-10 09:50:37,329 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,340 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST10'}
+INFO 2026-06-10 09:50:37,701 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:37,705 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST9'}
+INFO 2026-06-10 09:50:38,043 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:38,052 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST8'}
+INFO 2026-06-10 09:50:38,104 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:38,123 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST7'}
+INFO 2026-06-10 09:50:38,125 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:38,135 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST6'}
+INFO 2026-06-10 09:50:39,110 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,118 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST5'}
+INFO 2026-06-10 09:50:39,663 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,672 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST4'}
+INFO 2026-06-10 09:50:39,691 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,729 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,734 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,738 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST3'}
+INFO 2026-06-10 09:50:39,742 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST2'}
+INFO 2026-06-10 09:50:39,745 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST1'}
+INFO 2026-06-10 09:50:39,757 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,762 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '152'}
+INFO 2026-06-10 09:50:39,974 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:39,981 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '151'}
+INFO 2026-06-10 09:50:40,572 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:40,590 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '150'}
+INFO 2026-06-10 09:50:40,615 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:40,626 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:40,636 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '149'}
+INFO 2026-06-10 09:50:40,640 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '148'}
+INFO 2026-06-10 09:50:41,719 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:41,736 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '147'}
+INFO 2026-06-10 09:50:42,392 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,397 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '146'}
+INFO 2026-06-10 09:50:42,422 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,437 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '145'}
+INFO 2026-06-10 09:50:42,488 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,503 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '144'}
+INFO 2026-06-10 09:50:42,516 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,523 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,528 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '143'}
+INFO 2026-06-10 09:50:42,537 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '142'}
+INFO 2026-06-10 09:50:42,897 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:42,902 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '141'}
+INFO 2026-06-10 09:50:43,380 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:43,394 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '140'}
+INFO 2026-06-10 09:50:43,427 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:43,439 tasks 26856 19836 [Celery] Iniciando sync_products_task limit=100
+INFO 2026-06-10 09:50:43,448 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '139'}
+INFO 2026-06-10 09:50:43,460 getProducts 26856 19836 Sincronizando productos
+INFO 2026-06-10 09:50:43,491 getProducts 26856 19836 Descarga completa de productos
+INFO 2026-06-10 09:50:43,508 panaccess_client 26856 19836 Llamando 'getListOfProducts' - Parámetros: {'offset': 0, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:43,776 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:43,780 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '138'}
+INFO 2026-06-10 09:50:44,248 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:44,259 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '137'}
+INFO 2026-06-10 09:50:45,017 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,030 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '136'}
+INFO 2026-06-10 09:50:45,139 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,147 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '134'}
+INFO 2026-06-10 09:50:45,151 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,157 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '133'}
+INFO 2026-06-10 09:50:45,170 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,182 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '132'}
+INFO 2026-06-10 09:50:45,194 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,198 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '131'}
+INFO 2026-06-10 09:50:45,405 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,409 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '130'}
+INFO 2026-06-10 09:50:45,741 panaccess_client 26856 19836 Llamada 'getListOfProducts' exitosa - dict(productEntries: 100 items, count: 204)
+INFO 2026-06-10 09:50:45,747 panaccess_client 26856 19836 Llamando 'getListOfProducts' - Parámetros: {'offset': 100, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:45,754 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,763 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '129'}
+INFO 2026-06-10 09:50:45,908 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:45,916 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '128'}
+INFO 2026-06-10 09:50:46,098 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:46,102 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '127'}
+INFO 2026-06-10 09:50:46,493 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:46,502 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '126'}
+INFO 2026-06-10 09:50:47,680 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:47,698 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '125'}
+INFO 2026-06-10 09:50:47,803 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:47,813 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '124'}
+INFO 2026-06-10 09:50:47,906 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:47,910 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123'}
+INFO 2026-06-10 09:50:47,929 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:47,937 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '122'}
+INFO 2026-06-10 09:50:47,956 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:47,962 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '121'}
+INFO 2026-06-10 09:50:48,262 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:48,266 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '64'}
+INFO 2026-06-10 09:50:48,390 panaccess_client 26856 19836 Llamada 'getListOfProducts' exitosa - dict(productEntries: 100 items, count: 204)
+INFO 2026-06-10 09:50:48,401 panaccess_client 26856 19836 Llamando 'getListOfProducts' - Parámetros: {'offset': 200, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 09:50:48,444 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:48,448 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '120'}
+INFO 2026-06-10 09:50:48,656 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:48,664 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '119'}
+INFO 2026-06-10 09:50:48,698 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:48,717 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '118'}
+INFO 2026-06-10 09:50:49,000 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:49,095 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '106'}
+INFO 2026-06-10 09:50:50,179 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:50,184 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '117'}
+INFO 2026-06-10 09:50:50,191 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:50,200 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '116'}
+INFO 2026-06-10 09:50:50,485 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:50,489 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '115'}
+INFO 2026-06-10 09:50:50,579 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:50,580 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:50,598 panaccess_client 26856 14344 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '114'}
+INFO 2026-06-10 09:50:50,609 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '113'}
+INFO 2026-06-10 09:50:50,909 panaccess_client 26856 19836 Llamada 'getListOfProducts' exitosa - dict(productEntries: 4 items, count: 204)
+INFO 2026-06-10 09:50:50,917 getProducts 26856 19836 Descargados 204 productos
+INFO 2026-06-10 09:50:50,921 getProducts 26856 19836 Almacenando 204 productos
+INFO 2026-06-10 09:50:51,023 getProducts 26856 19836 Almacenados 204 productos
+INFO 2026-06-10 09:50:51,029 tasks 26856 19836 [Celery] sync_products_task completada
+INFO 2026-06-10 09:50:51,120 runserver 26856 8980 [mHTTP POST /wind/sync-products/ 202 [7.99, 127.0.0.1:53000][0m
+INFO 2026-06-10 09:50:51,292 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:51,296 panaccess_client 26856 16696 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '112'}
+INFO 2026-06-10 09:50:51,743 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:51,747 panaccess_client 26856 8648 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '111'}
+INFO 2026-06-10 09:50:51,938 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:51,942 panaccess_client 26856 5412 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '110'}
+INFO 2026-06-10 09:50:51,949 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:51,953 panaccess_client 26856 16112 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '109'}
+INFO 2026-06-10 09:50:51,960 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:51,967 panaccess_client 26856 21028 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '108'}
+INFO 2026-06-10 09:50:52,604 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:52,609 panaccess_client 26856 2376 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '107'}
+INFO 2026-06-10 09:50:52,677 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:52,686 panaccess_client 26856 2300 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '105'}
+INFO 2026-06-10 09:50:52,825 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:52,834 panaccess_client 26856 22484 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '104'}
+INFO 2026-06-10 09:50:52,969 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:52,981 panaccess_client 26856 13160 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '2'}
+INFO 2026-06-10 09:50:53,030 panaccess_client 26856 14344 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:53,754 panaccess_client 26856 16696 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,142 panaccess_client 26856 8648 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,306 panaccess_client 26856 16112 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,434 panaccess_client 26856 5412 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,437 panaccess_client 26856 21028 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,582 panaccess_client 26856 2376 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,596 panaccess_client 26856 2300 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,675 panaccess_client 26856 22484 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,769 panaccess_client 26856 13160 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 09:50:54,810 tasks 26856 24892 [OK] [Celery] Sincronización completada
+INFO 2026-06-10 09:50:54,836 runserver 26856 8980 [mHTTP POST /wind/sync-subscribers/ 202 [44.16, 127.0.0.1:57971][0m
+INFO 2026-06-10 09:50:56,576 runserver 26856 8980 [mHTTP GET /wind/sync-smartcards/ 200 [0.09, 127.0.0.1:57971][0m
+INFO 2026-06-10 09:51:02,719 tasks 26856 23788 [Celery] Iniciando sync_smartcards_task limit=100
+INFO 2026-06-10 09:51:02,721 getSmartcard 26856 23788 Sincronizando smartcards
+INFO 2026-06-10 09:51:02,732 getSmartcard 26856 23788 Descarga completa de smartcards
+INFO 2026-06-10 09:51:02,732 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 0, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:03,917 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:51:03,920 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 100, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:05,616 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:51:05,617 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 200, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:07,028 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:51:07,030 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 300, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:08,425 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:51:08,427 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 400, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:09,718 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 38 items, count: 438)
+INFO 2026-06-10 09:51:09,719 panaccess_client 26856 23788 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 500, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:51:10,907 panaccess_client 26856 23788 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 0 items, count: 438)
+INFO 2026-06-10 09:51:10,910 getSmartcard 26856 23788 Descargados 438 smartcards
+INFO 2026-06-10 09:51:10,910 getSmartcard 26856 23788 Almacenando 438 smartcards
+ERROR 2026-06-10 09:51:10,963 getSmartcard 26856 23788 Error insertando chunk 2: el valor es demasiado largo para el tipo character varying(100)
 
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
-    token_count = redis_client.incr(token_key)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
-    return self.execute_command("INCRBY", name, amount)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
-    return self._execute_command(*args, **options)
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
-    conn = self.connection or pool.get_connection()
-                              ~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
-    return func(*args, **kwargs)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
-    connection.connect()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
-    self.retry.call_with_retry(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        lambda: self.connect_check_health(
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<2 lines>...
-        lambda error: self.disconnect(error),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
-    raise error
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
-    return do()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
-    lambda: self.connect_check_health(
-            ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        check_health=True, retry_socket_connect=False
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ),
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
-    raise e
-redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:38:43,824 log_buffer 7444 16596 LogBuffer flush thread started (interval=5s, batch_size=100)
-ERROR 2026-06-09 20:39:21,852 websocket_utils 7444 16596 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
-    sock = self._connect()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
-    raise err
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
-    sock.connect(socket_address)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
-ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
-    token_count = redis_client.incr(token_key)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
-    return self.execute_command("INCRBY", name, amount)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
-    return self._execute_command(*args, **options)
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
-    conn = self.connection or pool.get_connection()
-                              ~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
-    return func(*args, **kwargs)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
-    connection.connect()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
-    self.retry.call_with_retry(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        lambda: self.connect_check_health(
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<2 lines>...
-        lambda error: self.disconnect(error),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
-    raise error
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
-    return do()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
-    lambda: self.connect_check_health(
-            ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        check_health=True, retry_socket_connect=False
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ),
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
-    raise e
-redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:39:51,564 log_buffer 6012 4368 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:39:53,305 create_subscriber 6012 4368 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
-INFO 2026-06-09 20:39:53,305 create_subscriber 6012 4368 Validando email normalizado: 'duplicate@example.com'
-WARNING 2026-06-09 20:39:53,334 email_validation 6012 4368 Intento de registro duplicado con email duplicate@example.com
-INFO 2026-06-09 20:39:53,334 create_subscriber 6012 4368 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
-WARNING 2026-06-09 20:39:53,335 create_subscriber 6012 4368 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
-INFO 2026-06-09 20:39:53,335 create_subscriber 6012 4368 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
-INFO 2026-06-09 20:39:53,360 create_subscriber 6012 4368 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
-INFO 2026-06-09 20:39:53,360 create_subscriber 6012 4368 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 20:39:53,361 email_validation 6012 4368 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 20:39:53,361 create_subscriber 6012 4368 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 20:39:53,362 create_subscriber 6012 4368 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 20:39:53,362 create_subscriber 6012 4368 Generando código único de suscriptor automáticamente...
-WARNING 2026-06-09 20:39:53,365 panaccess_singleton 6012 4368 No hay sesión activa, obteniendo una...
-WARNING 2026-06-09 20:40:20,141 panaccess_session_store 6012 4368 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-WARNING 2026-06-09 20:40:42,737 panaccess_session_store 6012 4368 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 No hay sesión, autenticando...
-INFO 2026-06-09 20:40:42,737 panaccess_singleton 6012 4368 Intento login #1/5
-INFO 2026-06-09 20:40:42,737 panaccess_auth 6012 4368 Iniciando login
-INFO 2026-06-09 20:40:44,184 panaccess_auth 6012 4368 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 20:40:44,186 panaccess_singleton 6012 4368 Login exitoso
-WARNING 2026-06-09 20:41:09,652 panaccess_session_store 6012 4368 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:41:09,653 panaccess_client 6012 4368 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
-ERROR 2026-06-09 20:41:11,144 panaccess_client 6012 4368 Llamada 'getSubscriber' falló: This subscriber does not exist.
-INFO 2026-06-09 20:41:11,146 subscriber_code_generator 6012 4368 Código único generado: AUTO1
-INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Código generado automáticamente: AUTO1
-INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Creando suscriptor: AUTO1
-INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Parámetros a enviar a PanAccess: {'subscriber[code]': 'AUTO1', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
-WARNING 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Código retornado (10001) difiere del enviado (AUTO1)
-INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 Suscriptor 10001 creado exitosamente
-INFO 2026-06-09 20:41:11,147 create_subscriber 6012 4368 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
-INFO 2026-06-09 20:41:11,147 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:13,281 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:41:13,282 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:16,100 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:41:16,102 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:17,273 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-WARNING 2026-06-09 20:41:17,275 create_subscriber 6012 4368 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess después de crearlo
-INFO 2026-06-09 20:41:17,276 create_subscriber 6012 4368 Registro de email creado: john.doe@example.com -> 10001
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Agregando email john.doe@example.com al suscriptor 10001
-ERROR 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Error al agregar email: Mock error for addContactToSubscriber
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Agregando teléfono +18095551234 al suscriptor 10001
-ERROR 2026-06-09 20:41:17,277 create_subscriber 6012 4368 Error al agregar teléfono: Mock error for addContactToSubscriber
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] Respuesta recibida - success=True
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
-INFO 2026-06-09 20:41:17,277 create_subscriber 6012 4368 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
-INFO 2026-06-09 20:41:17,277 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:18,894 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:41:18,895 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:19,818 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:41:19,820 panaccess_client 6012 4368 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:41:21,018 panaccess_client 6012 4368 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-WARNING 2026-06-09 20:41:21,020 create_subscriber 6012 4368 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess para actualizar smartcards
-WARNING 2026-06-09 20:41:21,075 create_subscriber 6012 4368 No se pudo encolar el email de verificación: send_verification_email_task() missing 1 required positional argument: 'body'
-ERROR 2026-06-09 20:41:40,508 websocket_utils 6012 4368 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
-    sock = self._connect()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1515, in _connect
-    raise err
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1499, in _connect
-    sock.connect(socket_address)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
-ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
-    token_count = redis_client.incr(token_key)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
-    return self.execute_command("INCRBY", name, amount)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 716, in execute_command
-    return self._execute_command(*args, **options)
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\client.py", line 722, in _execute_command
-    conn = self.connection or pool.get_connection()
-                              ~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\utils.py", line 236, in wrapper
-    return func(*args, **kwargs)
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 3041, in get_connection
-    connection.connect()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 976, in connect
-    self.retry.call_with_retry(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        lambda: self.connect_check_health(
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<2 lines>...
-        lambda error: self.disconnect(error),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
-    raise error
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
-    return do()
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 977, in <lambda>
-    lambda: self.connect_check_health(
-            ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        check_health=True, retry_socket_connect=False
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ),
-    ^
-  File "C:\Users\veyqp\Desktop\serverpanaccess\env\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
-    raise e
-redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:54:27,915 log_buffer 19656 23244 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:55:24,283 log_buffer 17424 8836 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 20:55:26,022 create_subscriber 17424 8836 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
-INFO 2026-06-09 20:55:26,022 create_subscriber 17424 8836 Validando email normalizado: 'duplicate@example.com'
-WARNING 2026-06-09 20:55:26,033 email_validation 17424 8836 Intento de registro duplicado con email duplicate@example.com
-INFO 2026-06-09 20:55:26,033 create_subscriber 17424 8836 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
-WARNING 2026-06-09 20:55:26,033 create_subscriber 17424 8836 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
-INFO 2026-06-09 20:55:26,034 create_subscriber 17424 8836 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
-INFO 2026-06-09 20:55:26,057 create_subscriber 17424 8836 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'phone']
-INFO 2026-06-09 20:55:26,057 create_subscriber 17424 8836 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 20:55:26,058 email_validation 17424 8836 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 20:55:26,058 create_subscriber 17424 8836 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 20:55:26,059 create_subscriber 17424 8836 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 20:55:26,059 create_subscriber 17424 8836 Generando código único de suscriptor automáticamente...
-WARNING 2026-06-09 20:55:26,061 panaccess_singleton 17424 8836 No hay sesión activa, obteniendo una...
-WARNING 2026-06-09 20:55:48,105 panaccess_session_store 17424 8836 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-WARNING 2026-06-09 20:56:14,359 panaccess_session_store 17424 8836 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 No hay sesión, autenticando...
-INFO 2026-06-09 20:56:14,360 panaccess_singleton 17424 8836 Intento login #1/5
-INFO 2026-06-09 20:56:14,360 panaccess_auth 17424 8836 Iniciando login
-INFO 2026-06-09 20:56:16,412 panaccess_auth 17424 8836 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 20:56:16,413 panaccess_singleton 17424 8836 Login exitoso
-WARNING 2026-06-09 20:56:39,283 panaccess_session_store 17424 8836 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 20:56:39,283 panaccess_client 17424 8836 Llamando 'getSubscriber' - Parámetros: {'code': 'AUTO1'}
-ERROR 2026-06-09 20:56:40,648 panaccess_client 17424 8836 Llamada 'getSubscriber' falló: This subscriber does not exist.
-INFO 2026-06-09 20:56:40,650 subscriber_code_generator 17424 8836 Código único generado: AUTO1
-INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Código generado automáticamente: AUTO1
-INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Creando suscriptor: AUTO1
-INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Parámetros a enviar a PanAccess: {'subscriber[code]': 'AUTO1', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
-WARNING 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Código retornado (10001) difiere del enviado (AUTO1)
-INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 Suscriptor 10001 creado exitosamente
-INFO 2026-06-09 20:56:40,650 create_subscriber 17424 8836 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
-INFO 2026-06-09 20:56:40,650 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:42,326 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:56:42,327 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:43,620 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:56:43,621 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:45,041 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-WARNING 2026-06-09 20:56:45,043 create_subscriber 17424 8836 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess después de crearlo
-INFO 2026-06-09 20:56:45,044 create_subscriber 17424 8836 Registro de email creado: john.doe@example.com -> 10001
-INFO 2026-06-09 20:56:45,044 create_subscriber 17424 8836 Agregando email john.doe@example.com al suscriptor 10001
-ERROR 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Error al agregar email: Mock error for addContactToSubscriber
-INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Agregando teléfono +18095551234 al suscriptor 10001
-ERROR 2026-06-09 20:56:45,045 create_subscriber 17424 8836 Error al agregar teléfono: Mock error for addContactToSubscriber
-INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
-INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] Respuesta recibida - success=True
-INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
-INFO 2026-06-09 20:56:45,045 create_subscriber 17424 8836 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
-INFO 2026-06-09 20:56:45,045 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:46,426 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:56:46,428 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:47,548 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-INFO 2026-06-09 20:56:47,549 panaccess_client 17424 8836 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
-INFO 2026-06-09 20:56:48,689 panaccess_client 17424 8836 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 21)
-WARNING 2026-06-09 20:56:48,690 create_subscriber 17424 8836 [DB] No se pudo encontrar el suscriptor 10001 en PanAccess para actualizar smartcards
-WARNING 2026-06-09 20:56:48,710 create_subscriber 17424 8836 No se pudo encolar el email de verificación: send_verification_email_task() missing 1 required positional argument: 'body'
-ERROR 2026-06-09 20:57:10,561 websocket_utils 17424 8836 Error checking WebSocket limits: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-Traceback (most recent call last):
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1003, in connect_check_health
-    sock = self._connect()
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1515, in _connect
-    raise err
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1499, in _connect
-    sock.connect(socket_address)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
-ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\veyqp\Desktop\Intento\panaccess_wind_integration\wind\utils\websocket_utils.py", line 230, in check_websocket_limits
-    token_count = redis_client.incr(token_key)
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\commands\core.py", line 2174, in incrby
-    return self.execute_command("INCRBY", name, amount)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\client.py", line 716, in execute_command
-    return self._execute_command(*args, **options)
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\client.py", line 722, in _execute_command
-    conn = self.connection or pool.get_connection()
-                              ~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\utils.py", line 236, in wrapper
-    return func(*args, **kwargs)
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 3041, in get_connection
-    connection.connect()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 976, in connect
-    self.retry.call_with_retry(
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        lambda: self.connect_check_health(
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<2 lines>...
-        lambda error: self.disconnect(error),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
-    raise error
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
-    return do()
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 977, in <lambda>
-    lambda: self.connect_check_health(
-            ~~~~~~~~~~~~~~~~~~~~~~~~~^
-        check_health=True, retry_socket_connect=False
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ),
-    ^
-  File "C:\Users\veyqp\AppData\Local\Programs\Python\Python313\Lib\site-packages\redis\connection.py", line 1025, in connect_check_health
-    raise e
-redis.exceptions.ConnectionError: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:00:17,696 log_buffer 12312 7792 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:00:20,893 create_subscriber 12312 7792 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:00:20,894 create_subscriber 12312 7792 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:00:20,905 create_subscriber 12312 7792 Validando código proporcionado: '40200000000'
-WARNING 2026-06-09 21:00:20,906 panaccess_singleton 12312 7792 No hay sesión activa, obteniendo una...
-WARNING 2026-06-09 21:00:43,408 panaccess_session_store 12312 7792 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-WARNING 2026-06-09 21:01:07,255 panaccess_session_store 12312 7792 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 No hay sesión, autenticando...
-INFO 2026-06-09 21:01:07,255 panaccess_singleton 12312 7792 Intento login #1/5
-INFO 2026-06-09 21:01:07,255 panaccess_auth 12312 7792 Iniciando login
-INFO 2026-06-09 21:01:08,587 panaccess_auth 12312 7792 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 21:01:08,588 panaccess_singleton 12312 7792 Login exitoso
-INFO 2026-06-09 21:01:42,855 log_buffer 11968 27444 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:01:46,907 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:01:46,907 create_subscriber 11968 27444 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:01:46,934 create_subscriber 11968 27444 Validando código proporcionado: '40200000000'
-WARNING 2026-06-09 21:01:46,936 email_validation 11968 27444 Intento de registro duplicado con documento 40200000000
-WARNING 2026-06-09 21:01:46,938 create_subscriber 11968 27444 Documento '40200000000' no válido según SubscriberDocumentRegistry
-INFO 2026-06-09 21:01:46,939 email_validation 11968 27444 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:01:46,940 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:01:46,943 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:01:46,990 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:01:46,991 create_subscriber 11968 27444 Validando email normalizado: 'duplicate@example.com'
-INFO 2026-06-09 21:01:46,991 create_subscriber 11968 27444 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:01:46,993 email_validation 11968 27444 Documento 40212345678 no registrado previamente, permitiendo registro
-WARNING 2026-06-09 21:01:46,994 email_validation 11968 27444 Intento de registro duplicado con email duplicate@example.com
-INFO 2026-06-09 21:01:46,995 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
-WARNING 2026-06-09 21:01:46,995 create_subscriber 11968 27444 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
-INFO 2026-06-09 21:01:46,996 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
-INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:01:47,034 create_subscriber 11968 27444 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:01:47,036 email_validation 11968 27444 Documento 40212345678 no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:01:47,036 email_validation 11968 27444 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:01:47,037 create_subscriber 11968 27444 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:01:47,041 create_subscriber 11968 27444 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:01:47,045 create_subscriber 11968 27444 Usando código proporcionado: 40212345678
-INFO 2026-06-09 21:01:47,048 create_subscriber 11968 27444 Creando suscriptor: 40212345678
-INFO 2026-06-09 21:01:47,052 create_subscriber 11968 27444 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
-WARNING 2026-06-09 21:01:47,053 create_subscriber 11968 27444 Código retornado (10001) difiere del enviado (40212345678)
-INFO 2026-06-09 21:01:47,053 create_subscriber 11968 27444 Suscriptor 10001 creado exitosamente
-INFO 2026-06-09 21:01:47,053 create_subscriber 11968 27444 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
-INFO 2026-06-09 21:01:47,054 create_subscriber 11968 27444 [DB] Suscriptor 10001 encontrado en PanAccess
-INFO 2026-06-09 21:01:47,054 create_subscriber 11968 27444 [DB] Encontradas 2 smartcards asociadas
-INFO 2026-06-09 21:01:47,064 create_subscriber 11968 27444 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
-INFO 2026-06-09 21:01:47,065 create_subscriber 11968 27444 Registro de email creado: john.doe@example.com -> 10001
-INFO 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Registro de documento creado: 10001 -> john.doe@example.com
-INFO 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Agregando email john.doe@example.com al suscriptor 10001
-ERROR 2026-06-09 21:01:47,067 create_subscriber 11968 27444 Error al agregar email: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:01:47,068 create_subscriber 11968 27444 Agregando teléfono +18095551234 al suscriptor 10001
-ERROR 2026-06-09 21:01:47,068 create_subscriber 11968 27444 Error al agregar teléfono: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
-INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] Respuesta recibida - success=True
-INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
-INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
-INFO 2026-06-09 21:01:47,069 create_subscriber 11968 27444 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Iniciando proceso para agregar productos a 2 smartcards
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Agregando producto 4639 a 2 smartcards
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Fecha de expiración: 2026-07-10 00:01:47 (30 días desde creación)
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Respuesta recibida - success=True
-INFO 2026-06-09 21:01:47,071 create_subscriber 11968 27444 [Products] Producto 4639 agregado exitosamente a 2 smartcards
-INFO 2026-06-09 21:01:47,228 tasks 11968 27444 Enviando email de verificación a john.doe@example.com
-INFO 2026-06-09 21:01:47,244 tasks 11968 27444 Email enviado exitosamente a john.doe@example.com
-INFO 2026-06-09 21:04:52,743 log_buffer 5212 5424 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:04:55,865 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:04:55,865 create_subscriber 5212 5424 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:04:55,875 create_subscriber 5212 5424 Validando código proporcionado: '40200000000'
-WARNING 2026-06-09 21:04:55,876 email_validation 5212 5424 Intento de registro duplicado con documento 40200000000
-WARNING 2026-06-09 21:04:55,876 create_subscriber 5212 5424 Documento '40200000000' no válido según SubscriberDocumentRegistry
-INFO 2026-06-09 21:04:55,877 email_validation 5212 5424 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:04:55,877 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:04:55,878 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:04:55,900 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:04:55,900 create_subscriber 5212 5424 Validando email normalizado: 'duplicate@example.com'
-INFO 2026-06-09 21:04:55,901 create_subscriber 5212 5424 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:04:55,901 email_validation 5212 5424 Documento 40212345678 no registrado previamente, permitiendo registro
-WARNING 2026-06-09 21:04:55,902 email_validation 5212 5424 Intento de registro duplicado con email duplicate@example.com
-INFO 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
-WARNING 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
-INFO 2026-06-09 21:04:55,902 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
-INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:04:55,926 create_subscriber 5212 5424 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:04:55,928 email_validation 5212 5424 Documento 40212345678 no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:04:55,929 email_validation 5212 5424 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:04:55,929 create_subscriber 5212 5424 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Usando código proporcionado: 40212345678
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Creando suscriptor: 40212345678
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
-WARNING 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Código retornado (10001) difiere del enviado (40212345678)
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 Suscriptor 10001 creado exitosamente
-INFO 2026-06-09 21:04:55,930 create_subscriber 5212 5424 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
-INFO 2026-06-09 21:04:55,931 create_subscriber 5212 5424 [DB] Suscriptor 10001 encontrado en PanAccess
-INFO 2026-06-09 21:04:55,931 create_subscriber 5212 5424 [DB] Encontradas 2 smartcards asociadas
-INFO 2026-06-09 21:04:55,937 create_subscriber 5212 5424 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
-INFO 2026-06-09 21:04:55,938 create_subscriber 5212 5424 Registro de email creado: john.doe@example.com -> 10001
-INFO 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Registro de documento creado: 10001 -> john.doe@example.com
-INFO 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Agregando email john.doe@example.com al suscriptor 10001
-ERROR 2026-06-09 21:04:55,939 create_subscriber 5212 5424 Error al agregar email: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 Agregando teléfono +18095551234 al suscriptor 10001
-ERROR 2026-06-09 21:04:55,940 create_subscriber 5212 5424 Error al agregar teléfono: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] Respuesta recibida - success=True
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
-INFO 2026-06-09 21:04:55,940 create_subscriber 5212 5424 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Iniciando proceso para agregar productos a 2 smartcards
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Agregando producto 4639 a 2 smartcards
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Fecha de expiración: 2026-07-10 00:04:55 (30 días desde creación)
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Respuesta recibida - success=True
-INFO 2026-06-09 21:04:55,942 create_subscriber 5212 5424 [Products] Producto 4639 agregado exitosamente a 2 smartcards
-INFO 2026-06-09 21:04:56,054 tasks 5212 5424 Enviando email de verificación a john.doe@example.com
-INFO 2026-06-09 21:04:56,065 tasks 5212 5424 Email enviado exitosamente a john.doe@example.com
-INFO 2026-06-09 21:12:57,022 log_buffer 3404 16252 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:13:08,481 log_buffer 10524 25108 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:16:43,900 apps 21556 23636 Inicializando PanAccess singleton...
-WARNING 2026-06-09 21:17:04,019 panaccess_session_store 21556 23636 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-WARNING 2026-06-09 21:17:22,299 panaccess_session_store 21556 23636 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:17:22,300 panaccess_singleton 21556 23636 No hay sesión, autenticando...
-INFO 2026-06-09 21:17:22,301 panaccess_singleton 21556 23636 Intento login #1/5
-INFO 2026-06-09 21:17:22,301 panaccess_auth 21556 23636 Iniciando login
-INFO 2026-06-09 21:17:25,592 panaccess_auth 21556 23636 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 21:17:25,594 panaccess_singleton 21556 23636 Login exitoso
-WARNING 2026-06-09 21:17:45,119 panaccess_session_store 21556 23636 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:17:45,119 panaccess_singleton 21556 23636 PanAccess inicializado y autenticado
-INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 14172 Validación periódica iniciada (intervalo: 900s)
-INFO 2026-06-09 21:17:45,120 panaccess_singleton 21556 23636 Thread de validación periódica iniciado
-INFO 2026-06-09 21:17:45,173 autoreload 21556 23636 Watching for file changes with StatReloader
-INFO 2026-06-09 21:17:45,389 log_buffer 21556 28320 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:17:45,586 server 21556 28320 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
-INFO 2026-06-09 21:17:45,588 server 21556 28320 Configuring endpoint tcp:port=8000:interface=127.0.0.1
-INFO 2026-06-09 21:17:45,589 server 21556 28320 Listening on TCP address 127.0.0.1:8000
-WARNING 2026-06-09 21:17:58,098 runserver 21556 28320 [33mHTTP GET / 404 [0.04, 127.0.0.1:50256][0m
-WARNING 2026-06-09 21:17:58,368 runserver 21556 28320 [33mHTTP GET /favicon.ico 404 [0.01, 127.0.0.1:50256][0m
-INFO 2026-06-09 21:18:13,156 runserver 21556 28320 [32mHTTP GET /health 301 [0.01, 127.0.0.1:50256][0m
-ERROR 2026-06-09 21:18:17,259 runserver 21556 28320 [35;1mHTTP GET /health/ 503 [4.09, 127.0.0.1:50256][0m
-ERROR 2026-06-09 21:18:39,445 runserver 21556 28320 [35;1mHTTP GET /ready/ 503 [4.10, 127.0.0.1:50256][0m
-WARNING 2026-06-09 21:19:17,011 runserver 21556 28320 [33mHTTP GET /api/auth/ 404 [0.01, 127.0.0.1:50256][0m
-ERROR 2026-06-09 21:19:49,726 runserver 21556 28320 [35;1mHTTP GET /api/auth/registration/ 500 [4.16, 127.0.0.1:50256][0m
-ERROR 2026-06-09 21:20:10,067 runserver 21556 28320 [35;1mHTTP GET /api/auth/registration/ 500 [4.13, 127.0.0.1:50256][0m
-WARNING 2026-06-09 21:20:29,103 runserver 21556 28320 [33mHTTP GET /api/v1/ 404 [0.02, 127.0.0.1:50256][0m
-ERROR 2026-06-09 21:20:41,832 runserver 21556 28320 [35;1mHTTP GET /wind/ 500 [0.11, 127.0.0.1:50256][0m
-INFO 2026-06-09 21:24:47,827 log_buffer 25772 8172 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:24:51,096 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:24:51,096 create_subscriber 25772 8172 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:24:51,108 create_subscriber 25772 8172 Validando código proporcionado: '40200000000'
-WARNING 2026-06-09 21:24:51,110 email_validation 25772 8172 Intento de registro duplicado con documento 40200000000
-WARNING 2026-06-09 21:24:51,110 create_subscriber 25772 8172 Documento '40200000000' no válido según SubscriberDocumentRegistry
-INFO 2026-06-09 21:24:51,111 email_validation 25772 8172 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:24:51,111 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:24:51,112 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Validando email normalizado: 'duplicate@example.com'
-INFO 2026-06-09 21:24:51,145 create_subscriber 25772 8172 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:24:51,147 email_validation 25772 8172 Documento 40212345678 no registrado previamente, permitiendo registro
-WARNING 2026-06-09 21:24:51,150 email_validation 25772 8172 Intento de registro duplicado con email duplicate@example.com
-INFO 2026-06-09 21:24:51,150 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=False, message='Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email.'
-WARNING 2026-06-09 21:24:51,150 create_subscriber 25772 8172 Email 'duplicate@example.com' no válido según SubscriberEmailRegistry
-INFO 2026-06-09 21:24:51,151 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'duplicate@example.com', existe=False
-INFO 2026-06-09 21:24:51,190 create_subscriber 25772 8172 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'document_number', 'document_type', 'phone']
-INFO 2026-06-09 21:24:51,191 create_subscriber 25772 8172 Validando email normalizado: 'john.doe@example.com'
-INFO 2026-06-09 21:24:51,191 create_subscriber 25772 8172 Validando código proporcionado: '40212345678'
-INFO 2026-06-09 21:24:51,192 email_validation 25772 8172 Documento 40212345678 no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:24:51,193 email_validation 25772 8172 Email john.doe@example.com no registrado previamente, permitiendo registro
-INFO 2026-06-09 21:24:51,193 create_subscriber 25772 8172 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
-INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Buscando email en ListOfSubscriber: 'john.doe@example.com', existe=False
-INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Usando código proporcionado: 40212345678
-INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Creando suscriptor: 40212345678
-INFO 2026-06-09 21:24:51,194 create_subscriber 25772 8172 Parámetros a enviar a PanAccess: {'subscriber[code]': '40212345678', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'Doe', 'subscriber[firstName]': 'John', 'subscriber[countryCode]': 'DO'}
-WARNING 2026-06-09 21:24:51,195 create_subscriber 25772 8172 Código retornado (10001) difiere del enviado (40212345678)
-INFO 2026-06-09 21:24:51,195 create_subscriber 25772 8172 Suscriptor 10001 creado exitosamente
-INFO 2026-06-09 21:24:51,195 create_subscriber 25772 8172 [DB] Obteniendo información completa del suscriptor 10001 desde PanAccess
-INFO 2026-06-09 21:24:51,196 create_subscriber 25772 8172 [DB] Suscriptor 10001 encontrado en PanAccess
-INFO 2026-06-09 21:24:51,196 create_subscriber 25772 8172 [DB] Encontradas 2 smartcards asociadas
-INFO 2026-06-09 21:24:51,206 create_subscriber 25772 8172 [DB] Suscriptor 10001 guardado exitosamente en ListOfSubscriber
-INFO 2026-06-09 21:24:51,208 create_subscriber 25772 8172 Registro de email creado: john.doe@example.com -> 10001
-INFO 2026-06-09 21:24:51,212 create_subscriber 25772 8172 Registro de documento creado: 10001 -> john.doe@example.com
-INFO 2026-06-09 21:24:51,213 create_subscriber 25772 8172 Agregando email john.doe@example.com al suscriptor 10001
-ERROR 2026-06-09 21:24:51,213 create_subscriber 25772 8172 Error al agregar email: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:24:51,214 create_subscriber 25772 8172 Agregando teléfono +18095551234 al suscriptor 10001
-ERROR 2026-06-09 21:24:51,215 create_subscriber 25772 8172 Error al agregar teléfono: Mock error for addContactToSubscriber
-INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 10001
-INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] Respuesta recibida - success=True
-INFO 2026-06-09 21:24:51,215 create_subscriber 25772 8172 [LicenseBlock] License block agregado exitosamente al suscriptor 10001
-INFO 2026-06-09 21:24:51,216 create_subscriber 25772 8172 [DB] Actualizando smartcards del suscriptor 10001 después de addLicenseBlockToSubscriber
-INFO 2026-06-09 21:24:51,216 create_subscriber 25772 8172 [DB] Smartcards actualizadas desde PanAccess: ['123456789012345', '123456789012346']
-INFO 2026-06-09 21:24:51,218 create_subscriber 25772 8172 [DB] Campo smartcards actualizado exitosamente para suscriptor 10001
-INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Iniciando proceso para agregar productos a 2 smartcards
-INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Agregando producto 4639 a 2 smartcards
-INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Fecha de expiración: 2026-07-10 00:24:51 (30 días desde creación)
-INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Respuesta recibida - success=True
-INFO 2026-06-09 21:24:51,219 create_subscriber 25772 8172 [Products] Producto 4639 agregado exitosamente a 2 smartcards
-INFO 2026-06-09 21:24:51,363 tasks 25772 8172 Enviando email de verificación a john.doe@example.com
-INFO 2026-06-09 21:24:51,376 tasks 25772 8172 Email enviado exitosamente a john.doe@example.com
-INFO 2026-06-09 21:26:56,999 apps 20880 20312 Inicializando PanAccess singleton...
-WARNING 2026-06-09 21:27:23,572 panaccess_session_store 20880 20312 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-WARNING 2026-06-09 21:27:46,892 panaccess_session_store 20880 20312 No se pudo leer sesión PanAccess desde Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:27:46,893 panaccess_singleton 20880 20312 No hay sesión, autenticando...
-INFO 2026-06-09 21:27:46,894 panaccess_singleton 20880 20312 Intento login #1/5
-INFO 2026-06-09 21:27:46,894 panaccess_auth 20880 20312 Iniciando login
-INFO 2026-06-09 21:27:50,533 panaccess_auth 20880 20312 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 21:27:50,534 panaccess_singleton 20880 20312 Login exitoso
-WARNING 2026-06-09 21:28:13,644 panaccess_session_store 20880 20312 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:28:13,644 panaccess_singleton 20880 20312 PanAccess inicializado y autenticado
-INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 11396 Validación periódica iniciada (intervalo: 900s)
-INFO 2026-06-09 21:28:13,645 panaccess_singleton 20880 20312 Thread de validación periódica iniciado
-INFO 2026-06-09 21:28:13,686 autoreload 20880 20312 Watching for file changes with StatReloader
-INFO 2026-06-09 21:28:13,921 log_buffer 20880 20312 LogBuffer flush thread started (interval=5s, batch_size=100)
-INFO 2026-06-09 21:28:14,133 server 20880 17472 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
-INFO 2026-06-09 21:28:14,137 server 20880 17472 Configuring endpoint tcp:port=8000:interface=127.0.0.1
-INFO 2026-06-09 21:28:14,138 server 20880 17472 Listening on TCP address 127.0.0.1:8000
-INFO 2026-06-09 21:28:28,510 runserver 20880 17472 [mHTTP GET /wind/register/ 200 [0.05, 127.0.0.1:56913][0m
-INFO 2026-06-09 21:28:28,687 runserver 20880 17472 [mHTTP GET /static/wind/images/backgroundalt.webp 200 [0.06, 127.0.0.1:56913][0m
-INFO 2026-06-09 21:28:35,102 runserver 20880 17472 [mHTTP GET /wind/login/ 200 [0.02, 127.0.0.1:56913][0m
-INFO 2026-06-09 21:28:35,207 runserver 20880 17472 [mHTTP GET /static/wind/css/app.css 200 [0.01, 127.0.0.1:56913][0m
-INFO 2026-06-09 21:28:35,236 runserver 20880 17472 [mHTTP GET /static/wind/js/auth-store.js 200 [0.01, 127.0.0.1:58029][0m
-ERROR 2026-06-09 21:28:44,897 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.15, 127.0.0.1:58029][0m
-ERROR 2026-06-09 21:30:20,492 runserver 20880 17472 [35;1mHTTP POST /api/auth/login/ 500 [4.12, 127.0.0.1:60786][0m
-WARNING 2026-06-09 21:32:21,992 runserver 20880 17472 [31;1mHTTP GET /wind/sync-subscribers/ 401 [0.01, 127.0.0.1:54919][0m
-INFO 2026-06-09 21:35:50,720 runserver 20880 17472 [mHTTP GET /wind/ 200 [0.01, 127.0.0.1:64296][0m
-WARNING 2026-06-09 21:36:00,296 runserver 20880 17472 [33mHTTP GET / 404 [0.01, 127.0.0.1:64296][0m
-INFO 2026-06-09 21:43:15,627 panaccess_singleton 20880 11396 Sesión caducada, refrescando...
-WARNING 2026-06-09 21:43:37,459 panaccess_session_store 20880 11396 No se pudo borrar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
-INFO 2026-06-09 21:43:37,459 panaccess_singleton 20880 11396 Intento login #1/5
-INFO 2026-06-09 21:43:37,460 panaccess_auth 20880 11396 Iniciando login
-INFO 2026-06-09 21:43:39,121 panaccess_auth 20880 11396 Login exitoso - SessionId obtenido (26 caracteres)
-INFO 2026-06-09 21:43:39,122 panaccess_singleton 20880 11396 Login exitoso
-WARNING 2026-06-09 21:44:02,504 panaccess_session_store 20880 11396 No se pudo guardar sesión PanAccess en Redis: Error 10061 connecting to localhost:6379. No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+INFO 2026-06-10 09:51:11,034 getSmartcard 26856 23788 Almacenados 438 smartcards
+INFO 2026-06-10 09:51:11,035 tasks 26856 23788 [Celery] sync_smartcards_task completada
+INFO 2026-06-10 09:51:11,054 runserver 26856 8980 [mHTTP POST /wind/sync-smartcards/ 202 [8.42, 127.0.0.1:57971][0m
+INFO 2026-06-10 09:58:32,270 apps 25180 9516 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:58:32,450 panaccess_singleton 25180 9516 No hay sesión, autenticando...
+INFO 2026-06-10 09:58:32,451 panaccess_singleton 25180 9516 Intento login #1/5
+INFO 2026-06-10 09:58:32,452 panaccess_auth 25180 9516 Iniciando login
+INFO 2026-06-10 09:58:33,642 panaccess_auth 25180 9516 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-10 09:58:33,646 panaccess_singleton 25180 9516 Login exitoso
+INFO 2026-06-10 09:58:33,654 panaccess_singleton 25180 9516 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:58:33,656 panaccess_singleton 25180 27832 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:58:33,656 panaccess_singleton 25180 9516 Thread de validación periódica iniciado
+INFO 2026-06-10 09:58:33,920 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 0, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:35,093 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:58:35,095 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 100, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:36,326 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:58:36,328 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 200, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:37,449 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:58:37,450 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 300, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:38,682 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 09:58:38,682 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 400, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:39,809 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 38 items, count: 438)
+INFO 2026-06-10 09:58:39,809 panaccess_client 25180 9516 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 500, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 09:58:41,009 panaccess_client 25180 9516 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 0 items, count: 438)
+INFO 2026-06-10 09:59:03,503 autoreload 26856 9836 C:\Users\Leonard\Desktop\panaccess_wind_integration\wind\models.py changed, reloading.
+INFO 2026-06-10 09:59:13,861 apps 7020 7216 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:59:14,034 panaccess_singleton 7020 7216 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:59:14,036 panaccess_singleton 7020 24004 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:59:14,036 panaccess_singleton 7020 7216 Thread de validación periódica iniciado
+INFO 2026-06-10 09:59:14,133 autoreload 7020 7216 Watching for file changes with StatReloader
+INFO 2026-06-10 09:59:14,465 log_buffer 7020 7216 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:59:14,967 server 7020 24180 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 09:59:14,968 server 7020 24180 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 09:59:14,970 server 7020 24180 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 09:59:18,464 autoreload 7020 7216 C:\Users\Leonard\Desktop\panaccess_wind_integration\wind\services\subscriber_catalog.py changed, reloading.
+INFO 2026-06-10 09:59:21,739 apps 26692 10328 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:59:21,976 panaccess_singleton 26692 10328 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:59:21,979 panaccess_singleton 26692 18352 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:59:21,979 panaccess_singleton 26692 10328 Thread de validación periódica iniciado
+INFO 2026-06-10 09:59:22,087 autoreload 26692 10328 Watching for file changes with StatReloader
+INFO 2026-06-10 09:59:22,435 log_buffer 26692 10328 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:59:23,111 server 26692 1020 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 09:59:23,113 server 26692 1020 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 09:59:23,115 server 26692 1020 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 09:59:38,675 autoreload 26692 10328 C:\Users\Leonard\Desktop\panaccess_wind_integration\wind\functions\getSmartcard.py changed, reloading.
+INFO 2026-06-10 09:59:44,817 apps 14740 22280 Inicializando PanAccess singleton...
+INFO 2026-06-10 09:59:45,030 panaccess_singleton 14740 22280 PanAccess inicializado y autenticado
+INFO 2026-06-10 09:59:45,039 panaccess_singleton 14740 28628 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 09:59:45,040 panaccess_singleton 14740 22280 Thread de validación periódica iniciado
+INFO 2026-06-10 09:59:45,119 autoreload 14740 22280 Watching for file changes with StatReloader
+INFO 2026-06-10 09:59:45,494 log_buffer 14740 22280 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:59:46,152 server 14740 28020 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 09:59:46,155 server 14740 28020 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 09:59:46,159 server 14740 28020 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 09:59:51,000 log_buffer 15996 8484 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 09:59:58,723 log_buffer 444 22220 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 10:00:30,017 apps 26408 28460 Inicializando PanAccess singleton...
+INFO 2026-06-10 10:00:30,153 panaccess_singleton 26408 28460 PanAccess inicializado y autenticado
+INFO 2026-06-10 10:00:30,157 panaccess_singleton 26408 2736 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 10:00:30,158 panaccess_singleton 26408 28460 Thread de validación periódica iniciado
+INFO 2026-06-10 10:00:30,662 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 0, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:32,152 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:00:32,156 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 100, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:33,496 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:00:33,497 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 200, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:34,675 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:00:34,676 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 300, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:35,916 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:00:35,917 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 400, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:37,044 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 38 items, count: 438)
+INFO 2026-06-10 10:00:37,044 panaccess_client 26408 28460 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 500, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:00:38,214 panaccess_client 26408 28460 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 0 items, count: 438)
+INFO 2026-06-10 10:00:38,217 getSmartcard 26408 28460 Almacenando 438 smartcards
+INFO 2026-06-10 10:00:38,587 getSmartcard 26408 28460 Almacenados 438 smartcards
+INFO 2026-06-10 10:02:06,776 apps 2780 22276 Inicializando PanAccess singleton...
+INFO 2026-06-10 10:02:06,972 panaccess_singleton 2780 22276 PanAccess inicializado y autenticado
+INFO 2026-06-10 10:02:06,972 panaccess_singleton 2780 12992 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 10:02:06,972 panaccess_singleton 2780 22276 Thread de validación periódica iniciado
+INFO 2026-06-10 10:02:07,056 autoreload 2780 22276 Watching for file changes with StatReloader
+INFO 2026-06-10 10:02:07,407 log_buffer 2780 22276 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-10 10:02:07,781 server 2780 9716 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-10 10:02:07,782 server 2780 9716 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-10 10:02:07,784 server 2780 9716 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-10 10:02:10,504 runserver 2780 9716 [mHTTP GET /wind/compare-and-update-subscribers/ 200 [0.25, 127.0.0.1:60463][0m
+INFO 2026-06-10 10:02:19,074 tasks 2780 9700 [Celery] Iniciando compare_and_update_subscribers_task limit=100
+INFO 2026-06-10 10:02:19,074 getSubscriber 2780 9700 Reconciliando suscriptores desde PanAccess (full sync correctivo)
+INFO 2026-06-10 10:02:19,093 panaccess_client 2780 9700 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:02:20,193 panaccess_client 2780 9700 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:02:20,426 panaccess_client 2780 9700 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:02:21,913 panaccess_client 2780 9700 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:02:22,096 panaccess_client 2780 9700 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:02:23,431 panaccess_client 2780 9700 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:02:23,452 tasks 2780 9700 [Celery] compare_and_update_subscribers_task completada
+INFO 2026-06-10 10:02:23,497 runserver 2780 9716 [mHTTP POST /wind/compare-and-update-subscribers/ 202 [4.55, 127.0.0.1:60463][0m
+INFO 2026-06-10 10:02:56,168 tasks 2780 18688 [Celery] Iniciando sync_smartcards_task limit=100
+INFO 2026-06-10 10:02:56,168 getSmartcard 2780 18688 Sincronizando smartcards
+INFO 2026-06-10 10:02:56,177 getSmartcard 2780 18688 Reconciliando smartcards desde PanAccess
+INFO 2026-06-10 10:02:56,195 panaccess_client 2780 18688 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 0, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:02:57,427 panaccess_client 2780 18688 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:02:57,505 panaccess_client 2780 18688 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 100, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:02:58,605 panaccess_client 2780 18688 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:02:58,632 panaccess_client 2780 18688 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 200, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:02:59,925 panaccess_client 2780 18688 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:00,005 panaccess_client 2780 18688 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 300, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:01,307 panaccess_client 2780 18688 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:01,345 panaccess_client 2780 18688 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 400, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:02,656 panaccess_client 2780 18688 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 38 items, count: 438)
+INFO 2026-06-10 10:03:02,656 getSmartcard 2780 18688 Reconciliación smartcards — remoto=438, local antes=438, actualizados=134, creados=0, eliminados=0
+INFO 2026-06-10 10:03:02,656 tasks 2780 18688 [Celery] sync_smartcards_task completada
+INFO 2026-06-10 10:03:02,674 runserver 2780 9716 [mHTTP POST /wind/sync-smartcards/ 202 [6.58, 127.0.0.1:60463][0m
+INFO 2026-06-10 10:03:28,287 tasks 2780 12692 [Celery] Iniciando sync_smartcards_task limit=100
+INFO 2026-06-10 10:03:28,287 getSmartcard 2780 12692 Sincronizando smartcards
+INFO 2026-06-10 10:03:28,296 getSmartcard 2780 12692 Reconciliando smartcards desde PanAccess
+INFO 2026-06-10 10:03:28,310 panaccess_client 2780 12692 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 0, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:29,446 panaccess_client 2780 12692 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:29,627 panaccess_client 2780 12692 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 100, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:30,962 panaccess_client 2780 12692 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:30,987 panaccess_client 2780 12692 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 200, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:32,104 panaccess_client 2780 12692 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:32,171 panaccess_client 2780 12692 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 300, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:33,374 panaccess_client 2780 12692 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 100 items, count: 438)
+INFO 2026-06-10 10:03:33,399 panaccess_client 2780 12692 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 400, 'limit': 100, 'orderDir': 'DESC', 'orderBy': 'sn'}
+INFO 2026-06-10 10:03:34,513 panaccess_client 2780 12692 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 38 items, count: 438)
+INFO 2026-06-10 10:03:34,516 getSmartcard 2780 12692 Reconciliación smartcards — remoto=438, local antes=438, actualizados=134, creados=0, eliminados=0
+INFO 2026-06-10 10:03:34,516 tasks 2780 12692 [Celery] sync_smartcards_task completada
+INFO 2026-06-10 10:03:34,540 runserver 2780 9716 [mHTTP POST /wind/sync-smartcards/ 202 [6.31, 127.0.0.1:60463][0m
+INFO 2026-06-10 10:05:43,506 runserver 2780 9716 [mHTTP GET /wind/login/ 200 [0.03, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:05:43,809 runserver 2780 9716 [mHTTP GET /static/wind/js/auth-store.js 200 [0.21, 127.0.0.1:55913][0m
+INFO 2026-06-10 10:05:43,873 runserver 2780 9716 [mHTTP GET /static/wind/css/app.css 200 [0.27, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:05:43,890 runserver 2780 9716 [mHTTP GET /static/wind/images/backgroundalt.webp 200 [0.00, 127.0.0.1:64882][0m
+WARNING 2026-06-10 10:05:44,736 runserver 2780 9716 [33mHTTP GET /favicon.ico 404 [0.06, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:05:55,375 runserver 2780 9716 [mHTTP POST /api/auth/login/ 200 [1.37, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:05:55,409 runserver 2780 9716 [mHTTP GET /wind/dashboard/ 200 [0.02, 127.0.0.1:64882][0m
+WARNING 2026-06-10 10:05:55,812 runserver 2780 9716 [33mHTTP GET /api/v1/profile/me/ 404 [0.30, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:06:08,938 runserver 2780 9716 [mHTTP GET /wind/login/ 200 [0.01, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:06:09,615 apps 2964 26148 Inicializando PanAccess singleton...
+INFO 2026-06-10 10:06:09,774 panaccess_singleton 2964 26148 PanAccess inicializado y autenticado
+INFO 2026-06-10 10:06:09,776 panaccess_singleton 2964 23716 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 10:06:09,776 panaccess_singleton 2964 26148 Thread de validación periódica iniciado
+INFO 2026-06-10 10:06:09,998 panaccess_client 2964 26148 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:06:11,232 panaccess_client 2964 26148 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:06:11,232 panaccess_client 2964 26148 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:06:12,451 panaccess_client 2964 26148 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:06:12,455 panaccess_client 2964 26148 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:06:13,694 panaccess_client 2964 26148 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:06:14,835 runserver 2780 9716 [mHTTP GET /wind/register/ 200 [0.02, 127.0.0.1:64882][0m
+INFO 2026-06-10 10:07:10,318 apps 16344 19168 Inicializando PanAccess singleton...
+INFO 2026-06-10 10:07:10,453 panaccess_singleton 16344 19168 PanAccess inicializado y autenticado
+INFO 2026-06-10 10:07:10,453 panaccess_singleton 16344 2080 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-10 10:07:10,453 panaccess_singleton 16344 19168 Thread de validación periódica iniciado
+INFO 2026-06-10 10:07:10,620 panaccess_client 16344 19168 Llamando 'getListOfProducts' - Parámetros: {'offset': 0, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:11,774 panaccess_client 16344 19168 Llamada 'getListOfProducts' exitosa - dict(productEntries: 100 items, count: 204)
+INFO 2026-06-10 10:07:11,782 panaccess_client 16344 19168 Llamando 'getListOfProducts' - Parámetros: {'offset': 100, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:13,243 panaccess_client 16344 19168 Llamada 'getListOfProducts' exitosa - dict(productEntries: 100 items, count: 204)
+INFO 2026-06-10 10:07:13,245 panaccess_client 16344 19168 Llamando 'getListOfProducts' - Parámetros: {'offset': 200, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:14,508 panaccess_client 16344 19168 Llamada 'getListOfProducts' exitosa - dict(productEntries: 4 items, count: 204)
+INFO 2026-06-10 10:07:14,508 panaccess_client 16344 19168 Llamando 'getListOfProducts' - Parámetros: {'offset': 300, 'limit': 100, 'orderBy': 'productId', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:15,776 panaccess_client 16344 19168 Llamada 'getListOfProducts' exitosa - dict(productEntries: 0 items, count: 204)
+INFO 2026-06-10 10:07:15,780 panaccess_client 16344 19168 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:17,080 panaccess_client 16344 19168 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:07:17,080 panaccess_client 16344 19168 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 100, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:18,375 panaccess_client 16344 19168 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:07:18,377 panaccess_client 16344 19168 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 200, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:19,586 panaccess_client 16344 19168 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 162)
+INFO 2026-06-10 10:07:19,588 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1523564846'}
+INFO 2026-06-10 10:07:20,761 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:20,766 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '125484584584'}
+INFO 2026-06-10 10:07:21,884 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:21,888 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123456'}
+INFO 2026-06-10 10:07:22,993 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:22,996 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'KSTEST2'}
+INFO 2026-06-10 10:07:24,154 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:24,161 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'LeoTestAire'}
+INFO 2026-06-10 10:07:25,319 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:25,319 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara8'}
+INFO 2026-06-10 10:07:26,692 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:26,698 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara7'}
+INFO 2026-06-10 10:07:27,902 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:27,908 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara6'}
+INFO 2026-06-10 10:07:29,033 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:29,037 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'AriChang'}
+INFO 2026-06-10 10:07:30,559 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:30,563 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara5'}
+INFO 2026-06-10 10:07:31,852 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:31,854 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara3'}
+INFO 2026-06-10 10:07:33,103 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:33,106 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara2'}
+INFO 2026-06-10 10:07:34,334 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:34,336 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MaxSagara'}
+INFO 2026-06-10 10:07:36,028 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:36,031 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'pela'}
+INFO 2026-06-10 10:07:37,721 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:37,727 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111158'}
+INFO 2026-06-10 10:07:39,247 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:39,247 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111157'}
+INFO 2026-06-10 10:07:40,848 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:40,852 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111156'}
+INFO 2026-06-10 10:07:42,402 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:42,402 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111155'}
+INFO 2026-06-10 10:07:43,731 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:43,733 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111154'}
+INFO 2026-06-10 10:07:44,887 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:44,891 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111153'}
+INFO 2026-06-10 10:07:46,017 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:46,021 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111152'}
+INFO 2026-06-10 10:07:46,528 create_subscriber 2780 3928 Datos recibidos y validados: ['lastName', 'firstName', 'email', 'code', 'phone']
+INFO 2026-06-10 10:07:46,540 create_subscriber 2780 3928 Validando email normalizado: 'sw9@bromteck.com'
+INFO 2026-06-10 10:07:46,558 create_subscriber 2780 3928 Validando código proporcionado: '123456789'
+INFO 2026-06-10 10:07:46,643 panaccess_client 2780 3928 Llamando 'getSubscriber' - Parámetros: {'code': '123456789'}
+INFO 2026-06-10 10:07:47,340 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:47,343 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111151'}
+ERROR 2026-06-10 10:07:47,821 panaccess_client 2780 3928 Llamada 'getSubscriber' falló: Este usuario no existe.
+INFO 2026-06-10 10:07:47,833 email_validation 2780 3928 Documento 123456789 no registrado previamente, permitiendo registro
+INFO 2026-06-10 10:07:47,843 email_validation 2780 3928 Email sw9@bromteck.com no registrado previamente, permitiendo registro
+INFO 2026-06-10 10:07:47,844 create_subscriber 2780 3928 Validación en SubscriberEmailRegistry: is_valid=True, message='Email válido para registro'
+INFO 2026-06-10 10:07:47,846 create_subscriber 2780 3928 Buscando email en ListOfSubscriber: 'sw9@bromteck.com', existe=False
+INFO 2026-06-10 10:07:47,847 create_subscriber 2780 3928 Usando código proporcionado: 123456789
+INFO 2026-06-10 10:07:47,848 create_subscriber 2780 3928 Creando suscriptor: 123456789
+INFO 2026-06-10 10:07:47,848 create_subscriber 2780 3928 Parámetros a enviar a PanAccess: {'subscriber[code]': '123456789', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'perez', 'subscriber[firstName]': 'josecarlos', 'subscriber[countryCode]': 'DO'}
+INFO 2026-06-10 10:07:47,849 panaccess_client 2780 3928 Llamando 'addSubscriber' - Parámetros: {'subscriber[code]': '123456789', 'subscriber[hcId]': 'hc01480190', 'subscriber[supervisor]': 'AUTOMATICO', 'subscriber[lastName]': 'perez', 'subscriber[firstName]': 'josecarlos', 'subscriber[countryCode]': 'DO'}
+INFO 2026-06-10 10:07:48,570 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:48,573 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111150'}
+INFO 2026-06-10 10:07:49,071 panaccess_client 2780 3928 Llamada 'addSubscriber' exitosa - str(123456789)
+INFO 2026-06-10 10:07:49,077 create_subscriber 2780 3928 Suscriptor 123456789 creado exitosamente
+INFO 2026-06-10 10:07:49,077 create_subscriber 2780 3928 [DB] Obteniendo información completa del suscriptor 123456789 desde PanAccess
+INFO 2026-06-10 10:07:49,077 panaccess_client 2780 3928 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:49,787 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:49,789 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111149'}
+INFO 2026-06-10 10:07:50,407 panaccess_client 2780 3928 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 163)
+INFO 2026-06-10 10:07:50,412 create_subscriber 2780 3928 [DB] Suscriptor 123456789 encontrado en PanAccess
+INFO 2026-06-10 10:07:50,412 create_subscriber 2780 3928 [DB] No se encontraron smartcards asociadas al suscriptor
+INFO 2026-06-10 10:07:50,446 create_subscriber 2780 3928 [DB] Suscriptor 123456789 guardado exitosamente en ListOfSubscriber
+INFO 2026-06-10 10:07:50,455 create_subscriber 2780 3928 Registro de email creado: sw9@bromteck.com -> 123456789
+INFO 2026-06-10 10:07:50,462 create_subscriber 2780 3928 Registro de documento creado: 123456789 -> sw9@bromteck.com
+INFO 2026-06-10 10:07:50,463 create_subscriber 2780 3928 Agregando email sw9@bromteck.com al suscriptor 123456789
+INFO 2026-06-10 10:07:50,464 panaccess_client 2780 3928 Llamando 'addContactToSubscriber' - Parámetros: {'code': '123456789', 'type': 'email', 'isBusiness': False, 'contact': 'sw9@bromteck.com'}
+INFO 2026-06-10 10:07:51,257 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:51,267 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111148'}
+INFO 2026-06-10 10:07:51,689 panaccess_client 2780 3928 Llamada 'addContactToSubscriber' exitosa - int(4685669)
+INFO 2026-06-10 10:07:51,692 create_subscriber 2780 3928 Email agregado exitosamente
+INFO 2026-06-10 10:07:51,692 create_subscriber 2780 3928 [ValidateContact] contactId=4685669 obtenido de addContactToSubscriber (subscriber=123456789)
+INFO 2026-06-10 10:07:51,692 create_subscriber 2780 3928 [ValidateContact] Llamando validateContactOfSubscriber (subscriber=123456789, contactId=4685669, email=sw9@bromteck.com, asLogin=True, overrideContact=sw9@bromteck.com)
+INFO 2026-06-10 10:07:51,694 panaccess_client 2780 3928 Llamando 'validateContactOfSubscriber' - Parámetros: {'code': '123456789', 'contactId': 4685669, 'asLogin': 1, 'overrideContact': 'sw9@bromteck.com'}
+INFO 2026-06-10 10:07:52,478 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:52,478 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111147'}
+INFO 2026-06-10 10:07:52,837 panaccess_client 2780 3928 Llamada 'validateContactOfSubscriber' exitosa - list(0 items)
+INFO 2026-06-10 10:07:52,841 create_subscriber 2780 3928 [ValidateContact] Email validado correctamente (subscriber=123456789, contactId=4685669, func=validateContactOfSubscriber, answer=[])
+INFO 2026-06-10 10:07:52,841 create_subscriber 2780 3928 Agregando teléfono +541141637864 al suscriptor 123456789
+INFO 2026-06-10 10:07:52,841 panaccess_client 2780 3928 Llamando 'addContactToSubscriber' - Parámetros: {'code': '123456789', 'type': 'phone', 'isBusiness': False, 'contact': '+541141637864'}
+INFO 2026-06-10 10:07:53,677 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:53,687 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111146'}
+INFO 2026-06-10 10:07:54,096 panaccess_client 2780 3928 Llamada 'addContactToSubscriber' exitosa - int(4685670)
+INFO 2026-06-10 10:07:54,096 create_subscriber 2780 3928 Teléfono agregado exitosamente
+INFO 2026-06-10 10:07:54,096 create_subscriber 2780 3928 [LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: 123456789
+INFO 2026-06-10 10:07:54,096 panaccess_client 2780 3928 Llamando 'addLicenseBlockToSubscriber' - Parámetros: {'code': '123456789'}
+INFO 2026-06-10 10:07:54,859 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:54,867 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111145'}
+INFO 2026-06-10 10:07:57,328 panaccess_client 2780 3928 Llamada 'addLicenseBlockToSubscriber' exitosa - list(4 items)
+INFO 2026-06-10 10:07:57,328 create_subscriber 2780 3928 [LicenseBlock] Respuesta recibida - success=True
+INFO 2026-06-10 10:07:57,328 create_subscriber 2780 3928 [LicenseBlock] License block agregado exitosamente al suscriptor 123456789
+INFO 2026-06-10 10:07:57,328 create_subscriber 2780 3928 [DB] Actualizando smartcards del suscriptor 123456789 después de addLicenseBlockToSubscriber
+INFO 2026-06-10 10:07:57,337 panaccess_client 2780 3928 Llamando 'getListOfExtendedSubscribers' - Parámetros: {'usePrefixFlags': True, 'offset': 0, 'limit': 100, 'orderBy': 'created', 'orderDir': 'DESC'}
+INFO 2026-06-10 10:07:57,344 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:57,347 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111144'}
+INFO 2026-06-10 10:07:58,543 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:58,546 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111143'}
+INFO 2026-06-10 10:07:58,574 panaccess_client 2780 3928 Llamada 'getListOfExtendedSubscribers' exitosa - dict(count: 163)
+INFO 2026-06-10 10:07:58,574 create_subscriber 2780 3928 [DB] Smartcards actualizadas desde PanAccess: ['4001412730', '4001412731', '4001412732', '4001412733']
+INFO 2026-06-10 10:07:58,582 create_subscriber 2780 3928 [DB] Campo smartcards actualizado exitosamente para suscriptor 123456789
+INFO 2026-06-10 10:07:58,584 create_subscriber 2780 3928 [Products] Iniciando proceso para agregar productos a 4 smartcards
+INFO 2026-06-10 10:07:58,584 create_subscriber 2780 3928 [Products] Agregando producto 4639 a 4 smartcards
+INFO 2026-06-10 10:07:58,585 create_subscriber 2780 3928 [Products] Fecha de expiración: 2026-07-10 17:07:48 (30 días desde creación)
+INFO 2026-06-10 10:07:58,586 panaccess_client 2780 3928 Llamando 'addProductToSmartcards' - Parámetros: {'productId': 4639, 'hcId': 'hc01480190', 'expiryTime': '2026-07-10 17:07:48', 'smartcards[0]': '4001412730', 'smartcards[1]': '4001412731', 'smartcards[2]': '4001412732', 'smartcards[3]': '4001412733'}
+INFO 2026-06-10 10:07:59,818 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:07:59,829 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111142'}
+INFO 2026-06-10 10:07:59,881 panaccess_client 2780 3928 Llamada 'addProductToSmartcards' exitosa - list(0 items)
+INFO 2026-06-10 10:07:59,881 create_subscriber 2780 3928 [Products] Respuesta recibida - success=True
+INFO 2026-06-10 10:07:59,881 create_subscriber 2780 3928 [Products] Producto 4639 agregado exitosamente a 4 smartcards
+INFO 2026-06-10 10:07:59,881 tasks 2780 3928 Enviando email de verificación a sw9@bromteck.com
+INFO 2026-06-10 10:08:00,917 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:00,917 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111141'}
+INFO 2026-06-10 10:08:01,165 tasks 2780 3928 Email enviado exitosamente a sw9@bromteck.com
+INFO 2026-06-10 10:08:01,196 runserver 2780 9716 [mHTTP POST /wind/create-subscriber/ 201 [14.88, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:01,256 panaccess_client 2780 21208 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123456789'}
+INFO 2026-06-10 10:08:02,463 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:02,465 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111140'}
+INFO 2026-06-10 10:08:02,726 panaccess_client 2780 21208 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:02,736 runserver 2780 9716 [mHTTP GET /wind/credentials/?t=123456789|1||c3c5QGJyb210ZWNrLmNvbQ==:1wXIf1:d1j7sZsELWkmcGvV8sHwQVWp6A5yZOgcIbhkzxCtTIA 200 [1.49, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:03,757 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:03,764 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111139'}
+INFO 2026-06-10 10:08:04,897 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:04,897 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111138'}
+INFO 2026-06-10 10:08:06,055 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:06,067 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111137'}
+INFO 2026-06-10 10:08:07,186 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:07,189 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111136'}
+INFO 2026-06-10 10:08:08,323 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:08,331 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111135'}
+INFO 2026-06-10 10:08:09,413 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:09,417 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111134'}
+INFO 2026-06-10 10:08:10,589 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:10,589 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111133'}
+INFO 2026-06-10 10:08:11,675 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:11,678 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111132'}
+INFO 2026-06-10 10:08:12,859 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:12,864 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111131'}
+INFO 2026-06-10 10:08:13,977 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:13,982 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111130'}
+INFO 2026-06-10 10:08:15,086 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:15,088 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111129'}
+INFO 2026-06-10 10:08:16,264 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:16,266 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111128'}
+INFO 2026-06-10 10:08:17,441 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:17,443 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111127'}
+INFO 2026-06-10 10:08:18,592 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:18,592 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111126'}
+INFO 2026-06-10 10:08:19,749 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:19,752 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111125'}
+INFO 2026-06-10 10:08:21,104 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:21,106 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111124'}
+INFO 2026-06-10 10:08:22,235 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:22,237 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111123'}
+INFO 2026-06-10 10:08:22,508 runserver 2780 9716 [mHTTP GET /wind/login/ 200 [0.01, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:23,689 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:23,691 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111122'}
+INFO 2026-06-10 10:08:24,822 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:24,827 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111121'}
+INFO 2026-06-10 10:08:25,901 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:25,902 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111120'}
+INFO 2026-06-10 10:08:27,186 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:27,188 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111119'}
+INFO 2026-06-10 10:08:28,354 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:28,359 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111118'}
+INFO 2026-06-10 10:08:29,609 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:29,612 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111117'}
+INFO 2026-06-10 10:08:30,863 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:30,864 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111116'}
+INFO 2026-06-10 10:08:32,032 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:32,034 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111115'}
+INFO 2026-06-10 10:08:33,280 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:33,282 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '9'}
+INFO 2026-06-10 10:08:33,335 panaccess_client 2780 9292 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123456789'}
+INFO 2026-06-10 10:08:34,453 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:34,465 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '8'}
+INFO 2026-06-10 10:08:34,571 panaccess_client 2780 9292 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:35,840 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:35,843 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '347'}
+INFO 2026-06-10 10:08:36,069 runserver 2780 9716 [mHTTP POST /api/auth/login/ 200 [5.44, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:36,094 runserver 2780 9716 [mHTTP GET /wind/dashboard/ 200 [0.01, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:36,516 runserver 2780 9716 [mHTTP GET /api/v1/profile/me/ 200 [0.25, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:36,664 runserver 2780 9716 [mHTTP GET /api/v1/profile/products/ 200 [0.14, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:08:37,327 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:37,330 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '342'}
+INFO 2026-06-10 10:08:38,552 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:38,557 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '341'}
+INFO 2026-06-10 10:08:39,704 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:39,704 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '340'}
+INFO 2026-06-10 10:08:40,926 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:40,928 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '339'}
+INFO 2026-06-10 10:08:42,306 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:42,307 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '338'}
+INFO 2026-06-10 10:08:43,539 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:43,541 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '337'}
+INFO 2026-06-10 10:08:44,811 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:44,811 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '336'}
+INFO 2026-06-10 10:08:46,026 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:46,026 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '335'}
+INFO 2026-06-10 10:08:47,182 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:47,183 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '334'}
+INFO 2026-06-10 10:08:48,302 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:48,306 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '333'}
+INFO 2026-06-10 10:08:49,413 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:49,415 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '332'}
+INFO 2026-06-10 10:08:50,514 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:50,515 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '331'}
+INFO 2026-06-10 10:08:51,611 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:51,613 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '330'}
+INFO 2026-06-10 10:08:52,801 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:52,801 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111114'}
+INFO 2026-06-10 10:08:53,936 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:53,936 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '321'}
+INFO 2026-06-10 10:08:55,056 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:55,056 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '302'}
+INFO 2026-06-10 10:08:56,144 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:56,144 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '297'}
+INFO 2026-06-10 10:08:57,353 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:57,354 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111113'}
+INFO 2026-06-10 10:08:58,441 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:58,443 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111112'}
+INFO 2026-06-10 10:08:59,583 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:08:59,583 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '2560'}
+INFO 2026-06-10 10:09:00,719 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:00,719 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '1111111111'}
+INFO 2026-06-10 10:09:01,792 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:01,801 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'test'}
+INFO 2026-06-10 10:09:02,945 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:02,948 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '4444'}
+INFO 2026-06-10 10:09:04,171 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:04,178 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'Gonzalo'}
+INFO 2026-06-10 10:09:05,285 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:05,285 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'MDP'}
+INFO 2026-06-10 10:09:06,401 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:06,411 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'CAVS94'}
+INFO 2026-06-10 10:09:07,477 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:07,480 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST24'}
+INFO 2026-06-10 10:09:08,608 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:08,612 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST23'}
+INFO 2026-06-10 10:09:09,756 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:09,759 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST22'}
+INFO 2026-06-10 10:09:10,922 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:10,922 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST21'}
+INFO 2026-06-10 10:09:12,044 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:12,044 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST20'}
+INFO 2026-06-10 10:09:13,187 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:13,187 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST19'}
+INFO 2026-06-10 10:09:14,354 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:14,354 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST18'}
+INFO 2026-06-10 10:09:15,443 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:15,444 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST17'}
+INFO 2026-06-10 10:09:16,512 runserver 2780 9716 [mHTTP GET /wind/login/ 200 [0.01, 127.0.0.1:52432][0m
+INFO 2026-06-10 10:09:16,563 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:16,565 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST16'}
+INFO 2026-06-10 10:09:17,820 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:17,820 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST15'}
+INFO 2026-06-10 10:09:18,979 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:18,979 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST14'}
+INFO 2026-06-10 10:09:20,114 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:20,114 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST13'}
+INFO 2026-06-10 10:09:21,352 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:21,352 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST12'}
+INFO 2026-06-10 10:09:22,521 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:22,521 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST11'}
+INFO 2026-06-10 10:09:23,677 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:23,680 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST10'}
+INFO 2026-06-10 10:09:24,899 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:24,908 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST9'}
+INFO 2026-06-10 10:09:25,972 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:25,972 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST8'}
+INFO 2026-06-10 10:09:27,123 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:27,124 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST7'}
+INFO 2026-06-10 10:09:28,191 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:28,193 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST6'}
+INFO 2026-06-10 10:09:29,412 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:29,412 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST5'}
+INFO 2026-06-10 10:09:30,554 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:30,562 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST4'}
+INFO 2026-06-10 10:09:31,638 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:31,638 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST3'}
+INFO 2026-06-10 10:09:32,856 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:32,856 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST2'}
+INFO 2026-06-10 10:09:33,924 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:33,925 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': 'TEST1'}
+INFO 2026-06-10 10:09:34,992 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:34,992 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '152'}
+INFO 2026-06-10 10:09:36,044 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:36,051 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '151'}
+INFO 2026-06-10 10:09:37,206 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:37,207 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '150'}
+INFO 2026-06-10 10:09:38,405 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:38,405 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '149'}
+INFO 2026-06-10 10:09:39,515 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:39,516 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '148'}
+INFO 2026-06-10 10:09:40,667 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:40,667 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '147'}
+INFO 2026-06-10 10:09:41,888 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:41,888 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '146'}
+INFO 2026-06-10 10:09:42,985 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:42,985 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '145'}
+INFO 2026-06-10 10:09:44,065 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:44,067 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '144'}
+INFO 2026-06-10 10:09:45,195 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:45,199 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '143'}
+INFO 2026-06-10 10:09:46,354 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:46,354 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '142'}
+INFO 2026-06-10 10:09:47,570 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:47,571 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '141'}
+INFO 2026-06-10 10:09:48,858 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:48,858 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '140'}
+INFO 2026-06-10 10:09:49,966 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:49,966 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '139'}
+INFO 2026-06-10 10:09:51,095 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:51,095 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '138'}
+INFO 2026-06-10 10:09:52,213 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:52,213 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '137'}
+INFO 2026-06-10 10:09:53,348 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:53,356 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '136'}
+INFO 2026-06-10 10:09:54,418 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:54,418 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '134'}
+INFO 2026-06-10 10:09:55,573 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:55,575 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '133'}
+INFO 2026-06-10 10:09:56,826 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:56,831 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '132'}
+INFO 2026-06-10 10:09:58,117 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:58,119 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '131'}
+INFO 2026-06-10 10:09:59,532 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:09:59,534 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '130'}
+INFO 2026-06-10 10:10:00,687 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:00,687 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '129'}
+INFO 2026-06-10 10:10:01,820 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:01,821 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '128'}
+INFO 2026-06-10 10:10:03,001 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:03,003 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '127'}
+INFO 2026-06-10 10:10:04,114 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:04,118 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '126'}
+INFO 2026-06-10 10:10:05,306 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:05,308 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '125'}
+INFO 2026-06-10 10:10:06,561 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:06,564 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '124'}
+INFO 2026-06-10 10:10:07,652 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:07,659 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '123'}
+INFO 2026-06-10 10:10:08,794 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:08,794 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '122'}
+INFO 2026-06-10 10:10:09,929 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:09,931 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '121'}
+INFO 2026-06-10 10:10:11,123 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:11,127 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '64'}
+INFO 2026-06-10 10:10:12,357 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:12,357 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '120'}
+INFO 2026-06-10 10:10:13,703 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:13,706 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '119'}
+INFO 2026-06-10 10:10:14,883 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:14,885 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '118'}
+INFO 2026-06-10 10:10:16,039 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:16,040 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '106'}
+INFO 2026-06-10 10:10:17,286 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:17,286 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '117'}
+INFO 2026-06-10 10:10:18,379 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:18,381 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '116'}
+INFO 2026-06-10 10:10:19,474 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:19,475 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '115'}
+INFO 2026-06-10 10:10:20,567 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:20,567 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '114'}
+INFO 2026-06-10 10:10:21,734 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:21,744 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '113'}
+INFO 2026-06-10 10:10:22,851 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:22,852 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '112'}
+INFO 2026-06-10 10:10:23,996 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:23,997 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '111'}
+INFO 2026-06-10 10:10:25,093 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:25,093 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '110'}
+INFO 2026-06-10 10:10:26,323 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:26,324 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '109'}
+INFO 2026-06-10 10:10:27,455 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:27,455 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '108'}
+INFO 2026-06-10 10:10:28,613 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:28,613 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '107'}
+INFO 2026-06-10 10:10:29,711 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:29,713 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '105'}
+INFO 2026-06-10 10:10:30,838 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:30,838 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '104'}
+INFO 2026-06-10 10:10:32,016 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)
+INFO 2026-06-10 10:10:32,016 panaccess_client 16344 19168 Llamando 'getSubscriberLoginInfo' - Parámetros: {'subscriberCode': '2'}
+INFO 2026-06-10 10:10:33,173 panaccess_client 16344 19168 Llamada 'getSubscriberLoginInfo' exitosa - dict(5 keys)

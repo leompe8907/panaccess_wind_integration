@@ -9,7 +9,10 @@ from django.contrib.auth import get_user_model
 from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
 
-from wind.functions.getSmartcard import fetch_subscriber_smartcards_from_panaccess
+from wind.functions.getSmartcard import (
+    fetch_subscriber_smartcards_from_panaccess,
+    normalize_smartcard_row,
+)
 from wind.functions.getSubscriber import CallGetSubscriber, extract_first_email
 from wind.models import (
     ListOfProducts,
@@ -291,7 +294,7 @@ def _upsert_smartcard_entry(entry: dict) -> None:
     sn = entry.get("sn")
     if not sn:
         return
-    filtered = {k: v for k, v in entry.items() if k in _SMARTCARD_MODEL_FIELDS}
+    filtered = normalize_smartcard_row(entry)
     if not filtered.get("sn"):
         return
     ListOfSmartcards.objects.update_or_create(sn=filtered["sn"], defaults=filtered)

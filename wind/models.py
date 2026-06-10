@@ -76,7 +76,7 @@ class ListOfSmartcards(models.Model):
     pin = models.CharField(max_length=100, null=True, blank=True)
     pairedBox = models.CharField(max_length=100, null=True, blank=True)
     products = models.JSONField(null=True, blank=True)
-    casIds = models.CharField(max_length=100, null=True, blank=True)
+    casIds = models.CharField(max_length=255, null=True, blank=True)
     packages = models.JSONField(null=True, blank=True)
     packageNames = models.JSONField(null=True, blank=True)
     configId = models.CharField(max_length=100, null=True, blank=True)
