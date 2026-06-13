@@ -62,7 +62,7 @@ sudo ufw --force enable
     Ejecuta las siguientes consultas SQL dentro del prompt (`psql`):
     ```sql
     CREATE DATABASE wind_db;
-    CREATE USER wind_user WITH PASSWORD 'CONTRASEÑA_FUERTE_POSTGRES';
+    CREATE USER wind_user WITH PASSWORD 'parana771';
     ALTER ROLE wind_user SET client_encoding TO 'utf8';
     ALTER ROLE wind_user SET default_transaction_isolation TO 'read committed';
     ALTER ROLE wind_user SET timezone TO 'UTC';
