@@ -12109,3 +12109,20 @@ INFO 2026-06-13 04:52:03,951 panaccess_client 85405 129863666483328 Llamando 'ge
 INFO 2026-06-13 04:52:10,109 panaccess_client 85405 129863666483328 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 500 items, count: 500000)
 INFO 2026-06-13 04:52:10,122 panaccess_client 85405 129863666483328 Llamando 'getListOfSmartcards' - Parámetros: {'offset': 499500, 'limit': 500, 'orderDir': 'DESC', 'orderBy': 'sn'}
 INFO 2026-06-13 04:52:16,528 panaccess_client 85405 129863666483328 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 500 items, count: 500000)
+INFO 2026-06-13 15:52:52,096 panaccess_singleton 7891 133193178181760 No hay sesión, autenticando...
+INFO 2026-06-13 15:52:52,096 panaccess_singleton 7891 133193178181760 Intento login #1/5
+INFO 2026-06-13 15:52:52,096 panaccess_auth 7891 133193178181760 Iniciando login
+INFO 2026-06-13 15:52:53,149 panaccess_auth 7891 133193178181760 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-13 15:52:53,150 panaccess_singleton 7891 133193178181760 Login exitoso
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193178181760 PanAccess inicializado y autenticado
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193058481856 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193178181760 Thread de validación periódica iniciado
+INFO 2026-06-13 16:00:41,595 panaccess_singleton 10628 133774604001408 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:00:41,596 panaccess_singleton 10628 133774485485248 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:00:41,596 panaccess_singleton 10628 133774604001408 Thread de validación periódica iniciado
+INFO 2026-06-13 16:02:41,248 panaccess_singleton 10843 139230143500416 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:02:41,249 panaccess_singleton 10843 139230024038080 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:02:41,249 panaccess_singleton 10843 139230143500416 Thread de validación periódica iniciado
+INFO 2026-06-13 16:08:52,884 panaccess_singleton 14387 123617350762624 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:08:52,885 panaccess_singleton 14387 123617231763136 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:08:52,885 panaccess_singleton 14387 123617350762624 Thread de validación periódica iniciado

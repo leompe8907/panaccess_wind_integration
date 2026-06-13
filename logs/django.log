@@ -12158,3 +12158,121 @@ INFO 2026-06-13 04:52:10,122 panaccess_client 85405 129863666483328 Llamando 'ge
 INFO 2026-06-13 04:52:16,528 panaccess_client 85405 129863666483328 Llamada 'getListOfSmartcards' exitosa - dict(smartcardEntries: 500 items, count: 500000)
 INFO 2026-06-13 04:52:16,716 getSmartcard 85405 129863666483328 Reconciliación smartcards — remoto=500000, local antes=500000, actualizados=35, creados=0, eliminados=0
 INFO 2026-06-13 04:52:17,025 tasks 85405 129863666483328 [Celery] compare_and_update_smartcards_task completada
+INFO 2026-06-13 15:52:51,993 apps 7891 133193178181760 Inicializando PanAccess singleton...
+INFO 2026-06-13 15:52:52,096 panaccess_singleton 7891 133193178181760 No hay sesión, autenticando...
+INFO 2026-06-13 15:52:52,096 panaccess_singleton 7891 133193178181760 Intento login #1/5
+INFO 2026-06-13 15:52:52,096 panaccess_auth 7891 133193178181760 Iniciando login
+INFO 2026-06-13 15:52:53,149 panaccess_auth 7891 133193178181760 Login exitoso - SessionId obtenido (26 caracteres)
+INFO 2026-06-13 15:52:53,150 panaccess_singleton 7891 133193178181760 Login exitoso
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193178181760 PanAccess inicializado y autenticado
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193058481856 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 15:52:53,153 panaccess_singleton 7891 133193178181760 Thread de validación periódica iniciado
+INFO 2026-06-13 15:52:53,171 autoreload 7891 133193178181760 Watching for file changes with StatReloader
+INFO 2026-06-13 15:52:53,288 log_buffer 7891 133193178181760 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-13 15:52:53,462 server 7891 133192975644352 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-13 15:52:53,463 server 7891 133192975644352 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-13 15:52:53,463 server 7891 133192975644352 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-13 15:53:57,215 runserver 7891 133192975644352 [mHTTP GET /wind/dashboard/ 200 [0.01, 127.0.0.1:52988][0m
+INFO 2026-06-13 15:53:57,262 runserver 7891 133192975644352 [36mHTTP GET /static/wind/css/app.css 304 [0.00, 127.0.0.1:52988][0m
+INFO 2026-06-13 15:53:57,264 runserver 7891 133192975644352 [36mHTTP GET /static/wind/js/auth-store.js 304 [0.00, 127.0.0.1:53004][0m
+INFO 2026-06-13 15:53:57,281 runserver 7891 133192975644352 [36mHTTP GET /static/wind/images/backgroundalt.webp 304 [0.00, 127.0.0.1:53004][0m
+INFO 2026-06-13 15:53:57,325 runserver 7891 133192975644352 [mHTTP GET /wind/login/ 200 [0.02, 127.0.0.1:52988][0m
+INFO 2026-06-13 15:54:03,043 runserver 7891 133192975644352 [mHTTP POST /api/auth/login/ 200 [0.39, 127.0.0.1:52988][0m
+INFO 2026-06-13 15:54:03,055 runserver 7891 133192975644352 [mHTTP GET /wind/dashboard/ 200 [0.00, 127.0.0.1:52988][0m
+INFO 2026-06-13 15:54:03,129 runserver 7891 133192975644352 [mHTTP GET /api/v1/profile/me/ 200 [0.04, 127.0.0.1:53004][0m
+INFO 2026-06-13 15:54:03,171 runserver 7891 133192975644352 [mHTTP GET /api/v1/profile/products/ 200 [0.04, 127.0.0.1:53004][0m
+INFO 2026-06-13 15:54:48,208 runserver 7891 133192975644352 [mHTTP GET /wind/login/ 200 [0.00, 127.0.0.1:52988][0m
+INFO 2026-06-13 16:00:40,141 autoreload 7891 133193178181760 /home/oem/Desktop/panaccess_wind_integration/panaccess_wind_integration/settings.py changed, reloading.
+INFO 2026-06-13 16:00:41,446 apps 10628 133774604001408 Inicializando PanAccess singleton...
+INFO 2026-06-13 16:00:41,595 panaccess_singleton 10628 133774604001408 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:00:41,596 panaccess_singleton 10628 133774485485248 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:00:41,596 panaccess_singleton 10628 133774604001408 Thread de validación periódica iniciado
+INFO 2026-06-13 16:00:41,616 autoreload 10628 133774604001408 Watching for file changes with StatReloader
+INFO 2026-06-13 16:00:41,714 log_buffer 10628 133774604001408 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-13 16:00:41,825 server 10628 133774406842048 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-13 16:00:41,825 server 10628 133774406842048 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-13 16:00:41,826 server 10628 133774406842048 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-13 16:02:41,178 apps 10843 139230143500416 Inicializando PanAccess singleton...
+INFO 2026-06-13 16:02:41,248 panaccess_singleton 10843 139230143500416 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:02:41,249 panaccess_singleton 10843 139230024038080 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:02:41,249 panaccess_singleton 10843 139230143500416 Thread de validación periódica iniciado
+INFO 2026-06-13 16:02:41,263 autoreload 10843 139230143500416 Watching for file changes with StatReloader
+INFO 2026-06-13 16:02:41,337 log_buffer 10843 139230143500416 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-13 16:02:41,422 server 10843 139230014596800 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-13 16:02:41,422 server 10843 139230014596800 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-13 16:02:41,423 server 10843 139230014596800 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-13 16:02:45,018 runserver 10843 139230014596800 [mHTTP POST /api/auth/login/ 200 [0.69, 127.0.0.1:49150][0m
+INFO 2026-06-13 16:02:45,034 runserver 10843 139230014596800 [mHTTP GET /wind/dashboard/ 200 [0.01, 127.0.0.1:49150][0m
+INFO 2026-06-13 16:02:45,109 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/me/ 200 [0.03, 127.0.0.1:49150][0m
+INFO 2026-06-13 16:02:45,145 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/products/ 200 [0.03, 127.0.0.1:49150][0m
+INFO 2026-06-13 16:03:03,326 runserver 10843 139230014596800 [mHTTP GET /wind/dashboard/ 200 [0.00, 127.0.0.1:36876][0m
+INFO 2026-06-13 16:05:34,413 runserver 10843 139230014596800 [mHTTP GET /wind/dashboard/ 200 [0.00, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:05:34,476 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/me/ 200 [0.04, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:05:38,582 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/products/ 200 [0.03, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:05:49,644 runserver 10843 139230014596800 [mHTTP GET /wind/dashboard/ 200 [0.01, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:05:49,698 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/me/ 200 [0.03, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:05:58,140 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/products/ 200 [0.03, 127.0.0.1:42364][0m
+INFO 2026-06-13 16:07:23,073 runserver 10843 139230014596800 [mHTTP GET /wind/dashboard/ 200 [0.01, 127.0.0.1:50352][0m
+INFO 2026-06-13 16:07:23,126 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/me/ 200 [0.03, 127.0.0.1:50352][0m
+INFO 2026-06-13 16:07:26,838 runserver 10843 139230014596800 [mHTTP GET /api/v1/profile/products/ 200 [0.03, 127.0.0.1:50352][0m
+INFO 2026-06-13 16:08:30,667 log_buffer 14342 130826937680000 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-13 16:08:52,811 apps 14387 123617350762624 Inicializando PanAccess singleton...
+INFO 2026-06-13 16:08:52,884 panaccess_singleton 14387 123617350762624 PanAccess inicializado y autenticado
+INFO 2026-06-13 16:08:52,885 panaccess_singleton 14387 123617231763136 Validación periódica iniciada (intervalo: 900s)
+INFO 2026-06-13 16:08:52,885 panaccess_singleton 14387 123617350762624 Thread de validación periódica iniciado
+INFO 2026-06-13 16:08:52,898 autoreload 14387 123617350762624 Watching for file changes with StatReloader
+INFO 2026-06-13 16:08:52,962 log_buffer 14387 123617222321856 LogBuffer flush thread started (interval=5s, batch_size=100)
+INFO 2026-06-13 16:08:53,063 server 14387 123617222321856 HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-06-13 16:08:53,064 server 14387 123617222321856 Configuring endpoint tcp:port=8000:interface=127.0.0.1
+INFO 2026-06-13 16:08:53,065 server 14387 123617222321856 Listening on TCP address 127.0.0.1:8000
+INFO 2026-06-13 16:09:03,505 runserver 14387 123617222321856 [32mHTTP GET /admin/ 302 [0.04, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:03,566 runserver 14387 123617222321856 [mHTTP GET /admin/login/?next=/admin/ 200 [0.06, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:03,624 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/base.css 200 [0.02, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:03,625 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/nav_sidebar.css 200 [0.01, 127.0.0.1:49376][0m
+INFO 2026-06-13 16:09:03,627 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/theme.js 200 [0.02, 127.0.0.1:49374][0m
+INFO 2026-06-13 16:09:03,629 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/nav_sidebar.js 200 [0.02, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:03,632 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/dark_mode.css 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:03,632 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/login.css 200 [0.02, 127.0.0.1:49398][0m
+INFO 2026-06-13 16:09:03,637 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/responsive.css 200 [0.01, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:13,778 runserver 14387 123617222321856 [32mHTTP POST /admin/login/?next=/admin/ 302 [0.36, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:13,812 runserver 14387 123617222321856 [mHTTP GET /admin/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:13,848 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/dashboard.css 200 [0.00, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:13,862 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/icon-addlink.svg 200 [0.00, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:13,863 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/icon-changelink.svg 200 [0.00, 127.0.0.1:49376][0m
+INFO 2026-06-13 16:09:23,410 runserver 14387 123617222321856 [mHTTP GET /admin/auth/user/ 200 [0.04, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:23,441 runserver 14387 123617222321856 [mHTTP GET /static/admin/css/changelists.css 200 [0.01, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:23,443 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/vendor/jquery/jquery.js 200 [0.01, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:23,452 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/jquery.init.js 200 [0.01, 127.0.0.1:49374][0m
+INFO 2026-06-13 16:09:23,454 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/admin/RelatedObjectLookups.js 200 [0.01, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:23,455 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/core.js 200 [0.02, 127.0.0.1:49398][0m
+INFO 2026-06-13 16:09:23,459 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/actions.js 200 [0.02, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:23,461 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/urlify.js 200 [0.01, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:23,465 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/prepopulate.js 200 [0.01, 127.0.0.1:49374][0m
+INFO 2026-06-13 16:09:23,469 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/filters.js 200 [0.01, 127.0.0.1:49398][0m
+INFO 2026-06-13 16:09:23,473 runserver 14387 123617222321856 [mHTTP GET /static/admin/js/vendor/xregexp/xregexp.js 200 [0.01, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:23,477 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.04, 127.0.0.1:49376][0m
+INFO 2026-06-13 16:09:23,483 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/icon-yes.svg 200 [0.01, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:23,484 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/search.svg 200 [0.01, 127.0.0.1:49398][0m
+INFO 2026-06-13 16:09:23,485 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/icon-no.svg 200 [0.01, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:23,525 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/tooltag-add.svg 200 [0.00, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:23,525 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/sorting-icons.svg 200 [0.01, 127.0.0.1:49376][0m
+INFO 2026-06-13 16:09:23,526 runserver 14387 123617222321856 [mHTTP GET /static/admin/img/icon-viewlink.svg 200 [0.00, 127.0.0.1:49384][0m
+INFO 2026-06-13 16:09:38,715 runserver 14387 123617222321856 [mHTTP GET /admin/account/emailaddress/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:38,762 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:40,444 runserver 14387 123617222321856 [mHTTP GET /admin/socialaccount/socialapp/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:40,489 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:42,724 runserver 14387 123617222321856 [mHTTP GET /admin/token_blacklist/blacklistedtoken/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:42,769 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:43,668 runserver 14387 123617222321856 [mHTTP GET /admin/token_blacklist/outstandingtoken/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:47,161 runserver 14387 123617222321856 [mHTTP GET /admin/authtoken/tokenproxy/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:49,858 runserver 14387 123617222321856 [mHTTP GET /admin/socialaccount/socialtoken/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:49,905 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:50,961 runserver 14387 123617222321856 [mHTTP GET /admin/socialaccount/socialaccount/ 200 [0.02, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:51,000 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:52,265 runserver 14387 123617222321856 [mHTTP GET /admin/socialaccount/socialapp/ 200 [0.02, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:52,306 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+INFO 2026-06-13 16:09:55,990 runserver 14387 123617222321856 [mHTTP GET /admin/socialaccount/ 200 [0.02, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:09:59,408 runserver 14387 123617222321856 [mHTTP GET /admin/ 200 [0.02, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:10:01,633 runserver 14387 123617222321856 [mHTTP GET /admin/auth/user/ 200 [0.03, 127.0.0.1:49356][0m
+INFO 2026-06-13 16:10:01,671 runserver 14387 123617222321856 [mHTTP GET /admin/jsi18n/ 200 [0.02, 127.0.0.1:49366][0m
+WARNING 2026-06-13 16:10:21,914 runserver 14387 123617222321856 [33mHTTP GET / 404 [0.01, 127.0.0.1:49356][0m

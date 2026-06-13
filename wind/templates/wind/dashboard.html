@@ -14,7 +14,7 @@
           <div class="app-brand">
             <div class="app-logo" aria-hidden="true"></div>
             <div>
-              <h1>Mi cuenta</h1>
+              <h1 id="dash-page-title">Mi cuenta</h1>
               <p id="user-greeting" class="dash-greeting">Cargando…</p>
             </div>
           </div>
@@ -22,92 +22,136 @@
         </header>
 
         <div class="app-content dash-content">
-          <section class="dash-account module-card" id="account-panel">
-            <p id="account-status" class="account-status" hidden></p>
+          <nav class="dash-tablist" id="dash-tablist" role="tablist" aria-label="Secciones de mi cuenta" hidden>
+            <button
+              type="button"
+              class="dash-tab is-active"
+              role="tab"
+              id="tab-btn-account"
+              aria-selected="true"
+              aria-controls="tab-panel-account"
+              data-tab="account"
+            >
+              Mi cuenta
+            </button>
+            <button
+              type="button"
+              class="dash-tab"
+              role="tab"
+              id="tab-btn-password"
+              aria-selected="false"
+              aria-controls="tab-panel-password"
+              data-tab="password"
+              hidden
+            >
+              Contraseña
+            </button>
+            <button
+              type="button"
+              class="dash-tab"
+              role="tab"
+              id="tab-btn-products"
+              aria-selected="false"
+              aria-controls="tab-panel-products"
+              data-tab="products"
+              hidden
+            >
+              Productos
+            </button>
+          </nav>
 
-            <div class="account-layout">
-              <div class="account-column">
-                <h3 class="account-section-title">Tu cuenta</h3>
-                <div class="account-block account-summary">
-              <p class="account-line">
-                <span class="account-line-label">Código de suscriptor:</span>
-                <span id="field-code" class="account-line-value">—</span>
-              </p>
-              <div class="account-line-row">
-                <p class="account-line">
-                  <span class="account-line-label">Nombre:</span>
-                  <span id="field-name" class="account-line-value">—</span>
-                </p>
-                <p class="account-line">
-                  <span class="account-line-label">Correo:</span>
-                  <span id="field-email" class="account-line-value">—</span>
-                </p>
-              </div>
+          <div class="dash-tabpanels">
+            <div
+              role="tabpanel"
+              id="tab-panel-account"
+              class="dash-tabpanel is-active"
+              aria-labelledby="tab-btn-account"
+            >
+              <section class="dash-account module-card" id="account-panel">
+                <p id="account-status" class="account-status" hidden></p>
+
+                <div class="account-fields">
+                  <p class="account-line">
+                    <span class="account-line-label">Código de suscriptor:</span>
+                    <span id="field-code" class="account-line-value">—</span>
+                  </p>
+                  <p class="account-line">
+                    <span class="account-line-label">Nombre:</span>
+                    <span id="field-name" class="account-line-value">—</span>
+                  </p>
+                  <p class="account-line">
+                    <span class="account-line-label">Correo:</span>
+                    <span id="field-email" class="account-line-value">—</span>
+                  </p>
+                  <p class="account-line">
+                    <span class="account-line-label">Usuario de acceso:</span>
+                    <span id="field-login1" class="account-line-value">—</span>
+                  </p>
+                  <p class="account-line">
+                    <span class="account-line-label">Usuario de acceso alternativo:</span>
+                    <span id="field-login2" class="account-line-value">—</span>
+                  </p>
+                  <p class="account-line">
+                    <span class="account-line-label">Número de pantallas:</span>
+                    <span id="field-screens" class="account-line-value">—</span>
+                  </p>
                 </div>
-              </div>
+              </section>
+            </div>
 
-              <div class="account-column">
-                <h3 class="account-section-title">Detalles de la cuenta</h3>
-                <div class="account-block account-details-block">
-              <p class="account-line">
-                <span class="account-line-label">Usuario de acceso:</span>
-                <span id="field-login1" class="account-line-value">—</span>
-              </p>
-              <p class="account-line">
-                <span class="account-line-label">Usuario de acceso alternativo:</span>
-                <span id="field-login2" class="account-line-value">—</span>
-              </p>
-              <p class="account-line">
-                <span class="account-line-label">Número de pantallas:</span>
-                <span id="field-screens" class="account-line-value">—</span>
-              </p>
+            <div
+              role="tabpanel"
+              id="tab-panel-password"
+              class="dash-tabpanel"
+              aria-labelledby="tab-btn-password"
+              hidden
+            >
+              <section class="dash-module module-card" id="password-module">
+                <form id="password-form" class="app-form password-form" novalidate>
+                  <div class="app-field">
+                    <label for="new-password">Nueva contraseña</label>
+                    <input
+                      id="new-password"
+                      name="newPass"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="4"
+                      required
+                    />
+                  </div>
+                  <div class="app-field">
+                    <label for="confirm-password">Confirmar contraseña</label>
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="4"
+                      required
+                    />
+                  </div>
+                  <p id="password-msg" class="app-alert" role="status"></p>
+                  <button type="submit" class="app-btn primary" id="btn-password-submit">
+                    Actualizar contraseña
+                  </button>
+                </form>
+              </section>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="tab-panel-products"
+              class="dash-tabpanel"
+              aria-labelledby="tab-btn-products"
+              hidden
+            >
+              <section class="dash-module module-card" id="products-module">
+                <p id="products-status" class="app-alert" role="status"></p>
+                <div id="products-list" class="products-list">
+                  <p class="products-placeholder">Selecciona esta pestaña para ver tus productos.</p>
                 </div>
-              </div>
+              </section>
             </div>
-          </section>
-
-          <section class="dash-module module-card" id="password-module" hidden>
-            <h3 class="account-section-title">Cambiar contraseña</h3>
-            <p class="module-desc">
-              Se actualizará la contraseña de acceso en PanAccess para tu suscriptor.
-            </p>
-            <form id="password-form" class="app-form password-form" novalidate>
-              <div class="app-field">
-                <label for="new-password">Nueva contraseña</label>
-                <input
-                  id="new-password"
-                  name="newPass"
-                  type="password"
-                  autocomplete="new-password"
-                  minlength="4"
-                  required
-                />
-              </div>
-              <div class="app-field">
-                <label for="confirm-password">Confirmar contraseña</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  autocomplete="new-password"
-                  minlength="4"
-                  required
-                />
-              </div>
-              <p id="password-msg" class="app-alert" role="status"></p>
-              <button type="submit" class="app-btn primary" id="btn-password-submit">
-                Actualizar contraseña
-              </button>
-            </form>
-          </section>
-
-          <section class="dash-module module-card" id="products-module" hidden>
-            <h3 class="account-section-title">Productos y pantallas</h3>
-            <p class="module-desc">Smartcards vinculadas a tu suscriptor y productos activos en cada una.</p>
-            <p id="products-status" class="app-alert" role="status"></p>
-            <div id="products-list" class="products-list">
-              <p class="products-placeholder">Cargando productos…</p>
-            </div>
-          </section>
+          </div>
         </div>
       </div>
     </div>
@@ -141,7 +185,6 @@
           login2: document.getElementById("field-login2"),
           screens: document.getElementById("field-screens"),
         };
-        var passwordModule = document.getElementById("password-module");
         var passwordForm = document.getElementById("password-form");
         var newPasswordInput = document.getElementById("new-password");
         var confirmPasswordInput = document.getElementById("confirm-password");
@@ -151,9 +194,20 @@
         var passwordModalConfirm = document.getElementById("pwd-modal-confirm");
         var passwordModalCancel = document.getElementById("pwd-modal-cancel");
         var pendingNewPassword = null;
-        var productsModule = document.getElementById("products-module");
         var productsList = document.getElementById("products-list");
         var productsStatus = document.getElementById("products-status");
+        var tabButtons = document.querySelectorAll(".dash-tab");
+        var tabPanels = document.querySelectorAll(".dash-tabpanel");
+        var tabBtnPassword = document.getElementById("tab-btn-password");
+        var tabBtnProducts = document.getElementById("tab-btn-products");
+        var pageTitleEl = document.getElementById("dash-page-title");
+        var activeTab = "account";
+        var productsLoaded = false;
+        var tabTitles = {
+          account: "Mi cuenta",
+          password: "Contraseña",
+          products: "Productos",
+        };
 
         function escapeHtml(text) {
           return String(text)
@@ -183,6 +237,61 @@
           if (panelEl) panelEl.classList.toggle("is-loading", loading);
         }
 
+        function switchTab(name) {
+          var targetBtn = null;
+          var i;
+
+          for (i = 0; i < tabButtons.length; i++) {
+            var btn = tabButtons[i];
+            var isActive = btn.dataset.tab === name;
+            btn.classList.toggle("is-active", isActive);
+            btn.setAttribute("aria-selected", isActive ? "true" : "false");
+            if (isActive) targetBtn = btn;
+          }
+
+          for (i = 0; i < tabPanels.length; i++) {
+            var panel = tabPanels[i];
+            var panelName = panel.id.replace("tab-panel-", "");
+            var isActive = panelName === name;
+            panel.classList.toggle("is-active", isActive);
+            panel.hidden = !isActive;
+          }
+
+          if (targetBtn && targetBtn.hidden) {
+            switchTab("account");
+            return;
+          }
+
+          activeTab = name;
+
+          if (pageTitleEl) {
+            pageTitleEl.textContent = tabTitles[name] || tabTitles.account;
+          }
+
+          if (name === "products" && subscriberCode && !productsLoaded) {
+            loadProducts();
+          }
+        }
+
+        function updateSubscriberTabs(hasSubscriber) {
+          var tablist = document.getElementById("dash-tablist");
+
+          if (tabBtnPassword) tabBtnPassword.hidden = !hasSubscriber;
+          if (tabBtnProducts) tabBtnProducts.hidden = !hasSubscriber;
+          if (tablist) tablist.hidden = !hasSubscriber;
+
+          if (!hasSubscriber && activeTab !== "account") {
+            switchTab("account");
+          }
+        }
+
+        tabButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            if (btn.hidden) return;
+            switchTab(btn.dataset.tab);
+          });
+        });
+
         function getSubscriber(data) {
           if (data.subscriber) return data.subscriber;
           if (data.profile && data.profile.subscriber) return data.profile.subscriber;
@@ -201,15 +310,7 @@
           setField(fieldEls.login2, sub.login2);
           setField(fieldEls.screens, sub.smartcards_count);
 
-          if (passwordModule) {
-            passwordModule.hidden = !subscriberCode;
-          }
-          if (productsModule) {
-            productsModule.hidden = !subscriberCode;
-          }
-          if (subscriberCode) {
-            loadProducts();
-          }
+          updateSubscriberTabs(!!subscriberCode);
         }
 
         function showProductsMsg(text, type) {
@@ -294,6 +395,7 @@
               if (!out.ok || !out.data.success) {
                 throw new Error(out.data.message || "No se pudieron cargar los productos");
               }
+              productsLoaded = true;
               renderProducts(out.data);
             })
             .catch(function (err) {

@@ -369,16 +369,16 @@ _FULL_SYNC_SOFT_LIMIT = CeleryConfig.FULL_SYNC_SOFT_TIME_LIMIT
 _FULL_SYNC_ENABLED = CeleryConfig.FULL_SYNC_ENABLED
 
 CELERY_BEAT_SCHEDULE = {
-    # "compare-and-update-subscribers": {
-    #     "task": "wind.tasks.compare_and_update_subscribers_task",
-    #     "schedule": _SCHEDULE,
-    #     "options": {
-    #         "queue": _SYNC_QUEUE,
-    #         "soft_time_limit": CELERY_TASK_SOFT_TIME_LIMIT,
-    #         "time_limit": CELERY_TASK_TIME_LIMIT,
-    #     },
-    #     "args": (_SYNC_LIMIT,),
-    # },
+    "sync-subscribers-incremental": {
+        "task": "wind.tasks.sync_subscribers_task",
+        "schedule": _SCHEDULE,
+        "options": {
+            "queue": _SYNC_QUEUE,
+            "soft_time_limit": CELERY_TASK_SOFT_TIME_LIMIT,
+            "time_limit": CELERY_TASK_TIME_LIMIT,
+        },
+        "args": (_SYNC_LIMIT,),
+    },
     # "compare-and-update-smartcards": {
     #     "task": "wind.tasks.compare_and_update_smartcards_task",
     #     "schedule": _SMARTCARD_SCHEDULE,
