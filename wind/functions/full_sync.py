@@ -93,7 +93,9 @@ def run_full_sync(limit: int = 100) -> dict:
     compare_and_update_all_products(session_id=None, limit=limit)
     result_products_delete = _delete_extra_products(limit=limit)
 
-    result_smartcards = compare_and_update_all_smartcards(session_id=None, limit=limit)
+    result_smartcards = compare_and_update_all_smartcards(
+        session_id=None, limit=limit, force_full=True
+    )
 
     result_login_info = sync_subscribers_login_info(session_id=None, limit=None)
     result_login_cleanup = _cleanup_login_info()
