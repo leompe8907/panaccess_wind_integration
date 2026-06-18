@@ -1,6 +1,8 @@
 [Unit]
-Description=PanAccess Wind — todas las instancias Daphne
-Wants=panaccess-wind@8000.service
+Description=PanAccess Wind — todas las instancias Daphne (8000-8007)
+After=network-online.target postgresql.service redis-server.service
+Wants=panaccess-wind@8000.service panaccess-wind@8001.service panaccess-wind@8002.service panaccess-wind@8003.service
+Wants=panaccess-wind@8004.service panaccess-wind@8005.service panaccess-wind@8006.service panaccess-wind@8007.service
 
 [Install]
 WantedBy=multi-user.target

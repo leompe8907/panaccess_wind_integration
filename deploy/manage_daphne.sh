@@ -15,10 +15,11 @@ ports() {
 }
 
 case "${1:-}" in
-    start|enable)
+    start|    enable)
         for port in $(ports); do
-            systemctl "${1}" "panaccess-wind@${port}.service"
+            systemctl enable "panaccess-wind@${port}.service"
         done
+        systemctl enable panaccess-wind.target 2>/dev/null || true
         ;;
     stop|disable)
         for port in $(ports | tac); do

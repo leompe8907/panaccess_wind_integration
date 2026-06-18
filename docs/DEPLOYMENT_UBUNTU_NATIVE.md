@@ -746,12 +746,60 @@ sudo certbot renew --dry-run
 
 ---
 
+## Paso 10b: Arranque automático tras reboot
+
+El **502** tras encender el servidor casi siempre es: **Nginx arriba, Daphne abajo** (`connection refused` en el log).
+
+Las instancias `panaccess-wind@8000`…`8007` deben estar **`enabled`** en systemd (no basta con haberlas arrancado una vez a mano).
+
+### Habilitar todo (una vez)
+
+```bash
+cd /opt/panaccess-wind
+git pull
+sudo chmod +x deploy/enable_boot_services.sh deploy/manage_daphne.sh
+sudo deploy/enable_boot_services.sh
+```
+
+O manualmente:
+
+```bash
+sudo cp deploy/systemd/panaccess-wind@.service deploy/systemd/panaccess-wind.target /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable postgresql redis-server nginx
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh enable
+sudo systemctl enable panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+```
+
+### Verificar que quedará activo al boot
+
+```bash
+systemctl is-enabled postgresql redis-server nginx panaccess-wind.target
+systemctl is-enabled panaccess-wind@{8000..8007}.service
+systemctl is-enabled panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+```
+
+Todos deben responder **`enabled`**.
+
+### Si tras reboot sigue el 502 (levantar ahora)
+
+```bash
+sudo systemctl start postgresql redis-server
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh start
+sudo systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+curl -s http://127.0.0.1:8000/health/
+```
+
+Espera 10–30 s tras el boot: PostgreSQL/Redis pueden tardar; Daphne tiene `Restart=always` y reintenta.
+
+---
+
 ## Paso 11: Comandos de Diagnóstico y Mantenimiento
 
 ### Logs en tiempo real
 
 ```bash
-sudo journalctl -u panaccess-wind.service -f
+sudo journalctl -u panaccess-wind@8000.service -f
 sudo journalctl -u panaccess-celery-worker-pipeline.service -f
 sudo journalctl -u panaccess-celery-worker-full.service -f
 sudo journalctl -u panaccess-celery-beat.service -f
