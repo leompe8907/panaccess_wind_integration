@@ -29,7 +29,14 @@ DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
 sudo cp /etc/nginx/sites-available/panaccess-wind.conf \
         /etc/nginx/sites-available/panaccess-wind.conf.bak.$(date +%F) 2>/dev/null || true
 sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
-sudo ls /etc/letsencrypt/live/backend.wind.do/ || sudo certbot --nginx -d backend.wind.do
+sudo ls /etc/letsencrypt/live/backend.wind.do/ || {
+  echo "Sin certificados — bootstrap HTTP + Certbot (ver deploy/nginx/panaccess-wind-bootstrap-http.conf)"
+  sudo apt install -y certbot python3-certbot-nginx
+  sudo cp deploy/nginx/panaccess-wind-bootstrap-http.conf /etc/nginx/sites-available/panaccess-wind.conf
+  sudo nginx -t && sudo systemctl reload nginx
+  sudo certbot --nginx -d backend.wind.do
+  sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
+}
 sudo nginx -t && sudo systemctl reload nginx
 
 # Verificación

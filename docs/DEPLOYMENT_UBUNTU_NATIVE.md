@@ -705,16 +705,44 @@ server {
 
 ## Paso 10: Obtención de Certificado SSL Seguro (Let's Encrypt)
 
-Certbot configurará automáticamente los certificados SSL y los inyectará en la configuración de Nginx:
+Si **aún no existen** certificados (`/etc/letsencrypt/live/backend.wind.do/`), no uses la plantilla HTTPS directamente: Nginx fallará en `nginx -t`. Sigue este orden:
 
-1.  **Ejecuta Certbot para tu dominio:**
-    ```bash
-    sudo certbot --nginx -d backend.wind.do
-    ```
-2.  **Verificación de Renovación Automática:**
-    ```bash
-    sudo certbot renew --dry-run
-    ```
+### 10.1 Instalar Certbot
+
+```bash
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+### 10.2 Bootstrap temporal (solo HTTP, puerto 80)
+
+```bash
+sudo cp deploy/nginx/panaccess-wind-bootstrap-http.conf /etc/nginx/sites-available/panaccess-wind.conf
+sudo nginx -t && sudo systemctl reload nginx
+curl -s http://backend.wind.do/health/
+```
+
+> `backend.wind.do` debe apuntar por DNS a la IP pública de este servidor y el puerto 80 debe estar abierto (UFW).
+
+### 10.3 Obtener certificado
+
+```bash
+sudo certbot --nginx -d backend.wind.do
+```
+
+### 10.4 Config final con HTTPS + 8 Daphne
+
+```bash
+sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
+sudo nginx -t && sudo systemctl reload nginx
+curl -sk https://backend.wind.do/health/
+```
+
+### 10.5 Renovación automática
+
+```bash
+sudo certbot renew --dry-run
+```
 
 ---
 
