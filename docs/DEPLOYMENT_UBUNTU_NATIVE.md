@@ -146,9 +146,9 @@ sudo systemctl daemon-reload
 sudo chmod +x deploy/manage_daphne.sh
 
 # Arranque automático + inicio
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh enable
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh start
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh enable
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh start
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh status
 ```
 
 Verifica puertos:
@@ -198,7 +198,7 @@ git pull && source env/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py collectstatic --noinput
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh restart
 sudo systemctl restart panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
 ```
 
@@ -767,7 +767,7 @@ O manualmente:
 sudo cp deploy/systemd/panaccess-wind@.service deploy/systemd/panaccess-wind.target /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable postgresql redis-server nginx
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh enable
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh enable
 sudo systemctl enable panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
 ```
 
@@ -785,7 +785,7 @@ Todos deben responder **`enabled`**.
 
 ```bash
 sudo systemctl start postgresql redis-server
-DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh start
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh start
 sudo systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
 curl -s http://127.0.0.1:8000/health/
 ```

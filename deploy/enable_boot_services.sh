@@ -18,7 +18,9 @@ echo "=== Infraestructura ==="
 systemctl enable postgresql redis-server nginx
 
 echo "=== Daphne ($DAPHNE_INSTANCES instancias) ==="
+DAPHNE_INSTANCES=$DAPHNE_INSTANCES "$BASE/deploy/manage_daphne.sh" disable 2>/dev/null || true
 DAPHNE_INSTANCES=$DAPHNE_INSTANCES "$BASE/deploy/manage_daphne.sh" enable
+systemctl enable panaccess-wind.target
 
 echo "=== Celery ==="
 systemctl enable panaccess-celery-worker-pipeline.service

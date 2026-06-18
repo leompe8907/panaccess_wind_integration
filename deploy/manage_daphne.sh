@@ -1,9 +1,8 @@
 #!/bin/bash
 # Gestión de múltiples instancias Daphne (systemd template panaccess-wind@PORT).
 #
-# Uso:
-#   DAPHNE_INSTANCES=8 sudo ./deploy/manage_daphne.sh start
-#   DAPHNE_INSTANCES=8 sudo ./deploy/manage_daphne.sh status
+# Uso (siempre ruta absoluta con sudo):
+#   DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh start
 #
 # Puertos: 8000 .. 8000+N-1
 
