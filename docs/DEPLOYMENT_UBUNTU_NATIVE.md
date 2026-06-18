@@ -4,6 +4,8 @@ Esta guía detalla el proceso paso a paso para realizar un despliegue nativo (si
 
 Plantillas listas para copiar: carpeta [`deploy/`](../deploy/) (systemd, nginx, script de reinicio).
 
+**Producción Wind:** dominio `backend.wind.do` | usuario de servicio `wind` | admin `sw4`.
+
 ---
 
 ## Índice
@@ -66,6 +68,21 @@ Servicios `systemd` de aplicación (4):
 | **32 GB / 16 cores** | **8** (hasta 12 si hace falta) | ~3 000–5 000 |
 
 > Daphne no tiene `--workers` como Gunicorn. Para escalar se levantan **varias instancias** en puertos distintos y Nginx reparte con `upstream`.
+
+### Usuarios Linux (servidor Wind)
+
+| Usuario | Rol |
+|---------|-----|
+| **`sw4`** | Admin humano: SSH, `sudo`, `git pull` (como `sudo -u wind`), mantenimiento |
+| **`wind`** | Dueño de `/opt/panaccess-wind`, `.env` y procesos systemd (`User=wind`) |
+
+Todos los `.service` en `deploy/systemd/` usan `User=wind`. No existe usuario `ubuntu` en este servidor.
+
+```bash
+sudo chown -R wind:wind /opt/panaccess-wind
+sudo chmod 600 /opt/panaccess-wind/.env
+grep "^User=" /etc/systemd/system/panaccess-*.service   # debe ser User=wind
+```
 
 Para cargas mayores, ajusta `maxmemory` de Redis (~25% de la RAM total):
 
@@ -144,22 +161,21 @@ Si tras monitorizar (`htop`, `journalctl`) la CPU de Daphne sigue alta con mucha
 
 ### 4. Nginx — upstream con balanceo
 
-**No copies la plantilla directo sobre tu config** si ya tenías dominio y certificados SSL reales. Haz backup y edita `server_name` + rutas `ssl_certificate` antes de `nginx -t`.
+La plantilla `deploy/nginx/panaccess-wind-scaled.conf` ya usa **`backend.wind.do`** y rutas Let's Encrypt correspondientes. Siempre haz backup antes de sobrescribir.
 
 ```bash
-# Backup de la config que ya funcionaba
 sudo cp /etc/nginx/sites-available/panaccess-wind.conf \
         /etc/nginx/sites-available/panaccess-wind.conf.bak.$(date +%F)
 
-# Copiar plantilla y editar dominio + certificados (NO dejar api.tudominio.com)
 sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
-sudo nano /etc/nginx/sites-available/panaccess-wind.conf
 
-# Ver certificados reales disponibles:
-sudo ls /etc/letsencrypt/live/
+# Verificar certificados (deben existir para backend.wind.do)
+sudo ls /etc/letsencrypt/live/backend.wind.do/
+# Si faltan: sudo certbot --nginx -d backend.wind.do
 
 sudo ln -sf /etc/nginx/sites-available/panaccess-wind.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+curl -sk https://backend.wind.do/health/
 ```
 
 **Alternativa mínima:** conserva tu `server { ... }` actual y solo reemplaza el bloque `upstream django_backend` por el de 8 puertos (8000–8007) de `deploy/nginx/panaccess-wind-scaled.conf`.
@@ -306,7 +322,7 @@ Pega el siguiente contenido y personaliza los valores con datos reales:
 # --- Configuración Básica de Django ---
 DEBUG=False
 SECRET_KEY=TU_LLAVE_SECRETA_SUPER_SEGURA_AQUI
-ALLOWED_HOSTS=api.tudominio.com,localhost,127.0.0.1
+ALLOWED_HOSTS=backend.wind.do,localhost,127.0.0.1
 
 # --- Configuración de Base de Datos (Local PostgreSQL) ---
 DB_NAME=wind_db
@@ -332,7 +348,7 @@ EMAIL_HOST=smtp.sendgrid.net
 EMAIL_PORT=587
 EMAIL_HOST_USER=apikey
 EMAIL_HOST_PASSWORD=tu_smtp_password
-EMAIL_FROM_ADDRESS=soporte@tudominio.com
+EMAIL_FROM_ADDRESS=soporte@wind.do
 
 # --- Autenticación Social (Google y Facebook) ---
 GOOGLE_CLIENT_ID=tu_google_client_id
@@ -373,7 +389,8 @@ Crearemos cuatro servicios en systemd para mantener Daphne, los dos workers Cele
 
 ```bash
 sudo cp deploy/systemd/*.service /etc/systemd/system/
-# Edita User= en cada archivo si no usas "ubuntu"
+# User=wind ya viene en las plantillas; verifica tras copiar:
+grep "^User=" /etc/systemd/system/panaccess-*.service
 sudo chmod +x deploy/manage_services.sh
 ```
 
@@ -398,7 +415,7 @@ Description=Servicio Web PanAccess Wind Integration (Daphne)
 After=network.target postgresql.service redis-server.service
 
 [Service]
-User=ubuntu  # Reemplaza por tu usuario real de Ubuntu
+User=wind
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/daphne -b 127.0.0.1 -p 8000 panaccess_wind_integration.asgi:application
@@ -436,7 +453,7 @@ After=network.target postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu
+User=wind
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker -Q sync_pipeline -c 1 --loglevel=info -n pipeline@%h
@@ -456,7 +473,7 @@ After=network.target postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu
+User=wind
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker -Q full_sync -c 1 --loglevel=info -n fullsync@%h
@@ -508,7 +525,7 @@ After=network.target postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu  # Reemplaza por tu usuario real
+User=wind  # Reemplaza por tu usuario real
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration beat --loglevel=info
@@ -564,7 +581,7 @@ upstream django_backend {
 server {
     listen 80;
     listen [::]:80;
-    server_name api.tudominio.com; # Cambia por tu dominio real
+    server_name backend.wind.do;
     
     # Redirección permanente a HTTPS
     return 301 https://$host$request_uri;
@@ -573,11 +590,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name api.tudominio.com; # Cambia por tu dominio real
+    server_name backend.wind.do;
 
     # Rutas de los certificados SSL (generados por Let's Encrypt en el paso 10)
-    ssl_certificate     /etc/letsencrypt/live/api.tudominio.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.tudominio.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/backend.wind.do/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/backend.wind.do/privkey.pem;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
@@ -692,7 +709,7 @@ Certbot configurará automáticamente los certificados SSL y los inyectará en l
 
 1.  **Ejecuta Certbot para tu dominio:**
     ```bash
-    sudo certbot --nginx -d api.tudominio.com
+    sudo certbot --nginx -d backend.wind.do
     ```
 2.  **Verificación de Renovación Automática:**
     ```bash
@@ -769,14 +786,14 @@ curl -sk https://localhost/ready/
 Desde tu máquina local (sustituye el dominio):
 
 ```bash
-curl -s https://api.tudominio.com/health/
+curl -s https://backend.wind.do/health/
 ```
 
 Probar WebSocket (emparejamiento Smart TV):
 
 ```bash
 sudo apt install -y websocat
-websocat -k wss://api.tudominio.com/ws/auth/
+websocat -k wss://backend.wind.do/ws/auth/
 ```
 
 Respuesta esperada de `/health/`: JSON con `"healthy": true` y checks de DB, caché y sesión PanAccess.
@@ -858,4 +875,4 @@ sudo deploy/manage_services.sh status
 - [ ] Celery Beat activo solo tras warm-up inicial
 - [ ] Nginx con SSL, `/health/`, `/ready/` y `/ws/` configurados
 - [ ] Rutas `/admin/` y sync restringidas a VPN/localhost
-- [ ] `curl https://api.tudominio.com/health/` responde `"healthy": true`
+- [ ] `curl https://backend.wind.do/health/` responde `"healthy": true`
