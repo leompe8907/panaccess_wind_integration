@@ -1,0 +1,6 @@
+[Unit]
+Description=PanAccess Wind — todas las instancias Daphne
+Wants=panaccess-wind@8000.service
+
+[Install]
+WantedBy=multi-user.target

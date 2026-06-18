@@ -2,15 +2,174 @@
 
 Esta guía detalla el proceso paso a paso para realizar un despliegue nativo (sin Docker) de la aplicación de integración PanAccess - Wind sobre un servidor físico o virtual con **Ubuntu Server** limpio (por ejemplo, Ubuntu 22.04 LTS o 24.04 LTS).
 
+Plantillas listas para copiar: carpeta [`deploy/`](../deploy/) (systemd, nginx, script de reinicio).
+
+---
+
+## Índice
+
+1. [Arquitectura del sistema](#arquitectura-del-sistema)
+2. [Requisitos del servidor](#requisitos-del-servidor)
+3. [Perfil recomendado: 32 GB / 16 cores](#perfil-recomendado-32-gb--16-cores)
+4. [Pasos 1–10: instalación y configuración](#paso-1-conexión-ssh-y-actualización-inicial)
+5. [Paso 11: diagnóstico y mantenimiento](#paso-11-comandos-de-diagnóstico-y-mantenimiento)
+6. [Paso 12: verificación post-despliegue](#paso-12-verificación-post-despliegue)
+7. [Paso 13: solución de problemas](#paso-13-solución-de-problemas)
+8. [Paso 14: checklist final](#paso-14-checklist-final)
+
 ---
 
 ## Arquitectura del Sistema
-El despliegue nativo se organizará utilizando las siguientes herramientas del sistema:
-*   **Base de datos:** PostgreSQL corriendo como servicio de sistema (`systemd`).
-*   **Caché y Broker:** Redis Server local gestionado por `systemd`.
-*   **Servidor ASGI:** **Daphne** corriendo bajo `systemd` para atender peticiones HTTP y WebSockets concurrentemente en el puerto `8000`.
-*   **Gestión de Procesos:** Tres servicios de `systemd` independientes (uno para la aplicación web Daphne, uno para el worker de Celery y uno para Celery Beat).
-*   **Servidor Web Principal:** Nginx actuando como proxy inverso y manejando el SSL de Let's Encrypt.
+
+Despliegue **monolítico en una sola instancia**: todos los componentes corren en el mismo servidor Ubuntu.
+
+```
+Internet → Nginx (443/80) → Daphne (127.0.0.1:8000, ASGI)
+                                ├── PostgreSQL (5432)
+                                └── Redis (6379) ← Celery workers + Beat
+```
+
+| Componente | Rol |
+|------------|-----|
+| **PostgreSQL** | Base de datos (`systemd`) |
+| **Redis** | Broker Celery, caché Django, channel layer WebSockets |
+| **Daphne** | HTTP + WebSockets (emparejamiento Smart TV) en puerto `8000` |
+| **Celery** | 2 workers (`sync_pipeline`, `full_sync`) + Beat |
+| **Nginx** | Proxy inverso, SSL, estáticos, rate limiting |
+
+Servicios `systemd` de aplicación (4):
+
+| Servicio | Cola / rol |
+|----------|------------|
+| `panaccess-wind.service` | Daphne (API + `/ws/`) |
+| `panaccess-celery-worker-pipeline.service` | Cola `sync_pipeline` |
+| `panaccess-celery-worker-full.service` | Cola `full_sync` |
+| `panaccess-celery-beat.service` | Agenda de tareas periódicas |
+
+> **Importante:** Este proyecto requiere **Daphne (ASGI)**, no Gunicorn solo. Gunicorn no sirve WebSockets de Django Channels.
+
+---
+
+## Requisitos del Servidor
+
+| Componente | Mínimo | Recomendado | Alto rendimiento (tu VM) |
+|------------|--------|-------------|--------------------------|
+| **CPU** | 2 cores | 4 cores | **16 cores** |
+| **RAM** | 4 GB | 8 GB | **32 GB** |
+| **Disco** | 20 GB SSD | 50 GB SSD | 80+ GB SSD/NVMe |
+| **SO** | Ubuntu 22.04 LTS | Ubuntu 22.04 / 24.04 LTS | Ubuntu 22.04 / 24.04 LTS |
+
+| Perfil | Instancias Daphne | Conexiones simultáneas orientativas |
+|--------|-------------------|-------------------------------------|
+| Mínimo (2–4 cores) | 1 | ~500 |
+| Medio (4–8 cores) | 2–4 | ~1 000 |
+| **32 GB / 16 cores** | **8** (hasta 12 si hace falta) | ~3 000–5 000 |
+
+> Daphne no tiene `--workers` como Gunicorn. Para escalar se levantan **varias instancias** en puertos distintos y Nginx reparte con `upstream`.
+
+Para cargas mayores, ajusta `maxmemory` de Redis (~25% de la RAM total):
+
+```bash
+sudo nano /etc/redis/redis.conf
+# maxmemory 8gb          # perfil 32 GB RAM
+# maxmemory-policy allkeys-lru
+sudo systemctl restart redis-server
+```
+
+---
+
+## Perfil recomendado: 32 GB / 16 cores
+
+Con tu VM conviene el **modo escalado** (8 instancias Daphne). Celery sigue en `-c 1` por cola: el sync pesado no debe paralelizarse ahí.
+
+### Distribución de memoria orientativa
+
+| Componente | RAM asignada |
+|------------|--------------|
+| Sistema operativo | ~4 GB |
+| PostgreSQL | ~8 GB (`shared_buffers`) |
+| Redis | ~8 GB (`maxmemory`) |
+| Daphne (8 × ~500 MB) | ~4 GB |
+| Celery (2 workers + Beat) | ~2 GB |
+| Nginx + margen | ~6 GB |
+
+### 1. PostgreSQL (tuning básico)
+
+```bash
+sudo nano /etc/postgresql/*/main/postgresql.conf
+```
+
+```conf
+shared_buffers = 8GB
+effective_cache_size = 24GB
+max_connections = 200
+work_mem = 16MB
+```
+
+```bash
+sudo systemctl restart postgresql
+```
+
+### 2. Redis
+
+```conf
+maxmemory 8gb
+maxmemory-policy allkeys-lru
+```
+
+### 3. Daphne — 8 instancias (puertos 8000–8007)
+
+**No** uses `panaccess-wind.service` (instancia única) en este perfil.
+
+```bash
+sudo cp deploy/systemd/panaccess-wind@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo chmod +x deploy/manage_daphne.sh
+
+# Arranque automático + inicio
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh enable
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh start
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+```
+
+Verifica puertos:
+
+```bash
+sudo ss -tlnp | grep -E '800[0-7]'
+```
+
+Si tras monitorizar (`htop`, `journalctl`) la CPU de Daphne sigue alta con muchas TVs conectadas, sube a **12 instancias** (puertos 8000–8011) y añade esos servidores al `upstream` de Nginx. Con 32 GB no conviene pasar de ~12 instancias (~6 GB solo en Daphne).
+
+### 4. Nginx — upstream con balanceo
+
+```bash
+sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
+sudo nano /etc/nginx/sites-available/panaccess-wind.conf   # dominio + SSL
+sudo ln -sf /etc/nginx/sites-available/panaccess-wind.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 5. Celery — sin cambios
+
+Mantén `-c 1` en pipeline y full_sync. La concurrencia hacia PanAccess se controla por `.env`:
+
+```env
+PANACCESS_SMARTCARD_SUBSCRIBER_CONCURRENCY=4
+```
+
+Sube ese valor con cuidado si PanAccess tolera más llamadas paralelas; no aumentes `-c` del worker Celery.
+
+### 6. Reinicio tras deploy (perfil escalado)
+
+```bash
+cd /opt/panaccess-wind
+git pull && source env/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
+sudo systemctl restart panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+```
 
 ---
 
@@ -193,12 +352,29 @@ Con el entorno virtual activado, corre los siguientes comandos preparativos:
 
 ## Paso 8: Configuración de Procesos con Systemd
 
-Crearemos tres archivos de servicios en systemd para mantener la aplicación web, el worker y la agenda de tareas corriendo de forma ininterrumpida y que arranquen automáticamente si el servidor se reinicia.
+Crearemos cuatro servicios en systemd para mantener Daphne, los dos workers Celery y Beat corriendo de forma ininterrumpida.
+
+**Opción rápida** (plantillas del repo):
+
+```bash
+sudo cp deploy/systemd/*.service /etc/systemd/system/
+# Edita User= en cada archivo si no usas "ubuntu"
+sudo chmod +x deploy/manage_services.sh
+```
+
+**Opción manual:** crea cada archivo como se indica abajo.
+
+### Orden de arranque recomendado
+
+1. Completar `python manage.py run_full_sync` (Paso 7).
+2. Iniciar Daphne + workers Celery.
+3. **Activar Beat solo después** de que el warm-up inicial haya terminado correctamente.
 
 ### 1. Servicio de la Aplicación Web (Daphne/ASGI)
 Crea el archivo `/etc/systemd/system/panaccess-wind.service`:
 ```bash
 sudo nano /etc/systemd/system/panaccess-wind.service
+# o: sudo cp deploy/systemd/panaccess-wind.service /etc/systemd/system/
 ```
 Escribe el siguiente contenido:
 ```ini
@@ -329,10 +505,14 @@ WantedBy=multi-user.target
 ```
 
 ### 4. Activar e Iniciar todos los Servicios
-Recarga systemd, habilita el arranque automático e inicia los tres procesos:
+
+Recarga systemd e inicia **primero** Daphne y workers (Beat al final, tras el full sync inicial):
+
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service panaccess-celery-beat.service
+sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service
+# Tras confirmar run_full_sync OK:
+sudo systemctl enable --now panaccess-celery-beat.service
 ```
 Verifica que estén activos sin errores:
 ```bash
@@ -352,9 +532,10 @@ sudo systemctl status panaccess-celery-beat.service
     ```
 2.  **Crea el archivo de configuración del sitio:**
     ```bash
-    sudo nano /etc/nginx/sites-available/panaccess-wind.conf
+    sudo cp deploy/nginx/panaccess-wind.conf /etc/nginx/sites-available/panaccess-wind.conf
+    sudo nano /etc/nginx/sites-available/panaccess-wind.conf   # ajustar dominio y SSL
     ```
-3.  **Pega la siguiente estructura adaptada para HTTP y WebSockets (Smart TV pairing):**
+    O créalo manualmente con la estructura siguiente (HTTP, WebSockets, health checks):
 
 ```nginx
 # Límite de peticiones a nivel de Nginx para el endpoint de registro público
@@ -426,6 +607,19 @@ server {
         proxy_pass http://django_backend;
     }
 
+    # Probes de salud (liveness / readiness)
+    location = /health/ {
+        access_log off;
+        proxy_set_header Host $host;
+        proxy_pass http://django_backend;
+    }
+
+    location = /ready/ {
+        access_log off;
+        proxy_set_header Host $host;
+        proxy_pass http://django_backend;
+    }
+
     # Redirección de WebSockets (Smart TV pairing)
     location /ws/ {
         proxy_pass http://django_backend;
@@ -494,21 +688,159 @@ Certbot configurará automáticamente los certificados SSL y los inyectará en l
 
 ## Paso 11: Comandos de Diagnóstico y Mantenimiento
 
-*   **Ver logs del servidor web (Daphne/Django) en tiempo real:**
-    ```bash
-    sudo journalctl -u panaccess-wind.service -f
-    ```
-*   **Ver logs del Celery Worker:**
-    ```bash
-    sudo journalctl -u panaccess-celery-worker-pipeline.service -f
-    ```
-*   **Actualizar la aplicación tras cambios de código:**
-    ```bash
-    cd /opt/panaccess-wind
-    git pull
-    source env/bin/activate
-    pip install -r requirements.txt
-    python manage.py migrate
-    python manage.py collectstatic --noinput
-    sudo systemctl restart panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service panaccess-celery-beat.service
-    ```
+### Logs en tiempo real
+
+```bash
+sudo journalctl -u panaccess-wind.service -f
+sudo journalctl -u panaccess-celery-worker-pipeline.service -f
+sudo journalctl -u panaccess-celery-worker-full.service -f
+sudo journalctl -u panaccess-celery-beat.service -f
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Reinicio rápido de servicios de aplicación
+
+```bash
+sudo /opt/panaccess-wind/deploy/manage_services.sh restart
+sudo /opt/panaccess-wind/deploy/manage_services.sh status
+```
+
+> Tras `git pull`, reinicia **solo** servicios que ejecutan código Python (Daphne + Celery). Nginx, PostgreSQL y Redis no suelen necesitarlo.
+
+### Actualizar la aplicación tras cambios de código
+
+```bash
+cd /opt/panaccess-wind
+git pull
+source env/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+sudo deploy/manage_services.sh restart
+```
+
+### Monitoreo básico
+
+```bash
+free -h && df -h
+sudo ss -tlnp | grep -E '(443|8000|5432|6379)'
+ps aux --sort=-%mem | head -10
+```
+
+---
+
+## Paso 12: Verificación Post-Despliegue
+
+Ejecuta este bloque tras completar los pasos 1–10:
+
+```bash
+echo "=== Servicios ==="
+for svc in postgresql redis-server nginx panaccess-wind panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat; do
+    echo "--- $svc ---"
+    sudo systemctl is-active "$svc" 2>/dev/null || sudo systemctl is-active "${svc}.service"
+done
+
+echo "=== Redis ==="
+redis-cli ping
+
+echo "=== Puertos ==="
+sudo ss -tlnp | grep -E '(443|8000|5432|6379)'
+
+echo "=== Health ==="
+curl -sk https://localhost/health/
+curl -sk https://localhost/ready/
+```
+
+Desde tu máquina local (sustituye el dominio):
+
+```bash
+curl -s https://api.tudominio.com/health/
+```
+
+Probar WebSocket (emparejamiento Smart TV):
+
+```bash
+sudo apt install -y websocat
+websocat -k wss://api.tudominio.com/ws/auth/
+```
+
+Respuesta esperada de `/health/`: JSON con `"healthy": true` y checks de DB, caché y sesión PanAccess.
+
+---
+
+## Paso 13: Solución de Problemas
+
+### Error 502 Bad Gateway (Nginx)
+
+Daphne no está escuchando o falló al arrancar:
+
+```bash
+sudo systemctl status panaccess-wind.service
+sudo journalctl -u panaccess-wind.service -n 50
+sudo ss -tlnp | grep 8000
+sudo deploy/manage_services.sh restart
+```
+
+### Celery no procesa tareas
+
+Beat encola pero el worker no consume (cola incorrecta o servicio caído):
+
+```bash
+sudo systemctl status panaccess-celery-worker-pipeline.service
+sudo systemctl status panaccess-celery-worker-full.service
+redis-cli ping
+sudo journalctl -u panaccess-celery-worker-pipeline.service -n 30
+```
+
+Verifica en `.env`: `CELERY_SYNC_PIPELINE_QUEUE=sync_pipeline` y `CELERY_FULL_SYNC_QUEUE=full_sync`.
+
+### WebSocket no conecta
+
+```bash
+sudo nginx -t
+sudo tail -20 /var/log/nginx/error.log
+curl -i -k https://localhost/ws/auth/ -H "Upgrade: websocket" -H "Connection: Upgrade"
+```
+
+Confirma que Nginx tiene el bloque `location /ws/` con headers `Upgrade` y timeouts largos.
+
+### Error SSL en Nginx ("cannot load certificate")
+
+Los certificados aún no existen. Ejecuta Certbot (Paso 10) o comenta temporalmente las líneas `ssl_certificate` y usa solo HTTP hasta obtenerlos.
+
+### ModuleNotFoundError tras actualizar
+
+```bash
+cd /opt/panaccess-wind && source env/bin/activate
+pip install -r requirements.txt
+sudo deploy/manage_services.sh restart
+```
+
+### Reinicio completo (último recurso)
+
+```bash
+sudo deploy/manage_services.sh stop
+sudo systemctl stop nginx
+sudo systemctl stop redis-server postgresql
+sleep 3
+sudo systemctl start postgresql redis-server
+sudo deploy/manage_services.sh start
+sudo systemctl start nginx
+sudo deploy/manage_services.sh status
+```
+
+---
+
+## Paso 14: Checklist Final
+
+- [ ] PostgreSQL y Redis activos (`systemctl is-active`)
+- [ ] `.env` con `DEBUG=False`, `SECRET_KEY` fuerte y credenciales PanAccess
+- [ ] `python manage.py migrate` y `collectstatic` ejecutados
+- [ ] `python manage.py run_full_sync` completado antes de activar Beat
+- [ ] Daphne: 8 instancias activas (`8000–8007`) **o** 1 instancia en despliegues pequeños
+- [ ] Nginx `upstream` apunta a todas las instancias Daphne en uso
+- [ ] Workers pipeline y full_sync activos (`-c 1` cada uno)
+- [ ] Celery Beat activo solo tras warm-up inicial
+- [ ] Nginx con SSL, `/health/`, `/ready/` y `/ws/` configurados
+- [ ] Rutas `/admin/` y sync restringidas a VPN/localhost
+- [ ] `curl https://api.tudominio.com/health/` responde `"healthy": true`

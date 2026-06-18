@@ -1,0 +1,16 @@
+[Unit]
+Description=Celery Beat (Agenda de Sincronizacion)
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/panaccess-wind
+EnvironmentFile=/opt/panaccess-wind/.env
+ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration beat --loglevel=info
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
