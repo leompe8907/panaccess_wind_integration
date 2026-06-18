@@ -341,18 +341,24 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = not CELERY_TASK_ALWAYS_EAGER
 CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = TIME_ZONE
 
-# Configurar cola por defecto para tareas específicas
+# Colas: pipeline incremental (serie) vs full_sync (nocturno, exclusivo)
+_PIPELINE_QUEUE = CeleryConfig.SYNC_PIPELINE_QUEUE
+_FULL_SYNC_QUEUE = CeleryConfig.FULL_SYNC_QUEUE
+_SYNC_QUEUE = CeleryConfig.SYNC_QUEUE  # alias legacy
+
 CELERY_TASK_ROUTES = {
-    'wind.tasks.sync_subscribers_task': {'queue': 'sync_subscribers'},
-    'wind.tasks.compare_and_update_subscribers_task': {'queue': 'sync_subscribers'},
-    'wind.tasks.sync_smartcards_task': {'queue': 'sync_subscribers'},
-    'wind.tasks.compare_and_update_smartcards_task': {'queue': 'sync_subscribers'},
-    'wind.tasks.full_sync_task': {'queue': 'sync_subscribers'},
+    'wind.tasks.periodic_sync_pipeline_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.sync_subscribers_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.compare_and_update_subscribers_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.sync_smartcards_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.compare_and_update_smartcards_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.sync_products_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.full_sync_task': {'queue': _FULL_SYNC_QUEUE},
 }
 
 _SYNC_MINUTES = CeleryConfig.SYNC_MINUTES
 _SYNC_LIMIT = CeleryConfig.SYNC_LIMIT
-_SYNC_QUEUE = CeleryConfig.SYNC_QUEUE
+_PIPELINE_LOCK_TIMEOUT = CeleryConfig.PIPELINE_LOCK_TIMEOUT
 _SMARTCARD_SYNC_MINUTES = CeleryConfig.SMARTCARD_SYNC_MINUTES
 
 if CeleryConfig.USE_CRONTAB:
@@ -369,26 +375,16 @@ _FULL_SYNC_SOFT_LIMIT = CeleryConfig.FULL_SYNC_SOFT_TIME_LIMIT
 _FULL_SYNC_ENABLED = CeleryConfig.FULL_SYNC_ENABLED
 
 CELERY_BEAT_SCHEDULE = {
-    "sync-subscribers-incremental": {
-        "task": "wind.tasks.sync_subscribers_task",
+    "periodic-sync-pipeline": {
+        "task": "wind.tasks.periodic_sync_pipeline_task",
         "schedule": _SCHEDULE,
         "options": {
-            "queue": _SYNC_QUEUE,
-            "soft_time_limit": CELERY_TASK_SOFT_TIME_LIMIT,
-            "time_limit": CELERY_TASK_TIME_LIMIT,
+            "queue": _PIPELINE_QUEUE,
+            "soft_time_limit": _PIPELINE_LOCK_TIMEOUT,
+            "time_limit": _PIPELINE_LOCK_TIMEOUT + 60,
         },
         "args": (_SYNC_LIMIT,),
     },
-    # "compare-and-update-smartcards": {
-    #     "task": "wind.tasks.compare_and_update_smartcards_task",
-    #     "schedule": _SMARTCARD_SCHEDULE,
-    #     "options": {
-    #         "queue": _SYNC_QUEUE,
-    #         "soft_time_limit": CELERY_TASK_SOFT_TIME_LIMIT,
-    #         "time_limit": CELERY_TASK_TIME_LIMIT,
-    #     },
-    #     "args": (_SYNC_LIMIT,),
-    # },
 }
 
 if _FULL_SYNC_ENABLED:
@@ -396,7 +392,7 @@ if _FULL_SYNC_ENABLED:
         "task": "wind.tasks.full_sync_task",
         "schedule": crontab(hour=_FULL_SYNC_HOUR, minute=_FULL_SYNC_MINUTE),
         "options": {
-            "queue": _SYNC_QUEUE,
+            "queue": _FULL_SYNC_QUEUE,
             "soft_time_limit": _FULL_SYNC_SOFT_LIMIT,
             "time_limit": _FULL_SYNC_TIME_LIMIT,
         },

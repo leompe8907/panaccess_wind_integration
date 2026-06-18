@@ -4,11 +4,14 @@ Funciones para obtener y sincronizar smartcards desde PanAccess.
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import timedelta, timezone as dt_timezone
 
 from django.db import transaction
+from django.utils import timezone
 
-from appConfig import PanaccessConfig
+from appConfig import PanaccessConfig, RedisConfig
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from wind.models import ListOfSmartcards, ListOfSubscriber
 from wind.serializers import ListOfSmartcardsSerializer
 
@@ -179,6 +182,262 @@ def _subscriber_code_filters(subscriber_code: str) -> dict:
     }
 
 
+def _format_panaccess_filter_datetime(dt) -> str:
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, dt_timezone.utc)
+    return dt.astimezone(dt_timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _parse_sync_timestamp(raw: str | None):
+    if not raw:
+        return None
+    from datetime import datetime
+
+    try:
+        parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if timezone.is_naive(parsed):
+        return timezone.make_aware(parsed)
+    return parsed
+
+
+def _resolve_incremental_since():
+    stored = RedisConfig.get_smartcard_incremental_since()
+    parsed = _parse_sync_timestamp(stored)
+    if parsed is not None:
+        return parsed
+    lookback = PanaccessConfig.SMARTCARD_INCREMENTAL_LOOKBACK_HOURS
+    return timezone.now() - timedelta(hours=lookback)
+
+
+def _smartcards_changed_since_filters(since_label: str) -> dict:
+    """Filtro OR: tarjetas con lastContact o lastActivation posteriores a since_label."""
+    return {
+        "groupOp": "OR",
+        "rules": [
+            {"field": "lastContact", "op": "gt", "data": since_label},
+            {"field": "lastActivation", "op": "gt", "data": since_label},
+        ],
+    }
+
+
+def _valid_subscriber_codes() -> set[str]:
+    return {
+        str(code).strip()
+        for code in ListOfSubscriber.objects.exclude(code__isnull=True)
+        .exclude(code="")
+        .values_list("code", flat=True)
+        if code and str(code).strip()
+    }
+
+
+def _fetch_smartcards_changed_since(
+    session_id=None,
+    since_label: str = "",
+    limit: int = 100,
+) -> list[dict]:
+    if not since_label:
+        return []
+
+    offset = 0
+    entries: list[dict] = []
+    remote_total_count = None
+    max_pages = PanaccessConfig.SMARTCARD_INCREMENTAL_MAX_PAGES
+    filters = _smartcards_changed_since_filters(since_label)
+    page_num = 0
+
+    while True:
+        if max_pages > 0 and page_num >= max_pages:
+            logger.warning(
+                "Sync incremental smartcards: tope de %s páginas alcanzado "
+                "(offset=%s, count=%s). Suba PANACCESS_SMARTCARD_INCREMENTAL_MAX_PAGES "
+                "o use 0 para sin límite.",
+                max_pages,
+                offset,
+                remote_total_count,
+            )
+            break
+
+        response = CallListSmartcards(
+            session_id,
+            offset,
+            limit,
+            order_by_sn=False,
+            filters=filters,
+        )
+        if remote_total_count is None:
+            remote_total_count = int(response.get("count") or 0)
+
+        batch = response.get("smartcardEntries") or []
+        if not batch:
+            break
+
+        for entry in batch:
+            if isinstance(entry, dict) and entry.get("sn"):
+                entries.append(entry)
+
+        page_num += 1
+        offset += limit
+        if len(batch) < limit:
+            break
+        if remote_total_count and offset >= remote_total_count:
+            break
+
+    return entries
+
+
+def _upsert_smartcard_batch(
+    remote_list: list[dict],
+    *,
+    valid_subscriber_codes: set[str] | None = None,
+) -> dict:
+    updated = 0
+    skipped = 0
+    new_rows: list[dict] = []
+    remote_sns: set[str] = set()
+
+    for remote in remote_list:
+        if not isinstance(remote, dict):
+            continue
+        remote = normalize_smartcard_row(remote)
+        sn = remote.get("sn")
+        if not sn or not str(sn).strip():
+            continue
+        sn = str(sn).strip()
+
+        sub = remote.get("subscriberCode")
+        sub_code = str(sub).strip() if sub else ""
+        if valid_subscriber_codes is not None:
+            if not sub_code or sub_code not in valid_subscriber_codes:
+                skipped += 1
+                continue
+
+        remote_sns.add(sn)
+        existing = ListOfSmartcards.objects.filter(sn=sn).first()
+        if existing:
+            changed_fields = _update_smartcard_from_remote(existing, remote)
+            if changed_fields:
+                try:
+                    existing.save(update_fields=changed_fields)
+                    updated += 1
+                except Exception as exc:
+                    logger.error("Error actualizando smartcard SN %s: %s", sn, exc)
+        else:
+            new_rows.append(remote)
+
+    created = 0
+    if new_rows:
+        before = ListOfSmartcards.objects.count()
+        store_all_smartcards_in_chunks(new_rows)
+        created = max(0, ListOfSmartcards.objects.count() - before)
+
+    return {
+        "updated": updated,
+        "created": created,
+        "deleted": 0,
+        "skipped": skipped,
+        "remote_count": len(remote_sns),
+    }
+
+
+def compare_and_update_smartcards_incremental(session_id=None, limit=100):
+    """Actualiza smartcards que cambiaron desde el último sync (lastContact/lastActivation)."""
+    sync_marker = timezone.now()
+    since = _resolve_incremental_since()
+    since_label = _format_panaccess_filter_datetime(since)
+    page_limit = max(1, min(int(limit or 100), 1000))
+    valid_codes = _valid_subscriber_codes()
+
+    logger.info(
+        "Sync incremental smartcards — since=%s, abonados_locales=%s, limit=%s",
+        since_label,
+        len(valid_codes),
+        page_limit,
+    )
+
+    remote_list = _fetch_smartcards_changed_since(session_id, since_label, page_limit)
+    stats = _upsert_smartcard_batch(remote_list, valid_subscriber_codes=valid_codes)
+    stats.update(
+        {
+            "strategy": "incremental",
+            "since": since_label,
+            "fetched": len(remote_list),
+            "sync_marker": sync_marker.isoformat(),
+        }
+    )
+
+    RedisConfig.set_smartcard_incremental_since(sync_marker.isoformat())
+    logger.info(
+        "Sync incremental smartcards — fetched=%s, remoto=%s, actualizados=%s, "
+        "creados=%s, omitidos=%s",
+        len(remote_list),
+        stats.get("remote_count"),
+        stats.get("updated"),
+        stats.get("created"),
+        stats.get("skipped"),
+    )
+    return stats
+
+
+def _should_run_full_smartcard_by_subscriber() -> bool:
+    if not PanaccessConfig.SMARTCARD_SYNC_BY_SUBSCRIBER:
+        return False
+    if PanaccessConfig.SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE:
+        return True
+
+    every_hours = PanaccessConfig.SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS
+    if every_hours <= 0:
+        return False
+
+    last = _parse_sync_timestamp(RedisConfig.get_smartcard_full_by_subscriber_at())
+    if last is None:
+        return True
+    return timezone.now() - last >= timedelta(hours=every_hours)
+
+
+def run_smartcard_sync_for_pipeline(
+    session_id=None,
+    limit=100,
+    *,
+    force_full: bool = False,
+) -> dict:
+    """
+    Estrategia híbrida para el pipeline periódico:
+    - incremental: cambios recientes (paginación completa si MAX_PAGES=0)
+    - por abonado: reconciliación completa cada ciclo si PIPELINE_COMPLETE_EACH_CYCLE
+    """
+    if force_full:
+        result = compare_and_update_all_smartcards(session_id, limit, force_full=True)
+        return {"strategy": "force_full", "result": result}
+
+    payload: dict = {"strategy": "pipeline_hybrid", "steps": {}}
+
+    if PanaccessConfig.SMARTCARD_SYNC_INCREMENTAL:
+        payload["steps"]["incremental"] = compare_and_update_smartcards_incremental(
+            session_id, limit
+        )
+
+    run_full_by_sub = _should_run_full_smartcard_by_subscriber()
+    if run_full_by_sub:
+        logger.info("Pipeline smartcards — reconciliación completa por abonado")
+        payload["steps"]["by_subscriber"] = compare_and_update_smartcards_by_subscribers(
+            session_id, limit
+        )
+        RedisConfig.set_smartcard_full_by_subscriber_at(timezone.now().isoformat())
+    elif not PanaccessConfig.SMARTCARD_SYNC_INCREMENTAL:
+        payload["steps"]["by_subscriber"] = compare_and_update_smartcards_by_subscribers(
+            session_id, limit
+        )
+
+    if not payload["steps"]:
+        payload["steps"]["by_subscriber"] = compare_and_update_smartcards_by_subscribers(
+            session_id, limit
+        )
+
+    return payload
+
+
 def _fetch_smartcards_for_subscriber(
     session_id=None,
     subscriber_code: str = "",
@@ -193,8 +452,18 @@ def _fetch_smartcards_for_subscriber(
     entries: list[dict] = []
     remote_total_count = None
     max_pages = PanaccessConfig.SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES
+    page_num = 0
 
-    for _ in range(max_pages):
+    while True:
+        if max_pages > 0 and page_num >= max_pages:
+            logger.warning(
+                "Smartcards abonado %s: tope de %s páginas alcanzado. "
+                "Use PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES=0 para sin límite.",
+                code,
+                max_pages,
+            )
+            break
+
         response = CallListSmartcards(
             session_id,
             offset,
@@ -217,6 +486,7 @@ def _fetch_smartcards_for_subscriber(
                 continue
             entries.append(entry)
 
+        page_num += 1
         offset += limit
         if len(batch) < limit:
             break

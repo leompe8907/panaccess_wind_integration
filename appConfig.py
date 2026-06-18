@@ -243,7 +243,11 @@ class RedisConfig:
         return Redis(**kwargs)
 
     FULL_SYNC_FLAG_KEY = "celery:flag:full_sync_in_progress"
+    SMARTCARD_INCREMENTAL_SINCE_KEY = "celery:smartcard_sync:last_incremental_at"
+    SMARTCARD_FULL_BY_SUBSCRIBER_AT_KEY = "celery:smartcard_sync:last_full_by_subscriber_at"
     _eager_full_sync_active = False
+    _eager_smartcard_incremental_since: str | None = None
+    _eager_smartcard_full_by_subscriber_at: str | None = None
 
     @classmethod
     def set_full_sync_in_progress(cls, *, timeout: int = 3600) -> None:
@@ -276,6 +280,60 @@ class RedisConfig:
             return cls.get_client().get(cls.FULL_SYNC_FLAG_KEY) is not None
         except Exception:
             return False
+
+    @classmethod
+    def get_smartcard_incremental_since(cls) -> str | None:
+        from django.conf import settings
+
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            return cls._eager_smartcard_incremental_since
+        try:
+            raw = cls.get_client().get(cls.SMARTCARD_INCREMENTAL_SINCE_KEY)
+            if raw is None:
+                return None
+            return raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+        except Exception:
+            return None
+
+    @classmethod
+    def set_smartcard_incremental_since(cls, value: str) -> None:
+        from django.conf import settings
+
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            cls._eager_smartcard_incremental_since = value
+            return
+        try:
+            cls.get_client().set(cls.SMARTCARD_INCREMENTAL_SINCE_KEY, value.encode("utf-8"))
+        except Exception:
+            pass
+
+    @classmethod
+    def get_smartcard_full_by_subscriber_at(cls) -> str | None:
+        from django.conf import settings
+
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            return cls._eager_smartcard_full_by_subscriber_at
+        try:
+            raw = cls.get_client().get(cls.SMARTCARD_FULL_BY_SUBSCRIBER_AT_KEY)
+            if raw is None:
+                return None
+            return raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+        except Exception:
+            return None
+
+    @classmethod
+    def set_smartcard_full_by_subscriber_at(cls, value: str) -> None:
+        from django.conf import settings
+
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            cls._eager_smartcard_full_by_subscriber_at = value
+            return
+        try:
+            cls.get_client().set(
+                cls.SMARTCARD_FULL_BY_SUBSCRIBER_AT_KEY, value.encode("utf-8")
+            )
+        except Exception:
+            pass
 
     @classmethod
     @contextmanager
@@ -317,7 +375,15 @@ class CeleryConfig:
     SYNC_MINUTES = max(1, _env_int("CELERY_SYNC_MINUTES", 10))
     SMARTCARD_SYNC_MINUTES = max(1, _env_int("CELERY_SMARTCARD_SYNC_MINUTES", 10))
     SYNC_LIMIT = max(1, _env_int("CELERY_SYNC_LIMIT", 200))
-    SYNC_QUEUE = _strip_env(os.getenv("CELERY_SYNC_QUEUE")) or "sync_subscribers"
+    SYNC_PIPELINE_QUEUE = (
+        _strip_env(os.getenv("CELERY_SYNC_PIPELINE_QUEUE")) or "sync_pipeline"
+    )
+    FULL_SYNC_QUEUE = _strip_env(os.getenv("CELERY_FULL_SYNC_QUEUE")) or "full_sync"
+    # Alias legacy (HTTP / docs antiguos)
+    SYNC_QUEUE = _strip_env(os.getenv("CELERY_SYNC_QUEUE")) or SYNC_PIPELINE_QUEUE
+    PIPELINE_LOCK_TIMEOUT = max(
+        600, _env_int("CELERY_PIPELINE_LOCK_TIMEOUT", 1800)
+    )
     USE_CRONTAB = _env_bool("CELERY_USE_CRONTAB", False)
 
     FULL_SYNC_ENABLED = _env_bool("CELERY_FULL_SYNC_ENABLED", True)
@@ -379,8 +445,22 @@ class PanaccessConfig:
     SMARTCARD_SUBSCRIBER_CONCURRENCY = max(
         1, min(_env_int("PANACCESS_SMARTCARD_SUBSCRIBER_CONCURRENCY", 5), 32)
     )
-    SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES = max(
-        1, _env_int("PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES", 50)
+    SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES = _env_int(
+        "PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES", 0
+    )
+    SMARTCARD_SYNC_INCREMENTAL = _env_bool("PANACCESS_SMARTCARD_SYNC_INCREMENTAL", True)
+    SMARTCARD_INCREMENTAL_LOOKBACK_HOURS = max(
+        1, _env_int("PANACCESS_SMARTCARD_INCREMENTAL_LOOKBACK_HOURS", 24)
+    )
+    # 0 = paginar hasta agotar todos los resultados del filtro (sin tope artificial)
+    SMARTCARD_INCREMENTAL_MAX_PAGES = _env_int(
+        "PANACCESS_SMARTCARD_INCREMENTAL_MAX_PAGES", 0
+    )
+    SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS = max(
+        0, _env_int("PANACCESS_SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS", 24)
+    )
+    SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE = _env_bool(
+        "PANACCESS_SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE", True
     )
 
     @classmethod

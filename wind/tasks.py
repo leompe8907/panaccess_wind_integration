@@ -8,7 +8,7 @@ from wind.functions.getSubscriber import (
     sync_subscribers,
 )
 from wind.functions.getProducts import sync_products
-from wind.functions.getSmartcard import compare_and_update_all_smartcards, sync_smartcards
+from wind.functions.getSmartcard import compare_and_update_all_smartcards, run_smartcard_sync_for_pipeline, sync_smartcards
 from wind.functions.full_sync import run_full_sync
 from wind.exceptions import (
     PanAccessConnectionError,
@@ -22,6 +22,15 @@ from appConfig import CeleryConfig, RedisConfig
 logger = logging.getLogger(__name__)
 
 
+def _skipped_already_running(task_name: str) -> dict:
+    logger.warning("[Celery] %s ya está ejecutándose, se omite", task_name)
+    return {
+        "success": False,
+        "skipped": True,
+        "message": "Task already running, skipped",
+    }
+
+
 def _skipped_during_full_sync(task_name: str) -> dict:
     logger.warning(
         "[Celery] %s omitida: full_sync correctivo en curso",
@@ -32,6 +41,76 @@ def _skipped_during_full_sync(task_name: str) -> dict:
         "skipped": True,
         "message": "Deferred: full_sync in progress",
     }
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(
+        PanAccessConnectionError,
+        PanAccessTimeoutError,
+        PanAccessSessionError,
+        PanAccessRateLimitError,
+        ConnectionError,
+    ),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def periodic_sync_pipeline_task(self, limit=None):
+    """
+    Orquestador periódico: sync suscriptores y luego smartcards, en serie.
+
+    Diseñado para un worker dedicado (-Q sync_pipeline -c 1).
+    Se omite si full_sync está en curso.
+    """
+    if RedisConfig.is_full_sync_in_progress():
+        return _skipped_during_full_sync("periodic_sync_pipeline_task")
+
+    lock_key = "celery:lock:periodic_sync_pipeline_task"
+    lock_timeout = CeleryConfig.PIPELINE_LOCK_TIMEOUT
+
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+        if not acquired:
+            return _skipped_already_running("periodic_sync_pipeline_task")
+
+        try:
+            env_limit = CeleryConfig.SYNC_LIMIT
+            limit = limit or env_limit or 200
+            started = time.monotonic()
+
+            logger.info(
+                "[Celery] Pipeline sync — paso 1/2: sync_subscribers limit=%s",
+                limit,
+            )
+            subscribers_result = sync_subscribers(session_id=None, limit=limit)
+
+            logger.info(
+                "[Celery] Pipeline sync — paso 2/2: smartcards (híbrido incremental) limit=%s",
+                limit,
+            )
+            smartcards_result = run_smartcard_sync_for_pipeline(
+                session_id=None, limit=limit
+            )
+
+            elapsed = round(time.monotonic() - started, 2)
+            logger.info("[Celery] Pipeline sync completado en %ss", elapsed)
+
+            return {
+                "success": True,
+                "limit": limit,
+                "duration_seconds": elapsed,
+                "subscribers": subscribers_result,
+                "smartcards": smartcards_result,
+            }
+        except PanAccessException:
+            logger.error("[Celery] Error PanAccess en periodic_sync_pipeline_task")
+            raise
+        except Exception:
+            logger.exception(
+                "[Celery] Error inesperado en periodic_sync_pipeline_task"
+            )
+            raise
 
 
 @shared_task(

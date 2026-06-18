@@ -4,8 +4,11 @@ from django.test import SimpleTestCase
 
 from wind.functions.getSmartcard import (
     CallListSmartcards,
+    _should_run_full_smartcard_by_subscriber,
+    _smartcards_changed_since_filters,
     compare_and_update_all_smartcards,
     compare_and_update_smartcards_by_subscribers,
+    run_smartcard_sync_for_pipeline,
 )
 
 
@@ -118,3 +121,45 @@ class CompareSmartcardsBySubscriberTestCase(SimpleTestCase):
         self.assertEqual(parameters["subscriberCode"], "SUB001")
         self.assertIn("filters", parameters)
         self.assertEqual(parameters["filters"]["rules"][0]["field"], "subscriberCode")
+
+    def test_incremental_filters_or_last_contact_and_activation(self):
+        filt = _smartcards_changed_since_filters("2026-06-17 10:00:00")
+        self.assertEqual(filt["groupOp"], "OR")
+        fields = {r["field"] for r in filt["rules"]}
+        self.assertEqual(fields, {"lastContact", "lastActivation"})
+        self.assertTrue(all(r["op"] == "gt" for r in filt["rules"]))
+
+    @patch("wind.functions.getSmartcard.RedisConfig")
+    @patch("wind.functions.getSmartcard.PanaccessConfig")
+    def test_should_run_full_by_subscriber_when_never_ran(
+        self, mock_config, mock_redis
+    ):
+        mock_config.SMARTCARD_SYNC_BY_SUBSCRIBER = True
+        mock_config.SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE = False
+        mock_config.SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS = 24
+        mock_redis.get_smartcard_full_by_subscriber_at.return_value = None
+        self.assertTrue(_should_run_full_smartcard_by_subscriber())
+
+    @patch("wind.functions.getSmartcard.PanaccessConfig")
+    def test_should_run_full_each_cycle_when_complete_flag(self, mock_config):
+        mock_config.SMARTCARD_SYNC_BY_SUBSCRIBER = True
+        mock_config.SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE = True
+        self.assertTrue(_should_run_full_smartcard_by_subscriber())
+
+    @patch("wind.functions.getSmartcard.compare_and_update_smartcards_incremental")
+    @patch("wind.functions.getSmartcard._should_run_full_smartcard_by_subscriber")
+    @patch("wind.functions.getSmartcard.PanaccessConfig")
+    def test_pipeline_hybrid_runs_incremental_only(
+        self, mock_config, mock_should_full, mock_incremental
+    ):
+        mock_config.SMARTCARD_SYNC_INCREMENTAL = True
+        mock_config.SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE = False
+        mock_should_full.return_value = False
+        mock_incremental.return_value = {"strategy": "incremental", "remote_count": 2}
+
+        result = run_smartcard_sync_for_pipeline(limit=50)
+
+        self.assertEqual(result["strategy"], "pipeline_hybrid")
+        mock_incremental.assert_called_once()
+        self.assertIn("incremental", result["steps"])
+        self.assertNotIn("by_subscriber", result["steps"])

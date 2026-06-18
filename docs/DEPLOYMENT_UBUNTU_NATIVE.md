@@ -218,29 +218,91 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-### 2. Servicio del Worker de Celery
-Crea el archivo `/etc/systemd/system/panaccess-celery-worker.service`:
-```bash
-sudo nano /etc/systemd/system/panaccess-celery-worker.service
+### 2. Workers de Celery (pipeline + full sync)
+
+Se usan **dos workers** con colas separadas:
+
+| Worker | Cola | Rol |
+|--------|------|-----|
+| `panaccess-celery-worker-pipeline` | `sync_pipeline` | Pipeline periódico: suscriptores → smartcards (serie, `-c 1`) |
+| `panaccess-celery-worker-full` | `full_sync` | Full sync nocturno exclusivo (`-c 1`) |
+
+Variables en `.env`:
+
+```env
+CELERY_SYNC_PIPELINE_QUEUE=sync_pipeline
+CELERY_FULL_SYNC_QUEUE=full_sync
+CELERY_PIPELINE_LOCK_TIMEOUT=1800
+CELERY_TASK_ALWAYS_EAGER=false
 ```
-Escribe el siguiente contenido:
+
+**Pipeline** (`/etc/systemd/system/panaccess-celery-worker-pipeline.service`):
+
 ```ini
 [Unit]
-Description=Celery Worker para PanAccess Wind
+Description=Celery Worker pipeline (subscribers -> smartcards)
 After=network.target postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu  # Reemplaza por tu usuario real
+User=ubuntu
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
-ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker --loglevel=info
+ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker -Q sync_pipeline -c 1 --loglevel=info -n pipeline@%h
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+**Full sync** (`/etc/systemd/system/panaccess-celery-worker-full.service`):
+
+```ini
+[Unit]
+Description=Celery Worker full sync nocturno
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/panaccess-wind
+EnvironmentFile=/opt/panaccess-wind/.env
+ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker -Q full_sync -c 1 --loglevel=info -n fullsync@%h
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Opcional: worker general para emails y tareas sueltas (`-Q celery`).
+
+> Mientras `full_sync` corre, el flag Redis `celery:flag:full_sync_in_progress` hace que el pipeline **se omita** automáticamente.
+
+### Smartcards: sync híbrido (incremental + por abonado)
+
+El pipeline usa `run_smartcard_sync_for_pipeline`:
+
+1. **Incremental** (cada ciclo): `lastContact` o `lastActivation` > último sync — pocas llamadas API, escala a 10k+ abonados.
+2. **Por abonado** (cada `PANACCESS_SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS`, default 24h): reconcilia altas/bajas por subscriber.
+3. **Full scan** (solo `full_sync` nocturno): inventario completo 500k.
+
+Variables `.env`:
+
+```env
+PANACCESS_SMARTCARD_SYNC_INCREMENTAL=true
+PANACCESS_SMARTCARD_INCREMENTAL_LOOKBACK_HOURS=24
+PANACCESS_SMARTCARD_INCREMENTAL_MAX_PAGES=0
+PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES=0
+PANACCESS_SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE=true
+PANACCESS_SMARTCARD_FULL_BY_SUBSCRIBER_EVERY_HOURS=24
+```
+
+`MAX_PAGES=0` = paginar hasta agotar todos los resultados (sin corte artificial).
+`PIPELINE_COMPLETE_EACH_CYCLE=true` = reconciliación completa por abonado en **cada** ciclo del pipeline.
+
+Timestamps en Redis: `celery:smartcard_sync:last_incremental_at`, `celery:smartcard_sync:last_full_by_subscriber_at`.
 
 ### 3. Servicio de Celery Beat (Tareas Programadas)
 Crea el archivo `/etc/systemd/system/panaccess-celery-beat.service`:
@@ -270,12 +332,13 @@ WantedBy=multi-user.target
 Recarga systemd, habilita el arranque automático e inicia los tres procesos:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker.service panaccess-celery-beat.service
+sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service panaccess-celery-beat.service
 ```
 Verifica que estén activos sin errores:
 ```bash
 sudo systemctl status panaccess-wind.service
-sudo systemctl status panaccess-celery-worker.service
+sudo systemctl status panaccess-celery-worker-pipeline.service
+sudo systemctl status panaccess-celery-worker-full.service
 sudo systemctl status panaccess-celery-beat.service
 ```
 
@@ -437,7 +500,7 @@ Certbot configurará automáticamente los certificados SSL y los inyectará en l
     ```
 *   **Ver logs del Celery Worker:**
     ```bash
-    sudo journalctl -u panaccess-celery-worker.service -f
+    sudo journalctl -u panaccess-celery-worker-pipeline.service -f
     ```
 *   **Actualizar la aplicación tras cambios de código:**
     ```bash
@@ -447,5 +510,5 @@ Certbot configurará automáticamente los certificados SSL y los inyectará en l
     pip install -r requirements.txt
     python manage.py migrate
     python manage.py collectstatic --noinput
-    sudo systemctl restart panaccess-wind.service panaccess-celery-worker.service panaccess-celery-beat.service
+    sudo systemctl restart panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service panaccess-celery-beat.service
     ```
