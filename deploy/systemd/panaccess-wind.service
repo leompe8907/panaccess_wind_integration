@@ -5,7 +5,7 @@ Wants=postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu
+User=wind
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/daphne -b 127.0.0.1 -p 8000 panaccess_wind_integration.asgi:application

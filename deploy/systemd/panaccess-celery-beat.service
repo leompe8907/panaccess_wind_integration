@@ -5,7 +5,7 @@ Wants=postgresql.service redis-server.service
 
 [Service]
 Type=simple
-User=ubuntu
+User=wind
 WorkingDirectory=/opt/panaccess-wind
 EnvironmentFile=/opt/panaccess-wind/.env
 ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration beat --loglevel=info

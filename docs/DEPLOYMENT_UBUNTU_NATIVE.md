@@ -123,6 +123,8 @@ maxmemory-policy allkeys-lru
 
 ```bash
 sudo cp deploy/systemd/panaccess-wind@.service /etc/systemd/system/
+sudo cp deploy/systemd/panaccess-wind.target /etc/systemd/system/
+sudo sed -i 's/^User=.*/User=wind/' /etc/systemd/system/panaccess-wind@.service
 sudo systemctl daemon-reload
 sudo chmod +x deploy/manage_daphne.sh
 
@@ -142,12 +144,25 @@ Si tras monitorizar (`htop`, `journalctl`) la CPU de Daphne sigue alta con mucha
 
 ### 4. Nginx — upstream con balanceo
 
+**No copies la plantilla directo sobre tu config** si ya tenías dominio y certificados SSL reales. Haz backup y edita `server_name` + rutas `ssl_certificate` antes de `nginx -t`.
+
 ```bash
+# Backup de la config que ya funcionaba
+sudo cp /etc/nginx/sites-available/panaccess-wind.conf \
+        /etc/nginx/sites-available/panaccess-wind.conf.bak.$(date +%F)
+
+# Copiar plantilla y editar dominio + certificados (NO dejar api.tudominio.com)
 sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
-sudo nano /etc/nginx/sites-available/panaccess-wind.conf   # dominio + SSL
+sudo nano /etc/nginx/sites-available/panaccess-wind.conf
+
+# Ver certificados reales disponibles:
+sudo ls /etc/letsencrypt/live/
+
 sudo ln -sf /etc/nginx/sites-available/panaccess-wind.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+**Alternativa mínima:** conserva tu `server { ... }` actual y solo reemplaza el bloque `upstream django_backend` por el de 8 puertos (8000–8007) de `deploy/nginx/panaccess-wind-scaled.conf`.
 
 ### 5. Celery — sin cambios
 
