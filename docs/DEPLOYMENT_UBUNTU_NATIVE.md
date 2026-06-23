@@ -161,7 +161,7 @@ Si tras monitorizar (`htop`, `journalctl`) la CPU de Daphne sigue alta con mucha
 
 ### 4. Nginx — upstream con balanceo
 
-La plantilla `deploy/nginx/panaccess-wind-scaled.conf` ya usa **`backend.wind.do`** y rutas Let's Encrypt correspondientes. Siempre haz backup antes de sobrescribir.
+La plantilla `deploy/nginx/panaccess-wind-scaled.conf` ya usa **`backend.wind.do`** y certificados en `/etc/nginx/cdn1.wind.do.{crt,key}`. Siempre haz backup antes de sobrescribir.
 
 ```bash
 sudo cp /etc/nginx/sites-available/panaccess-wind.conf \
@@ -169,9 +169,9 @@ sudo cp /etc/nginx/sites-available/panaccess-wind.conf \
 
 sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
 
-# Verificar certificados (deben existir para backend.wind.do)
-sudo ls /etc/letsencrypt/live/backend.wind.do/
-# Si faltan: sudo certbot --nginx -d backend.wind.do
+# Verificar certificados (deben existir en /etc/nginx/)
+sudo ls -l /etc/nginx/cdn1.wind.do.crt /etc/nginx/cdn1.wind.do.key
+# Si faltan: copiar los archivos o usar panaccess-wind-bootstrap-http.conf (Paso 10)
 
 sudo ln -sf /etc/nginx/sites-available/panaccess-wind.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
@@ -216,7 +216,7 @@ sudo systemctl restart panaccess-celery-worker-pipeline panaccess-celery-worker-
     ```
 3.  **Instala las dependencias y compiladores básicos del sistema:**
     ```bash
-    sudo apt install -y git python3-pip python3-venv python3-dev build-essential libpq-dev curl certbot python3-certbot-nginx ufw
+    sudo apt install -y git python3-pip python3-venv python3-dev build-essential libpq-dev curl ufw
     ```
 
 ---
@@ -592,9 +592,9 @@ server {
     listen [::]:443 ssl http2;
     server_name backend.wind.do;
 
-    # Rutas de los certificados SSL (generados por Let's Encrypt en el paso 10)
-    ssl_certificate     /etc/letsencrypt/live/backend.wind.do/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/backend.wind.do/privkey.pem;
+    # Rutas de los certificados SSL (copiados a /etc/nginx/ en el paso 10)
+    ssl_certificate     /etc/nginx/cdn1.wind.do.crt;
+    ssl_certificate_key /etc/nginx/cdn1.wind.do.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
@@ -703,18 +703,28 @@ server {
 
 ---
 
-## Paso 10: Obtención de Certificado SSL Seguro (Let's Encrypt)
+## Paso 10: Certificados SSL en Nginx
 
-Si **aún no existen** certificados (`/etc/letsencrypt/live/backend.wind.do/`), no uses la plantilla HTTPS directamente: Nginx fallará en `nginx -t`. Sigue este orden:
+Los certificados se colocan directamente en `/etc/nginx/` (provistos por infraestructura / CDN):
 
-### 10.1 Instalar Certbot
+| Archivo | Ruta |
+|---------|------|
+| Certificado | `/etc/nginx/cdn1.wind.do.crt` |
+| Clave privada | `/etc/nginx/cdn1.wind.do.key` |
+
+Si **aún no existen**, no uses la plantilla HTTPS directamente: Nginx fallará en `nginx -t`. Sigue este orden:
+
+### 10.1 Copiar certificados al servidor
 
 ```bash
-sudo apt update
-sudo apt install -y certbot python3-certbot-nginx
+sudo cp cdn1.wind.do.crt /etc/nginx/cdn1.wind.do.crt
+sudo cp cdn1.wind.do.key /etc/nginx/cdn1.wind.do.key
+sudo chmod 644 /etc/nginx/cdn1.wind.do.crt
+sudo chmod 600 /etc/nginx/cdn1.wind.do.key
+sudo chown root:root /etc/nginx/cdn1.wind.do.crt /etc/nginx/cdn1.wind.do.key
 ```
 
-### 10.2 Bootstrap temporal (solo HTTP, puerto 80)
+### 10.2 Bootstrap temporal (solo HTTP, si aún no tienes los `.crt`/`.key`)
 
 ```bash
 sudo cp deploy/nginx/panaccess-wind-bootstrap-http.conf /etc/nginx/sites-available/panaccess-wind.conf
@@ -724,13 +734,7 @@ curl -s http://backend.wind.do/health/
 
 > `backend.wind.do` debe apuntar por DNS a la IP pública de este servidor y el puerto 80 debe estar abierto (UFW).
 
-### 10.3 Obtener certificado
-
-```bash
-sudo certbot --nginx -d backend.wind.do
-```
-
-### 10.4 Config final con HTTPS + 8 Daphne
+### 10.3 Config final con HTTPS + 8 Daphne
 
 ```bash
 sudo cp deploy/nginx/panaccess-wind-scaled.conf /etc/nginx/sites-available/panaccess-wind.conf
@@ -738,10 +742,12 @@ sudo nginx -t && sudo systemctl reload nginx
 curl -sk https://backend.wind.do/health/
 ```
 
-### 10.5 Renovación automática
+### 10.4 Renovación
+
+Renueva los certificados según el proceso de tu CA/CDN, vuelve a copiarlos a `/etc/nginx/` y recarga Nginx:
 
 ```bash
-sudo certbot renew --dry-run
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ---
@@ -914,7 +920,7 @@ Confirma que Nginx tiene el bloque `location /ws/` con headers `Upgrade` y timeo
 
 ### Error SSL en Nginx ("cannot load certificate")
 
-Los certificados aún no existen. Ejecuta Certbot (Paso 10) o comenta temporalmente las líneas `ssl_certificate` y usa solo HTTP hasta obtenerlos.
+Los certificados aún no existen en `/etc/nginx/`. Copia `cdn1.wind.do.crt` y `cdn1.wind.do.key` (Paso 10) o usa temporalmente la plantilla HTTP bootstrap.
 
 ### ModuleNotFoundError tras actualizar
 
