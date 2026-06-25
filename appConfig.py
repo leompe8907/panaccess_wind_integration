@@ -417,7 +417,7 @@ class PanaccessConfig:
     ENCRYPTION_KEY = _strip_env(os.getenv("ENCRYPTION_KEY"))
 
     # Dynamic registration default product ID from .env
-    REGISTRATION_PRODUCT_ID = _env_int("PANACCESS_REGISTRATION_PRODUCT_ID", 4639)
+    REGISTRATION_PRODUCT_ID = _strip_env(os.getenv("PANACCESS_REGISTRATION_PRODUCT_ID"))
 
     # Alias usados por wind.utils / panaccess_client (retrocompatibilidad)
     PANACCESS = URL
@@ -522,6 +522,17 @@ class EmailConfig:
     HOST_PASSWORD = _strip_env(os.getenv("EMAIL_HOST_PASSWORD"))
     USE_TLS = _env_bool("EMAIL_USE_TLS", True)
     DEFAULT_FROM = _strip_env(os.getenv("DEFAULT_FROM_EMAIL"))
+
+    WELCOME_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_WELCOME_SUBJECT"))
+        or "Bienvenido a WindTV — tus datos de acceso"
+    )
+    SUPPORT_ADDRESS = _strip_env(os.getenv("EMAIL_SUPPORT_ADDRESS")) or "info@wind.do"
+    SUPPORT_PHONE = _strip_env(os.getenv("EMAIL_SUPPORT_PHONE")) or "809.200.3000"
+    TERMS_URL = _strip_env(os.getenv("EMAIL_TERMS_URL")) or ""
+    GOOGLE_PLAY_URL = _strip_env(os.getenv("WIND_APP_GOOGLE_PLAY_URL")) or ""
+    APP_STORE_URL = _strip_env(os.getenv("WIND_APP_APP_STORE_URL")) or ""
+    SOCIAL_PASSWORD_MESSAGE = "Cuenta social no usa contraseña."
 
     @classmethod
     def account_verification(cls, *, debug: bool) -> str:

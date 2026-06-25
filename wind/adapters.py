@@ -13,7 +13,14 @@ from wind.functions.create_subscriber import create_subscriber_view
 
 logger = logging.getLogger(__name__)
 
-def create_subscriber_in_panaccess(email, first_name, last_name, auto_generate_code=True, comment=""):
+def create_subscriber_in_panaccess(
+    email,
+    first_name,
+    last_name,
+    auto_generate_code=True,
+    comment="",
+    is_social_account=False,
+):
     """
     Llama a la vista de creación de suscriptor simulando un request.
     """
@@ -26,6 +33,8 @@ def create_subscriber_in_panaccess(email, first_name, last_name, auto_generate_c
     }
     request = factory.post('/dummy/', data=json.dumps(data), content_type='application/json')
     request.wind_internal_create = True  # bypass throttling
+    if is_social_account:
+        request.wind_is_social_account = True
     response = create_subscriber_view(request)
     return response.data
 
@@ -130,7 +139,8 @@ class PanAccessSocialAccountAdapter(DefaultSocialAccountAdapter):
                     first_name=first_name,
                     last_name=last_name,
                     auto_generate_code=True,
-                    comment="Creado vía Google/Facebook Social Login"
+                    comment="Creado vía Google/Facebook Social Login",
+                    is_social_account=True,
                 )
                 
                 if result.get('success'):

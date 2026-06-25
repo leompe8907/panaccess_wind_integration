@@ -16,6 +16,9 @@ from channels.layers import get_channel_layer
 
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 
+from appConfig import EmailConfig
+from wind.models import ListOfSubscriber
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -807,6 +810,28 @@ def register_view(request):
     return render(request, 'wind/register.html', {'debug': bool(settings.DEBUG)})
 
 
+def _credentials_page_context(**extra):
+    """Contexto común para credentials.html (alineado con el correo de bienvenida)."""
+    return {
+        "support_email": EmailConfig.SUPPORT_ADDRESS,
+        "support_phone": EmailConfig.SUPPORT_PHONE,
+        "terms_url": EmailConfig.TERMS_URL,
+        "google_play_url": EmailConfig.GOOGLE_PLAY_URL,
+        "app_store_url": EmailConfig.APP_STORE_URL,
+        **extra,
+    }
+
+
+def _full_name_for_subscriber(subscriber_code: str, email: str = "") -> str:
+    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    if sub:
+        name = f"{sub.firstName or ''} {sub.lastName or ''}".strip()
+        if name:
+            return name
+    local = (email or "").split("@", 1)[0].strip()
+    return local or "Usuario"
+
+
 def credentials_view(request):
     """
     Página web para mostrar credenciales PanAccess recién creadas.
@@ -814,15 +839,32 @@ def credentials_view(request):
     """
     token = request.GET.get("t", "")
     if not token:
-        return render(request, "wind/credentials.html", {"error": "Enlace inválido o incompleto."}, status=400)
+        return render(
+            request,
+            "wind/credentials.html",
+            _credentials_page_context(error="Enlace inválido o incompleto."),
+            status=400,
+        )
 
     signer = TimestampSigner(salt="wind.credentials")
     try:
         raw = signer.unsign(token, max_age=10 * 60)  # 10 minutos
     except SignatureExpired:
-        return render(request, "wind/credentials.html", {"error": "Este enlace expiró. Regístrate de nuevo o solicita recuperación."}, status=400)
+        return render(
+            request,
+            "wind/credentials.html",
+            _credentials_page_context(
+                error="Este enlace expiró. Regístrate de nuevo o solicita recuperación."
+            ),
+            status=400,
+        )
     except BadSignature:
-        return render(request, "wind/credentials.html", {"error": "Enlace inválido."}, status=400)
+        return render(
+            request,
+            "wind/credentials.html",
+            _credentials_page_context(error="Enlace inválido."),
+            status=400,
+        )
 
     # Formato esperado:
     # "<subscriber_code>|<license_ok_int>|<b64(license_error)>|<b64(email)>"
@@ -847,21 +889,22 @@ def credentials_view(request):
 
     try:
         login_info = CallGetSubscriberLoginInfo(subscriber_code=subscriber_code)
-        # Mostrar el email como "usuario alternativo" cuando viene en el token.
-        login2_display = (email_from_token or "").strip() or (login_info.get("login2") or "")
-        context = {
-            "login2": login2_display,
-            "login1": login_info.get("login1") or "",
-            "password": login_info.get("password") or "",
-            "license_block_added": True if str(license_ok) == "1" else False,
-            "license_block_error": license_err or None,
-        }
+        username = (email_from_token or "").strip() or (login_info.get("login2") or "")
+        context = _credentials_page_context(
+            full_name=_full_name_for_subscriber(subscriber_code, username),
+            username=username,
+            password=login_info.get("password") or "",
+            license_block_added=True if str(license_ok) == "1" else False,
+            license_block_error=license_err or None,
+        )
         return render(request, "wind/credentials.html", context)
     except Exception:
         return render(
             request,
             "wind/credentials.html",
-            {"error": "No pudimos cargar tus credenciales en este momento. Intenta de nuevo en unos segundos."},
+            _credentials_page_context(
+                error="No pudimos cargar tus credenciales en este momento. Intenta de nuevo en unos segundos."
+            ),
             status=500,
         )
 

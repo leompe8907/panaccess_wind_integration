@@ -411,6 +411,34 @@ def full_sync_task(self, limit=None):
             RedisConfig.clear_full_sync_in_progress()
 
 
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_welcome_credentials_email_task(self, email, subject, text_body, html_body):
+    """
+    Envía el correo de bienvenida con credenciales tras el registro.
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    logger.info("Enviando correo de bienvenida a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Correo de bienvenida enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as exc:
+        logger.exception("Error al enviar correo de bienvenida a %s", email)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
+
+
 @shared_task
 def send_verification_email_task(email, subject, body, html_body=None):
     """

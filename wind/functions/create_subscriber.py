@@ -770,15 +770,20 @@ def create_subscriber_view(request):
 
         response_data['assigned_smartcards'] = assigned_smartcards
         response_data['product_add_result'] = product_add_result
-        
-        # Enviar correo electrónico de verificación asíncronamente
+
         try:
-            from wind.tasks import send_verification_email_task
-            subject = "Verificación de Cuenta - WIND"
-            body = f"Hola, tu código de suscriptor es: {subscriber_code}. Por favor, verifica tu cuenta."
-            send_verification_email_task.delay(email_normalized, subject, body)
+            from wind.services.welcome_email import enqueue_welcome_credentials_email
+
+            is_social_account = bool(getattr(request, "wind_is_social_account", False))
+            enqueue_welcome_credentials_email(
+                first_name=data.get("firstName", ""),
+                last_name=data.get("lastName", ""),
+                email=email_normalized,
+                subscriber_code=subscriber_code,
+                is_social_account=is_social_account,
+            )
         except Exception as e:
-            logger.warning(f"No se pudo encolar el email de verificación: {e}")
+            logger.warning("No se pudo encolar el correo de bienvenida: %s", e)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
         

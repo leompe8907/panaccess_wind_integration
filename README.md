@@ -987,7 +987,7 @@ Cliente POST /wind/create-subscriber/
     ├─ PanAccess: addProductToSmartcards (producto trial 30 días a TODAS las SC)
     │
     ├─ Generar token firmado → credentials_url
-    └─ Encolar email verificación (Celery)
+    └─ Encolar correo de bienvenida con credenciales (Celery)
 ```
 
 **Producto de registro**: `PANACCESS_REGISTRATION_PRODUCT_ID` (default 4639).
@@ -1134,6 +1134,7 @@ GET /api/v1/profile/products/ (JWT)
 | `compare_and_update_smartcards_task` | Sí | 5 | Sí |
 | `sync_products_task` | Sí | 5 | Sí |
 | `full_sync_task` | Sí (3600s) | 3 | N/A (es el full-sync) |
+| `send_welcome_credentials_email_task` | No | 3 (60s) | No |
 | `send_verification_email_task` | No | No | No |
 
 ### Schedule Celery Beat (default)

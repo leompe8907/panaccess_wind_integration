@@ -30,7 +30,8 @@ class SubscriberRegistrationTestCase(APITestCase):
 
     @patch('wind.functions.create_subscriber.get_panaccess')
     @patch('wind.functions.getSubscriber.get_panaccess')
-    def test_successful_registration(self, mock_get_subscriber_panaccess, mock_get_panaccess):
+    @patch('wind.services.welcome_email.enqueue_welcome_credentials_email')
+    def test_successful_registration(self, mock_welcome_email, mock_get_subscriber_panaccess, mock_get_panaccess):
         # Configurar mocks de PanAccess
         mock_client = MagicMock()
         mock_get_panaccess.return_value = mock_client
@@ -74,6 +75,11 @@ class SubscriberRegistrationTestCase(APITestCase):
         # Verificar que se crearon registros de unicidad local
         self.assertTrue(SubscriberEmailRegistry.objects.filter(email='john.doe@example.com').exists())
         self.assertTrue(SubscriberDocumentRegistry.objects.filter(document='40212345678').exists())
+        mock_welcome_email.assert_called_once()
+        call_kwargs = mock_welcome_email.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], "john.doe@example.com")
+        self.assertEqual(call_kwargs["subscriber_code"], "10001")
+        self.assertFalse(call_kwargs["is_social_account"])
 
     @patch('wind.functions.create_subscriber.get_panaccess')
     def test_duplicate_email_validation(self, mock_get_panaccess):
