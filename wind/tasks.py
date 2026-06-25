@@ -440,6 +440,43 @@ def send_welcome_credentials_email_task(self, email, subject, text_body, html_bo
 
 
 @shared_task
+def send_password_reset_email_task(email: str, reset_link: str):
+    """Envía el correo con enlace de recuperación de contraseña."""
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    subject = "Restablecer contraseña - Wind"
+    body = (
+        "Hola,\n\n"
+        "Recibimos una solicitud para restablecer la contraseña de tu cuenta Wind.\n"
+        f"Usa este enlace (válido 60 minutos):\n\n{reset_link}\n\n"
+        "Si no solicitaste este cambio, ignora este correo.\n"
+    )
+    html_body = (
+        "<p>Hola,</p>"
+        "<p>Recibimos una solicitud para restablecer la contraseña de tu cuenta Wind.</p>"
+        f'<p><a href="{reset_link}">Restablecer contraseña</a></p>'
+        "<p>El enlace expira en 60 minutos.</p>"
+        "<p>Si no solicitaste este cambio, ignora este correo.</p>"
+    )
+    logger.info("Enviando email de recuperación de contraseña a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Email de recuperación enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as e:
+        logger.exception("Error al enviar email de recuperación a %s", email)
+        return {"success": False, "error": str(e), "email": email}
+
+
+@shared_task
 def send_verification_email_task(email, subject, body, html_body=None):
     """
     Envía un email de verificación o notificación de forma asíncrona.

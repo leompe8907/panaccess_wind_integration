@@ -908,3 +908,57 @@ def credentials_view(request):
             status=500,
         )
 
+
+@ensure_csrf_cookie
+def forgot_password_view(request):
+    """Página para solicitar recuperación de contraseña por correo."""
+    return render(request, "wind/forgot-password.html")
+
+
+@ensure_csrf_cookie
+def reset_password_view(request):
+    """Página para ingresar nueva contraseña con token del enlace de recuperación."""
+    from wind.services.password_reset import is_reset_token_used, parse_reset_token
+
+    token = request.GET.get("t", "")
+    if not token:
+        return render(
+            request,
+            "wind/reset-password.html",
+            {"error": "Enlace inválido o incompleto.", "token": ""},
+            status=400,
+        )
+
+    if is_reset_token_used(token):
+        return render(
+            request,
+            "wind/reset-password.html",
+            {
+                "error": "Este enlace ya fue utilizado. Solicita uno nuevo.",
+                "token": "",
+            },
+            status=400,
+        )
+
+    try:
+        parse_reset_token(token)
+    except SignatureExpired:
+        return render(
+            request,
+            "wind/reset-password.html",
+            {
+                "error": "Este enlace expiró. Solicita uno nuevo.",
+                "token": "",
+            },
+            status=400,
+        )
+    except BadSignature:
+        return render(
+            request,
+            "wind/reset-password.html",
+            {"error": "Enlace inválido.", "token": ""},
+            status=400,
+        )
+
+    return render(request, "wind/reset-password.html", {"token": token})
+

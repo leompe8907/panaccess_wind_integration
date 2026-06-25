@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
         'profile': ThrottleConfig.PROFILE,
         'sync_admin': ThrottleConfig.SYNC_ADMIN,
         'register': ThrottleConfig.REGISTER,
+        'password_reset': ThrottleConfig.PASSWORD_RESET,
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,

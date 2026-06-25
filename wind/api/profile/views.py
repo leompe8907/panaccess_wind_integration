@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from wind.api.profile.serializers import ProfilePasswordSerializer
 from wind.exceptions import PanAccessException
 from wind.permissions import IsOwnerSubscriber
-from wind.services import get_panaccess
+from wind.services.password_reset import reset_password_in_panaccess, sync_password_locally
 from wind.services.subscriber_catalog import (
     build_subscriber_detail_payload,
     build_subscriber_products_payload,
@@ -65,20 +65,14 @@ def profile_password_view(request):
     new_pass = ser.validated_data["newPass"]
 
     try:
-        panaccess = get_panaccess()
-        response = panaccess.call(
-            "resetSubscriberPassword",
-            {"code": code, "newPass": new_pass, "hash": False},
+        reset_password_in_panaccess(code, new_pass)
+        sync_password_locally(code, request.user.email or "", new_pass)
+        return Response(
+            {
+                "success": True,
+                "message": "Contraseña actualizada",
+            }
         )
-        if response.get("success"):
-            return Response(
-                {
-                    "success": True,
-                    "message": "Contraseña actualizada",
-                    "result": response.get("answer", response),
-                }
-            )
-        raise PanAccessException(response.get("errorMessage", "Error al cambiar contraseña"))
     except PanAccessException as e:
         return Response(
             {"success": False, "error_type": "PanAccessException", "message": str(e)},

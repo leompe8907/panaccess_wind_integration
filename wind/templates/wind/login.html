@@ -42,7 +42,10 @@
               <input id="password" name="password" type="password" autocomplete="current-password" required />
             </div>
             <button type="submit" class="app-btn primary" id="btn-login">Iniciar sesión</button>
-            <p style="text-align: center; margin: 0">
+            <p style="text-align: center; margin: 8px 0 0">
+              <a class="app-link" href="{% url 'forgot_password' %}">¿Olvidaste tu contraseña?</a>
+            </p>
+            <p style="text-align: center; margin: 12px 0 0">
               ¿No tienes cuenta?
               <a class="app-link" href="{% url 'register_web' %}">Regístrate</a>
             </p>

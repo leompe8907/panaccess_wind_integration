@@ -29,3 +29,9 @@ class RegisterThrottle(AnonRateThrottle):
         if getattr(request, "wind_internal_create", False):
             return True
         return super().allow_request(request, view)
+
+
+class PasswordResetThrottle(AnonRateThrottle):
+    """Recuperación de contraseña — límite bajo por IP."""
+
+    scope = "password_reset"

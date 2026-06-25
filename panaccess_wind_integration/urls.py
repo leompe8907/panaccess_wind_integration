@@ -10,6 +10,9 @@ urlpatterns = [
     # URLs nativas de Allauth para renderizado HTML de providers
     path('accounts/', include('allauth.urls')),
     
+    # Recuperación de contraseña PanAccess (antes de dj-rest-auth)
+    path('api/auth/password/', include('wind.api.password_reset.urls')),
+
     # Endpoints de JWT y Autenticación REST
     path('api/auth/', include('dj_rest_auth.urls')),
     path('api/auth/registration/', include('dj_rest_auth.registration.urls')),

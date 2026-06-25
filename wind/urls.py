@@ -23,6 +23,8 @@ from wind.views import (
     login_facebook_test_view,
     register_view,
     credentials_view,
+    forgot_password_view,
+    reset_password_view,
     RequestUDIDManualView,
     ValidateAndAssociateUDIDView,
     AuthenticateWithUDIDView,
@@ -54,6 +56,8 @@ urlpatterns = [
     path('register/', register_view, name='register_web'),
     # Página para mostrar credenciales recién creadas (token firmado)
     path('credentials/', credentials_view, name='credentials_web'),
+    path('forgot-password/', forgot_password_view, name='forgot_password'),
+    path('reset-password/', reset_password_view, name='reset_password'),
     
     # Operaciones PanAccess (staff)
     path('ops/panaccess-session/', panaccess_session_status_view, name='panaccess_session'),

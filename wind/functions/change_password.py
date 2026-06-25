@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from wind.services import get_panaccess
+from wind.services.password_reset import reset_password_in_panaccess, sync_password_locally
 from wind.exceptions import PanAccessException
 from wind.permissions import IsOwnerSubscriber
 from wind.throttles import ProfileThrottle
@@ -48,23 +48,16 @@ def change_password_view(request):
         )
 
     try:
-        panaccess = get_panaccess()
-        parameters = {"code": code, "newPass": new_pass, "hash": False}
-        response = panaccess.call("resetSubscriberPassword", parameters)
-
-        if response.get("success"):
-            return Response(
-                {
-                    "success": True,
-                    "message": "Reset de contraseña ejecutado",
-                    "result": response.get("answer", response),
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        error_message = response.get("errorMessage", "Error desconocido al resetear contraseña")
-        logger.error(f"Error PanAccess: {error_message}")
-        raise PanAccessException(error_message)
+        reset_password_in_panaccess(code, new_pass)
+        email = getattr(request.user, "email", "") or ""
+        sync_password_locally(code, email, new_pass)
+        return Response(
+            {
+                "success": True,
+                "message": "Reset de contraseña ejecutado",
+            },
+            status=status.HTTP_200_OK,
+        )
 
     except PanAccessException as e:
         return Response(
