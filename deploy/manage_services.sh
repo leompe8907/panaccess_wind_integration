@@ -1,9 +1,8 @@
 #!/bin/bash
-# Reinicio / estado de servicios de aplicación (Daphne + Celery).
+# Reinicio / estado de servicios Celery (Daphne escalado: deploy/manage_daphne.sh).
 # Uso: sudo ./deploy/manage_services.sh {start|stop|restart|status}
 
 SERVICES=(
-    panaccess-wind.service
     panaccess-celery-worker-pipeline.service
     panaccess-celery-worker-full.service
     panaccess-celery-beat.service
