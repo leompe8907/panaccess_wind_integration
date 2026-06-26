@@ -1,0 +1,193 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Cómo solicitar la eliminación de tu cuenta WindTV y qué datos se eliminan o conservan."
+    />
+    <title>Eliminación de cuenta | WindTV</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}" />
+    <style>
+      .legal-page .app-content {
+        padding: 18px 20px 22px;
+      }
+
+      .legal-intro {
+        margin: 0 0 18px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .legal-section {
+        margin-bottom: 16px;
+      }
+
+      .legal-section h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .legal-section p {
+        margin: 0 0 10px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .legal-section ol,
+      .legal-section ul {
+        margin: 0 0 10px;
+        padding-left: 1.25rem;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .legal-section li + li {
+        margin-top: 6px;
+      }
+
+      .legal-note {
+        margin: 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(234, 179, 8, 0.35);
+        background: rgba(234, 179, 8, 0.1);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .legal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .legal-meta {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line-2);
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+    </style>
+  </head>
+  <body class="app-body legal-page">
+    <div class="app-wrap">
+      <div class="app-card wide">
+        <header class="app-header">
+          <div class="app-brand">
+            <div class="app-logo" aria-hidden="true"></div>
+            <div>
+              <h1>Eliminación de cuenta — WindTV</h1>
+              <p>Wind Telecomunicaciones</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="app-content">
+          <p class="legal-intro">
+            En esta página explicamos cómo puedes solicitar la eliminación de tu cuenta de
+            <strong>WindTV</strong> y los datos asociados, tal como lo requiere Google Play.
+            La eliminación es voluntaria y puede realizarse en cualquier momento.
+          </p>
+
+          <section class="app-panel legal-section" aria-labelledby="steps-title">
+            <h2 id="steps-title">Cómo solicitar la eliminación</h2>
+
+            <p><strong>Opción 1 — Desde la app móvil WindTV</strong></p>
+            <ol>
+              <li>Inicia sesión con tu correo y contraseña.</li>
+              <li>Ve a <strong>Perfil</strong> → <strong>Cuenta</strong> → <strong>Eliminar cuenta</strong>.</li>
+              <li>Escribe tu código de suscriptor para confirmar.</li>
+              <li>Confirma la eliminación. Verás un mensaje de éxito en pantalla.</li>
+            </ol>
+
+            <p><strong>Opción 2 — Desde el portal web</strong></p>
+            <ol>
+              <li>
+                Entra en
+                <a class="app-link" href="{% url 'login' %}">el portal de WindTV</a>
+                e inicia sesión.
+              </li>
+              <li>Abre tu panel de usuario.</li>
+              <li>Selecciona la pestaña <strong>Eliminar cuenta</strong>.</li>
+              <li>Escribe tu código de suscriptor, opcionalmente un motivo, y confirma.</li>
+            </ol>
+
+            <p><strong>Opción 3 — Por correo electrónico</strong></p>
+            <p>
+              Si no puedes acceder a la app ni al portal, escribe a
+              <a class="app-link" href="mailto:{{ support_email }}?subject=Solicitud%20de%20eliminaci%C3%B3n%20de%20cuenta%20WindTV">{{ support_email }}</a>
+              desde el correo registrado en tu cuenta. Indica tu código de suscriptor o el email
+              con el que te registraste. Procesaremos tu solicitud en un plazo máximo de
+              <strong>30 días hábiles</strong>.
+            </p>
+          </section>
+
+          <section class="app-panel legal-section" aria-labelledby="deleted-title">
+            <h2 id="deleted-title">Datos que se eliminan o desactivan</h2>
+            <p>Al cerrar tu cuenta se realiza lo siguiente:</p>
+            <ul>
+              <li>Credenciales de acceso al portal (usuario y contraseña).</li>
+              <li>Datos de perfil operativo asociados a tu suscripción.</li>
+              <li>Productos y smartcards en PanAccess (se desaprovisionan).</li>
+              <li>Emparejamientos de Smart TV y solicitudes UDID activas (se revocan).</li>
+              <li>Cuenta de usuario del portal (se desactiva).</li>
+            </ul>
+          </section>
+
+          <section class="app-panel legal-section" aria-labelledby="retained-title">
+            <h2 id="retained-title">Datos que se conservan</h2>
+            <p>
+              Por prevención de fraude, cumplimiento legal y la política de un solo periodo de
+              prueba, conservamos registros mínimos que <strong>no</strong> permiten reutilizar
+              beneficios ya otorgados:
+            </p>
+            <ul>
+              <li>Registro de correo electrónico (marcado como cuenta cerrada).</li>
+              <li>Registro de documento de identidad (marcado como cuenta cerrada).</li>
+              <li>Indicador de si ya utilizaste el periodo de prueba (<code>trial_used</code>).</li>
+              <li>Registro histórico del abonado con estado <em>cerrado</em> (sin acceso activo).</li>
+              <li>Log de auditoría interno del cierre de cuenta.</li>
+            </ul>
+            <p>
+              <strong>Periodo de retención:</strong> estos registros se conservan hasta
+              <strong>{{ retention_years }} años</strong> desde la fecha de cierre, o el plazo
+              exigido por la normativa aplicable, lo que sea mayor. Transcurrido ese periodo
+              pueden anonimizarse o eliminarse de forma segura.
+            </p>
+          </section>
+
+          <section class="app-panel legal-section" aria-labelledby="notes-title">
+            <h2 id="notes-title">Información importante</h2>
+            <p class="legal-note">
+              El cierre de cuenta <strong>no es reversible</strong> desde el portal. Puedes volver a
+              registrarte con el mismo correo, pero <strong>no recibirás un segundo periodo de
+              prueba</strong> si ya lo utilizaste con anterioridad.
+            </p>
+          </section>
+
+          <div class="legal-actions">
+            <a class="app-btn primary" href="{% url 'dashboard' %}">Ir al panel (requiere sesión)</a>
+            <a class="app-btn ghost" href="{% url 'login' %}">Iniciar sesión</a>
+          </div>
+
+          <p class="legal-meta">
+            Soporte: <a class="app-link" href="mailto:{{ support_email }}">{{ support_email }}</a>
+            {% if support_phone %} · {{ support_phone }}{% endif %}
+            {% if terms_url %}
+              · <a class="app-link" href="{{ terms_url }}" rel="noopener noreferrer">Términos y condiciones</a>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

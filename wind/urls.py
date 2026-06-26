@@ -25,6 +25,7 @@ from wind.views import (
     credentials_view,
     forgot_password_view,
     reset_password_view,
+    delete_account_info_view,
     RequestUDIDManualView,
     ValidateAndAssociateUDIDView,
     AuthenticateWithUDIDView,
@@ -58,6 +59,7 @@ urlpatterns = [
     path('credentials/', credentials_view, name='credentials_web'),
     path('forgot-password/', forgot_password_view, name='forgot_password'),
     path('reset-password/', reset_password_view, name='reset_password'),
+    path('eliminar-cuenta/', delete_account_info_view, name='delete_account_info'),
     
     # Operaciones PanAccess (staff)
     path('ops/panaccess-session/', panaccess_session_status_view, name='panaccess_session'),

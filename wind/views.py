@@ -919,6 +919,20 @@ def forgot_password_view(request):
     return render(request, "wind/forgot-password.html")
 
 
+def delete_account_info_view(request):
+    """Página pública con pasos y política de eliminación de cuenta (Google Play Data Safety)."""
+    return render(
+        request,
+        "wind/delete-account.html",
+        {
+            "support_email": EmailConfig.SUPPORT_ADDRESS,
+            "support_phone": EmailConfig.SUPPORT_PHONE,
+            "terms_url": EmailConfig.TERMS_URL,
+            "retention_years": 5,
+        },
+    )
+
+
 @ensure_csrf_cookie
 def reset_password_view(request):
     """Página para ingresar nueva contraseña con token del enlace de recuperación."""
