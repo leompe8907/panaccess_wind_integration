@@ -418,6 +418,9 @@ class PanaccessConfig:
 
     # Dynamic registration default product ID from .env
     REGISTRATION_PRODUCT_ID = _strip_env(os.getenv("PANACCESS_REGISTRATION_PRODUCT_ID"))
+    REMOVE_PRODUCT_API = _strip_env(os.getenv("PANACCESS_REMOVE_PRODUCT_API")) or "removeProductFromSmartcard"
+    REMOVE_SMARTCARD_API = _strip_env(os.getenv("PANACCESS_REMOVE_SMARTCARD_API")) or "removeSmartcardFromSubscriber"
+    REGISTRATION_TRIAL_DAYS = _env_int("REGISTRATION_TRIAL_DAYS", 30)
 
     # Alias usados por wind.utils / panaccess_client (retrocompatibilidad)
     PANACCESS = URL
@@ -638,6 +641,8 @@ class FeatureConfig:
     FULL_SYNC_HTTP_ENABLED = _env_bool("FULL_SYNC_HTTP_ENABLED", False)
     PANACCESS_OPS_HTTP_ENABLED = _env_bool("PANACCESS_OPS_HTTP_ENABLED", False)
     CREATE_SUBSCRIBER_PUBLIC_ENABLED = _env_bool("CREATE_SUBSCRIBER_PUBLIC_ENABLED", True)
+    CLOSE_SUBSCRIBER_HTTP_ENABLED = _env_bool("CLOSE_SUBSCRIBER_HTTP_ENABLED", False)
+    CLOSE_SUBSCRIBER_DASHBOARD_ENABLED = _env_bool("CLOSE_SUBSCRIBER_DASHBOARD_ENABLED", True)
 
 
 # ---------------------------------------------------------------------------

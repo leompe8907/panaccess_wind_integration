@@ -58,6 +58,18 @@
             >
               Productos
             </button>
+            <button
+              type="button"
+              class="dash-tab dash-tab-danger"
+              role="tab"
+              id="tab-btn-close-account"
+              aria-selected="false"
+              aria-controls="tab-panel-close-account"
+              data-tab="close-account"
+              hidden
+            >
+              Eliminar cuenta
+            </button>
           </nav>
 
           <div class="dash-tabpanels">
@@ -151,6 +163,46 @@
                 </div>
               </section>
             </div>
+
+            <div
+              role="tabpanel"
+              id="tab-panel-close-account"
+              class="dash-tabpanel"
+              aria-labelledby="tab-btn-close-account"
+              hidden
+            >
+              <section class="dash-module module-card dash-danger-zone" id="close-account-module">
+                <h2 class="dash-section-title">Eliminar cuenta</h2>
+                <p class="dash-danger-text">
+                  Esta acción desactiva tu acceso al portal, quita productos y smartcards en PanAccess
+                  y marca tu cuenta como cerrada. Podrás volver a registrarte con el mismo correo,
+                  pero <strong>no</strong> recibirás un segundo período de prueba.
+                </p>
+                <div class="app-field">
+                  <label for="close-confirm-code">Confirma escribiendo tu código de suscriptor</label>
+                  <input
+                    id="close-confirm-code"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="Ej. 1120743001"
+                  />
+                </div>
+                <div class="app-field">
+                  <label for="close-reason">Motivo (opcional)</label>
+                  <textarea id="close-reason" rows="2" maxlength="500" placeholder="Ej. Ya no uso el servicio"></textarea>
+                </div>
+                <label class="dash-checkbox-row">
+                  <input type="checkbox" id="close-dry-run" />
+                  <span>Solo simular (dry-run) — muestra el resultado sin aplicar cambios</span>
+                </label>
+                <p id="close-account-msg" class="app-alert" role="status"></p>
+                <pre id="close-account-result" class="dash-json-result" hidden></pre>
+                <button type="button" class="app-btn danger" id="btn-close-account">
+                  Eliminar mi cuenta
+                </button>
+              </section>
+            </div>
           </div>
         </div>
       </div>
@@ -166,6 +218,20 @@
         <div class="dash-modal-actions">
           <button type="button" class="app-btn ghost" id="pwd-modal-cancel">Cancelar</button>
           <button type="button" class="app-btn primary" id="pwd-modal-confirm">Sí, cambiar contraseña</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="close-account-modal" class="dash-modal" hidden aria-hidden="true">
+      <div class="dash-modal-backdrop" data-close-modal-close></div>
+      <div class="dash-modal-card" role="dialog" aria-labelledby="close-modal-title" aria-modal="true">
+        <h3 id="close-modal-title" class="account-section-title">¿Eliminar tu cuenta?</h3>
+        <p class="dash-modal-text" id="close-modal-text">
+          Esta acción no se puede deshacer desde el portal. ¿Deseas continuar?
+        </p>
+        <div class="dash-modal-actions">
+          <button type="button" class="app-btn ghost" id="close-modal-cancel">Cancelar</button>
+          <button type="button" class="app-btn danger" id="close-modal-confirm">Sí, eliminar cuenta</button>
         </div>
       </div>
     </div>
@@ -200,13 +266,25 @@
         var tabPanels = document.querySelectorAll(".dash-tabpanel");
         var tabBtnPassword = document.getElementById("tab-btn-password");
         var tabBtnProducts = document.getElementById("tab-btn-products");
+        var tabBtnCloseAccount = document.getElementById("tab-btn-close-account");
         var pageTitleEl = document.getElementById("dash-page-title");
         var activeTab = "account";
         var productsLoaded = false;
+        var closeConfirmInput = document.getElementById("close-confirm-code");
+        var closeReasonInput = document.getElementById("close-reason");
+        var closeDryRunInput = document.getElementById("close-dry-run");
+        var closeAccountMsg = document.getElementById("close-account-msg");
+        var closeAccountResult = document.getElementById("close-account-result");
+        var closeAccountBtn = document.getElementById("btn-close-account");
+        var closeAccountModal = document.getElementById("close-account-modal");
+        var closeModalConfirm = document.getElementById("close-modal-confirm");
+        var closeModalCancel = document.getElementById("close-modal-cancel");
+        var closeModalText = document.getElementById("close-modal-text");
         var tabTitles = {
           account: "Mi cuenta",
           password: "Contraseña",
           products: "Productos",
+          "close-account": "Eliminar cuenta",
         };
 
         function escapeHtml(text) {
@@ -278,6 +356,7 @@
 
           if (tabBtnPassword) tabBtnPassword.hidden = !hasSubscriber;
           if (tabBtnProducts) tabBtnProducts.hidden = !hasSubscriber;
+          if (tabBtnCloseAccount) tabBtnCloseAccount.hidden = !hasSubscriber;
           if (tablist) tablist.hidden = !hasSubscriber;
 
           if (!hasSubscriber && activeTab !== "account") {
@@ -569,7 +648,165 @@
           if (e.key === "Escape" && passwordModal && !passwordModal.hidden) {
             closePasswordModal();
           }
+          if (e.key === "Escape" && closeAccountModal && !closeAccountModal.hidden) {
+            closeCloseAccountModal();
+          }
         });
+
+        function showCloseAccountMsg(text, type) {
+          if (!closeAccountMsg) return;
+          closeAccountMsg.textContent = text;
+          closeAccountMsg.className = "app-alert show " + (type || "error");
+        }
+
+        function clearCloseAccountMsg() {
+          if (!closeAccountMsg) return;
+          closeAccountMsg.textContent = "";
+          closeAccountMsg.className = "app-alert";
+        }
+
+        function showCloseAccountResult(data) {
+          if (!closeAccountResult) return;
+          if (!data) {
+            closeAccountResult.hidden = true;
+            closeAccountResult.textContent = "";
+            return;
+          }
+          closeAccountResult.hidden = false;
+          closeAccountResult.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function openCloseAccountModal() {
+          if (!closeAccountModal) return;
+          var dryRun = closeDryRunInput && closeDryRunInput.checked;
+          if (closeModalText) {
+            closeModalText.textContent = dryRun
+              ? "Se ejecutará una simulación (dry-run). No se aplicarán cambios reales. ¿Continuar?"
+              : "Se desactivará tu cuenta y se quitarán productos en PanAccess. Esta acción no se puede deshacer desde el portal. ¿Deseas continuar?";
+          }
+          closeAccountModal.hidden = false;
+          closeAccountModal.setAttribute("aria-hidden", "false");
+        }
+
+        function closeCloseAccountModal() {
+          if (!closeAccountModal) return;
+          closeAccountModal.hidden = true;
+          closeAccountModal.setAttribute("aria-hidden", "true");
+        }
+
+        function submitCloseAccount() {
+          if (!subscriberCode) {
+            showCloseAccountMsg("Espera a que cargue tu cuenta.", "error");
+            return;
+          }
+
+          var confirmCode = closeConfirmInput ? closeConfirmInput.value.trim() : "";
+          if (!confirmCode) {
+            showCloseAccountMsg("Escribe tu código de suscriptor para confirmar.", "error");
+            return;
+          }
+          if (confirmCode !== String(subscriberCode)) {
+            showCloseAccountMsg("El código no coincide con tu suscriptor.", "error");
+            return;
+          }
+
+          var dryRun = closeDryRunInput && closeDryRunInput.checked;
+          var reason = closeReasonInput ? closeReasonInput.value.trim() : "";
+
+          clearCloseAccountMsg();
+          showCloseAccountResult(null);
+          if (closeAccountBtn) closeAccountBtn.disabled = true;
+          if (closeModalConfirm) closeModalConfirm.disabled = true;
+
+          WindAuth.fetchApi("/api/v1/profile/account/close/", {
+            method: "POST",
+            body: JSON.stringify({
+              code: subscriberCode,
+              confirm: confirmCode,
+              reason: reason,
+              dry_run: dryRun,
+            }),
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, status: res.status, data: data };
+              });
+            })
+            .then(function (result) {
+              closeCloseAccountModal();
+              showCloseAccountResult(result.data);
+
+              if (result.ok && result.data && result.data.success) {
+                if (dryRun) {
+                  showCloseAccountMsg(
+                    "Simulación completada. Revisa el detalle abajo. Desmarca dry-run para aplicar el cierre real.",
+                    "success"
+                  );
+                } else if (result.data.already_closed) {
+                  showCloseAccountMsg(result.data.message || "La cuenta ya estaba cerrada.", "success");
+                  WindAuth.logout();
+                  window.setTimeout(function () {
+                    window.location.href = "/wind/login/?account=closed";
+                  }, 2000);
+                } else {
+                  showCloseAccountMsg("Cuenta cerrada correctamente. Redirigiendo…", "success");
+                  WindAuth.logout();
+                  window.setTimeout(function () {
+                    window.location.href = "/wind/login/?account=closed";
+                  }, 2500);
+                }
+              } else {
+                var msg =
+                  (result.data && (result.data.message || result.data.detail)) ||
+                  "No se pudo cerrar la cuenta. Revisa el detalle.";
+                showCloseAccountMsg(msg, "error");
+              }
+            })
+            .catch(function (err) {
+              closeCloseAccountModal();
+              if (err.message !== "Sesión expirada") {
+                showCloseAccountMsg(err.message || "Error de red al cerrar la cuenta.", "error");
+              }
+            })
+            .finally(function () {
+              if (closeAccountBtn) closeAccountBtn.disabled = false;
+              if (closeModalConfirm) closeModalConfirm.disabled = false;
+            });
+        }
+
+        if (closeAccountBtn) {
+          closeAccountBtn.addEventListener("click", function () {
+            clearCloseAccountMsg();
+            if (!subscriberCode) {
+              showCloseAccountMsg("Espera a que cargue tu cuenta.", "error");
+              return;
+            }
+            var confirmCode = closeConfirmInput ? closeConfirmInput.value.trim() : "";
+            if (!confirmCode) {
+              showCloseAccountMsg("Escribe tu código de suscriptor para confirmar.", "error");
+              return;
+            }
+            if (confirmCode !== String(subscriberCode)) {
+              showCloseAccountMsg("El código no coincide con tu suscriptor.", "error");
+              return;
+            }
+            openCloseAccountModal();
+          });
+        }
+
+        if (closeModalConfirm) {
+          closeModalConfirm.addEventListener("click", submitCloseAccount);
+        }
+
+        if (closeModalCancel) {
+          closeModalCancel.addEventListener("click", closeCloseAccountModal);
+        }
+
+        if (closeAccountModal) {
+          closeAccountModal.querySelectorAll("[data-close-modal-close]").forEach(function (el) {
+            el.addEventListener("click", closeCloseAccountModal);
+          });
+        }
 
         loadAccount();
       })();

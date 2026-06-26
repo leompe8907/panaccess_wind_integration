@@ -225,6 +225,19 @@ def DataBaseEmpty():
 
 
 def delete_subscriber_credentials(subscriber_codes):
+    return delete_subscriber_operational_data(
+        subscriber_codes,
+        preserve_registry=False,
+    )
+
+
+def delete_subscriber_operational_data(subscriber_codes, *, preserve_registry: bool = False):
+    """
+    Elimina datos operativos locales del suscriptor.
+
+    preserve_registry=True (cierre de cuenta): conserva SubscriberEmailRegistry y
+    SubscriberDocumentRegistry como tombstone antifraude.
+    """
     if not subscriber_codes:
         return {
             'login_info': 0,
@@ -232,7 +245,7 @@ def delete_subscriber_credentials(subscriber_codes):
             'document_registry': 0,
             'subscriber_info': 0
         }
-    
+
     codes_list = [code for code in subscriber_codes if code]
     if not codes_list:
         return {
@@ -241,12 +254,15 @@ def delete_subscriber_credentials(subscriber_codes):
             'document_registry': 0,
             'subscriber_info': 0
         }
-    
+
     login_info_deleted = SubscriberLoginInfo.objects.filter(subscriberCode__in=codes_list).delete()[0]
-    email_registry_deleted = SubscriberEmailRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
-    document_registry_deleted = SubscriberDocumentRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
+    email_registry_deleted = 0
+    document_registry_deleted = 0
+    if not preserve_registry:
+        email_registry_deleted = SubscriberEmailRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
+        document_registry_deleted = SubscriberDocumentRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
     subscriber_info_deleted = SubscriberInfo.objects.filter(subscriber_code__in=codes_list).delete()[0]
-    
+
     return {
         'login_info': login_info_deleted,
         'email_registry': email_registry_deleted,

@@ -43,6 +43,20 @@ class ProfilePasswordSerializer(serializers.Serializer):
     newPass = serializers.CharField(max_length=255, write_only=True)
 
 
+class ProfileCloseAccountSerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=100)
+    confirm = serializers.CharField(max_length=100)
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    dry_run = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if attrs["code"].strip() != attrs["confirm"].strip():
+            raise serializers.ValidationError(
+                {"confirm": ["Debe coincidir con tu código de suscriptor para confirmar."]}
+            )
+        return attrs
+
+
 class ProfileProductSerializer(ListOfProductsSerializer):
     """Catálogo local sincronizado (lectura)."""
 

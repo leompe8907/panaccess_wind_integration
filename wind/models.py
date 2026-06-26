@@ -52,6 +52,23 @@ class ListOfSubscriber(models.Model):
     lastExpiryTime = models.DateTimeField(null=True, blank=True)
     uniqueLogin = models.IntegerField(null=True, blank=True)
     tags = models.JSONField(null=True, blank=True)
+
+    STATUS_ACTIVE = "active"
+    STATUS_CLOSED = "closed"
+    STATUS_PENDING_CLOSURE = "pending_closure"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_CLOSED, "Closed"),
+        (STATUS_PENDING_CLOSURE, "Pending closure"),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_reason = models.TextField(null=True, blank=True)
     
     class Meta:
         indexes = [
@@ -287,6 +304,12 @@ class SubscriberEmailRegistry(models.Model):
     document = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)
+    trial_used = models.BooleanField(default=False, db_index=True)
+    trial_granted_at = models.DateTimeField(null=True, blank=True)
+    trial_expires_at = models.DateTimeField(null=True, blank=True)
+    eligible_for_trial = models.BooleanField(default=True)
+    account_closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    closed_subscriber_code = models.CharField(max_length=100, null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -295,6 +318,8 @@ class SubscriberEmailRegistry(models.Model):
         indexes = [
             models.Index(fields=['email']),
             models.Index(fields=['document']),
+            models.Index(fields=['trial_used']),
+            models.Index(fields=['account_closed_at']),
         ]
     
     def __str__(self):
@@ -310,6 +335,12 @@ class SubscriberDocumentRegistry(models.Model):
     email = models.EmailField(null=True, blank=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)
+    trial_used = models.BooleanField(default=False, db_index=True)
+    trial_granted_at = models.DateTimeField(null=True, blank=True)
+    trial_expires_at = models.DateTimeField(null=True, blank=True)
+    eligible_for_trial = models.BooleanField(default=True)
+    account_closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    closed_subscriber_code = models.CharField(max_length=100, null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -317,10 +348,48 @@ class SubscriberDocumentRegistry(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['document']),
+            models.Index(fields=['trial_used']),
+            models.Index(fields=['account_closed_at']),
         ]
     
     def __str__(self):
         return f"{self.document} -> {self.subscriber_code or 'N/A'}"
+
+
+class SubscriberClosureLog(models.Model):
+    """Auditoría de cierres de cuenta (append-only)."""
+
+    STATUS_COMPLETED = "completed"
+    STATUS_PARTIAL = "partial"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_PARTIAL, "Partial"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    subscriber_code = models.CharField(max_length=100, db_index=True)
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subscriber_closures",
+    )
+    reason = models.TextField(blank=True, default="")
+    dry_run = models.BooleanField(default=False)
+    panaccess_result = models.JSONField(null=True, blank=True)
+    local_result = models.JSONField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_COMPLETED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["subscriber_code", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Closure {self.subscriber_code} ({self.status})"
 
 
 # ============================================================================

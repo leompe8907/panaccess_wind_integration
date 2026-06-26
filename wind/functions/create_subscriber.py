@@ -19,6 +19,11 @@ from wind.utils.subscriber_code_generator import generate_unique_subscriber_code
 from wind.models import SubscriberEmailRegistry
 from wind.utils.email_validation import validate_email_for_registration
 from wind.utils.phone_validation import normalize_phone
+from wind.services.subscriber_trial import (
+    is_eligible_for_trial,
+    mark_trial_granted,
+    registration_trial_days,
+)
 
 from appConfig import FeatureConfig, PanaccessConfig
 
@@ -309,6 +314,16 @@ def create_subscriber_view(request):
     from wind.models import ListOfSubscriber
     errors = {}
     
+    grant_registration_trial = is_eligible_for_trial(
+        email=email_normalized,
+        document=(data.get('code') or data.get('document_number') or "").strip() or None,
+    )
+    logger.info(
+        "Elegibilidad trial de registro para %s: grant=%s",
+        email_normalized,
+        grant_registration_trial,
+    )
+    
     user_provided_code = (data.get('code') or data.get('document_number') or "").strip()
     if user_provided_code:
         subscriber_code_provided = user_provided_code
@@ -332,7 +347,9 @@ def create_subscriber_view(request):
         errors['email'] = [validation_message]
         logger.warning(f"Email '{email_normalized}' no válido según SubscriberEmailRegistry")
     
-    email_exists = ListOfSubscriber.objects.filter(emails__iexact=email_normalized).exists()
+    email_exists = ListOfSubscriber.objects.filter(
+        emails__iexact=email_normalized,
+    ).exclude(status=ListOfSubscriber.STATUS_CLOSED).exists()
     logger.info(f"Buscando email en ListOfSubscriber: '{email_normalized}', existe={email_exists}")
     
     if email_exists:
@@ -531,7 +548,8 @@ def create_subscriber_view(request):
             email=email_normalized,
             defaults={
                 'subscriber_code': subscriber_code,
-                'has_purchased': False,
+                'account_closed_at': None,
+                'closed_subscriber_code': None,
             }
         )
         
@@ -548,7 +566,8 @@ def create_subscriber_view(request):
                 defaults={
                     'subscriber_code': subscriber_code,
                     'email': email_normalized,
-                    'has_purchased': False,
+                    'account_closed_at': None,
+                    'closed_subscriber_code': None,
                 }
             )
             if doc_created:
@@ -720,59 +739,80 @@ def create_subscriber_view(request):
                             logger.info(f"[DB] Campo smartcards actualizado exitosamente para suscriptor {subscriber_code}")
                             
                             if updated_smartcards and isinstance(updated_smartcards, list) and len(updated_smartcards) > 0:
-                                try:
-                                    logger.info(f"[Products] Iniciando proceso para agregar productos a {len(updated_smartcards)} smartcards")
-                                    
-                                    # ProductId dinámico desde el .env
-                                    product_id = PanaccessConfig.REGISTRATION_PRODUCT_ID
-                                    
-                                    from datetime import timedelta
-                                    created_date = subscriber_obj.created if subscriber_obj.created else timezone.now()
-                                    expiry_time = created_date + timedelta(days=30)
-                                    
-                                    expiry_time_str = expiry_time.strftime('%Y-%m-%d %H:%M:%S')
-                                    
-                                    logger.info(f"[Products] Agregando producto {product_id} a {len(updated_smartcards)} smartcards")
-                                    logger.info(f"[Products] Fecha de expiración: {expiry_time_str} (30 días desde creación)")
-                                    
-                                    product_params = {
-                                        'productId': product_id,
-                                        'hcId': hcId,
-                                        'expiryTime': expiry_time_str
-                                    }
-                                    
-                                    for idx, smartcard in enumerate(updated_smartcards):
-                                        if smartcard:
-                                            product_params[f'smartcards[{idx}]'] = str(smartcard)
-                                    
-                                    product_response = panaccess.call('addProductToSmartcards', product_params)
-                                    
-                                    logger.info(f"[Products] Respuesta recibida - success={product_response.get('success')}")
-                                    
-                                    if product_response.get('success'):
-                                        logger.info(f"[Products] Producto {product_id} agregado exitosamente a {len(updated_smartcards)} smartcards")
-                                        product_add_result = {
-                                            'success': True,
-                                            'productId': product_id,
-                                            'expiryTime': expiry_time_str,
-                                            'smartcards_count': len(updated_smartcards),
-                                        }
-                                    else:
-                                        error_msg = product_response.get('errorMessage', 'Error desconocido')
-                                        logger.error(f"[Products] Error al agregar producto a smartcards: {error_msg}")
-                                        product_add_result = {
-                                            'success': False,
-                                            'productId': product_id,
-                                            'expiryTime': expiry_time_str,
-                                            'errorMessage': error_msg,
-                                        }
-                                        
-                                except Exception as e:
-                                    logger.error(f"[Products] Excepción al agregar productos a smartcards: {str(e)}", exc_info=True)
+                                if not grant_registration_trial:
+                                    logger.info(
+                                        "[Products] Trial omitido para %s (periodo de prueba ya utilizado o no elegible)",
+                                        subscriber_code,
+                                    )
                                     product_add_result = {
                                         'success': False,
-                                        'errorMessage': str(e),
+                                        'skipped': True,
+                                        'reason': 'trial_not_eligible',
+                                        'errorMessage': (
+                                            'El periodo de prueba ya fue utilizado con este email o documento.'
+                                        ),
                                     }
+                                else:
+                                    try:
+                                        logger.info(f"[Products] Iniciando proceso para agregar productos a {len(updated_smartcards)} smartcards")
+                                        
+                                        product_id = PanaccessConfig.REGISTRATION_PRODUCT_ID
+                                        
+                                        from datetime import timedelta
+                                        created_date = subscriber_obj.created if subscriber_obj.created else timezone.now()
+                                        trial_days = registration_trial_days()
+                                        expiry_time = created_date + timedelta(days=trial_days)
+                                        
+                                        expiry_time_str = expiry_time.strftime('%Y-%m-%d %H:%M:%S')
+                                        
+                                        logger.info(f"[Products] Agregando producto {product_id} a {len(updated_smartcards)} smartcards")
+                                        logger.info(f"[Products] Fecha de expiración: {expiry_time_str} ({trial_days} días desde creación)")
+                                        
+                                        product_params = {
+                                            'productId': product_id,
+                                            'hcId': hcId,
+                                            'expiryTime': expiry_time_str
+                                        }
+                                        
+                                        for idx, smartcard in enumerate(updated_smartcards):
+                                            if smartcard:
+                                                product_params[f'smartcards[{idx}]'] = str(smartcard)
+                                        
+                                        product_response = panaccess.call('addProductToSmartcards', product_params)
+                                        
+                                        logger.info(f"[Products] Respuesta recibida - success={product_response.get('success')}")
+                                        
+                                        if product_response.get('success'):
+                                            logger.info(f"[Products] Producto {product_id} agregado exitosamente a {len(updated_smartcards)} smartcards")
+                                            mark_trial_granted(
+                                                email=email_normalized,
+                                                document=user_provided_code or None,
+                                                subscriber_code=subscriber_code,
+                                                granted_at=created_date if hasattr(created_date, 'year') else timezone.now(),
+                                            )
+                                            product_add_result = {
+                                                'success': True,
+                                                'productId': product_id,
+                                                'expiryTime': expiry_time_str,
+                                                'smartcards_count': len(updated_smartcards),
+                                                'trial_granted': True,
+                                            }
+                                        else:
+                                            error_msg = product_response.get('errorMessage', 'Error desconocido')
+                                            logger.error(f"[Products] Error al agregar producto a smartcards: {error_msg}")
+                                            product_add_result = {
+                                                'success': False,
+                                                'productId': product_id,
+                                                'expiryTime': expiry_time_str,
+                                                'errorMessage': error_msg,
+                                            }
+                                            
+                                    except Exception as e:
+                                        logger.error(f"[Products] Excepción al agregar productos a smartcards: {str(e)}", exc_info=True)
+                                        product_add_result = {
+                                            'success': False,
+                                            'errorMessage': str(e),
+                                        }
                             else:
                                 logger.info(f"[Products] No hay smartcards asociadas para agregar productos")
                                 product_add_result = {
