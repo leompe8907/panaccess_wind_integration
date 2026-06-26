@@ -304,13 +304,15 @@
         margin: 0 0 6px;
         font-size: 13px;
       }
-      .status pre {
+      .status pre,
+      .status .statusBody {
         margin: 0;
         white-space: pre-wrap;
         word-break: break-word;
-        font-size: 12px;
+        font-size: 13px;
         color: rgba(15, 23, 42, 0.80);
-        line-height: 1.45;
+        line-height: 1.5;
+        font-family: inherit;
       }
       .kbd {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -475,9 +477,13 @@
                       placeholder="+1 809 555 1234"
                       autocomplete="tel"
                       inputmode="tel"
-                      aria-describedby="phoneHelp"
+                      aria-describedby="phoneError phoneHelp"
                     />
-                    <div class="small" id="phoneHelp">Incluye el código de país si aplica.</div>
+                    <div class="errorText" id="phoneError" role="alert">
+                      Teléfono inválido. Incluye el código de país y el número completo
+                      (ej: +1 809 555 1234 o 8095551234). Déjalo vacío si no aplica.
+                    </div>
+                    <div class="small" id="phoneHelp">Ej: +1 809 555 1234 o 8095551234. Déjalo vacío si no aplica.</div>
                   </div>
                 </div>
               </div>
@@ -500,7 +506,7 @@
 
               <div class="status" id="statusBox" aria-live="polite">
                 <h3 id="statusTitle"></h3>
-                <pre id="statusBody"></pre>
+                <div class="statusBody" id="statusBody"></div>
               </div>
             </form>
           </div>
@@ -565,10 +571,48 @@
           if (!field) return;
           field.setAttribute("data-invalid", "true");
           const errId = input.getAttribute("aria-describedby");
-          if (errId) {
-            const errEl = document.getElementById(errId);
-            if (errEl && message) errEl.textContent = message;
+          if (errId && message) {
+            const errIds = errId.split(/\s+/);
+            const errEl = document.getElementById(errIds.find((id) => id.endsWith("Error")) || errIds[0]);
+            if (errEl) errEl.textContent = message;
           }
+        }
+
+        function firstServerError(errors, field) {
+          if (!errors || !errors[field]) return null;
+          const value = errors[field];
+          return Array.isArray(value) ? String(value[0] || "") : String(value);
+        }
+
+        function applyServerErrors(data) {
+          const errors = data && typeof data === "object" ? data.errors : null;
+          if (!errors || typeof errors !== "object") {
+            return { detail: null, step: 1 };
+          }
+
+          clearFieldErrors();
+
+          const fieldMap = [
+            ["code", "code"],
+            ["document_number", "code"],
+            ["firstName", "firstName"],
+            ["lastName", "lastName"],
+            ["email", "email"],
+            ["phone", "phone"],
+          ];
+
+          let step = 1;
+          const messages = [];
+
+          fieldMap.forEach(([apiKey, inputId]) => {
+            const msg = firstServerError(errors, apiKey);
+            if (!msg) return;
+            markInvalid(inputId, msg);
+            messages.push(msg);
+            if (inputId === "email" || inputId === "phone") step = 2;
+          });
+
+          return { detail: messages.join(" "), step };
         }
 
         function formToPayload() {
@@ -745,18 +789,34 @@
             if (!res.ok) {
               const maybeType = data && typeof data === "object" ? (data.error_type || data.errorType || data.type) : null;
               const maybeMsg = data && typeof data === "object" ? (data.message || data.detail || data.error || data.msg) : null;
-              const msg =
-                maybeMsg ||
-                (maybeType === "DuplicateData"
-                  ? "Ya existe una cuenta con ese documento o email. Corrige el dato e inténtalo de nuevo."
-                  : "No pudimos completar el registro. Verifica tus datos e inténtalo de nuevo.");
+              const applied = applyServerErrors(data);
 
-              if (maybeType === "DuplicateData") {
-                markInvalid("code", "Este documento ya está registrado o no es válido.");
-                markInvalid("email", "Este email ya está registrado o no es válido.");
+              let msg = applied.detail || maybeMsg;
+              if (!msg) {
+                msg = maybeType === "DuplicateData"
+                  ? "Ya existe una cuenta con ese documento o email. Corrige el dato e inténtalo de nuevo."
+                  : "No pudimos completar el registro. Verifica tus datos e inténtalo de nuevo.";
+              }
+
+              if (maybeType === "DuplicateData" && !applied.detail) {
+                const codeMsg = firstServerError(data.errors, "code")
+                  || firstServerError(data.errors, "document_number")
+                  || "Este documento ya está registrado o no es válido.";
+                const emailMsg = firstServerError(data.errors, "email")
+                  || "Este email ya está registrado o no es válido.";
+                markInvalid("code", codeMsg);
+                markInvalid("email", emailMsg);
+                currentStep = 2;
+                syncStepperUI();
+              } else if (applied.detail) {
+                currentStep = applied.step;
+                syncStepperUI();
               }
 
               showStatus("bad", "No se pudo crear la cuenta", msg);
+
+              const firstInvalid = form.querySelector('.field[data-invalid="true"] input');
+              if (firstInvalid) firstInvalid.focus();
               return;
             }
 

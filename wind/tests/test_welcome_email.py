@@ -40,6 +40,22 @@ class WelcomeEmailContextTestCase(SimpleTestCase):
         self.assertEqual(context["password_display"], "Secr3t!")
 
     @patch("wind.services.welcome_email.CallGetSubscriberLoginInfo")
+    def test_username_is_always_email_not_login2(self, mock_login_info):
+        mock_login_info.return_value = {
+            "login2": "wtl_1@AUTO100",
+            "password": "Secr3t!",
+        }
+        context = build_welcome_email_context(
+            first_name="Juan",
+            last_name="Pérez",
+            email="juan@example.com",
+            subscriber_code="AUTO100",
+            is_social_account=False,
+        )
+        self.assertEqual(context["username"], "juan@example.com")
+        self.assertNotEqual(context["username"], "wtl_1@AUTO100")
+
+    @patch("wind.services.welcome_email.CallGetSubscriberLoginInfo")
     def test_credentials_fallback_when_panaccess_fails(self, mock_login_info):
         mock_login_info.side_effect = RuntimeError("timeout")
         context = build_welcome_email_context(

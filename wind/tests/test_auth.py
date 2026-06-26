@@ -5,7 +5,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from wind.models import SubscriberEmailRegistry, SubscriberDocumentRegistry, ListOfSubscriber
+from wind.models import SubscriberEmailRegistry, SubscriberDocumentRegistry, ListOfSubscriber, SubscriberLoginInfo
+from wind.services.subscriber_auth import get_or_create_portal_user
+from wind.utils.encryption import encrypt_value
 
 User = get_user_model()
 
@@ -140,6 +142,34 @@ class SubscriberAuthTestCase(APITestCase):
             email=self.email,
             subscriber_code='WND0003'
         )
+        try:
+            from allauth.account.models import EmailAddress
+
+            EmailAddress.objects.create(
+                user=self.user,
+                email=self.email,
+                verified=True,
+                primary=True,
+            )
+        except ImportError:
+            pass
+
+    def test_get_or_create_portal_user_marks_email_verified(self):
+        from allauth.account.models import EmailAddress
+
+        SubscriberEmailRegistry.objects.create(email='pan@example.com', subscriber_code='CODE1')
+        login_record = SubscriberLoginInfo.objects.create(
+            subscriberCode='CODE1',
+            login1=12345,
+            login2='wtl@CODE1',
+            password_hash=encrypt_value('secret'),
+        )
+
+        user = get_or_create_portal_user(login_record)
+
+        addr = EmailAddress.objects.get(user=user, email='pan@example.com')
+        self.assertTrue(addr.verified)
+        self.assertTrue(addr.primary)
 
     def test_jwt_login_success(self):
         # Intentar login estándar a través de dj_rest_auth

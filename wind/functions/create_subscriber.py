@@ -25,6 +25,11 @@ from appConfig import FeatureConfig, PanaccessConfig
 PanaccessConfig.validate()
 hcId = PanaccessConfig.HCID
 
+PHONE_INVALID_MESSAGE = (
+    "Teléfono inválido. Incluye el código de país y el número completo "
+    "(ej: +1 809 555 1234 o 8095551234). Déjalo vacío si no deseas indicarlo."
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -210,6 +215,46 @@ def _create_subscriber_public_enabled() -> bool:
     return FeatureConfig.CREATE_SUBSCRIBER_PUBLIC_ENABLED
 
 
+def _persist_subscriber_contacts_to_db(
+    subscriber_code: str,
+    *,
+    email: str = "",
+    phone: str = "",
+) -> None:
+    """Actualiza emails/phones en ListOfSubscriber tras agregar contactos en PanAccess."""
+    from wind.models import ListOfSubscriber
+
+    updates: dict[str, str] = {}
+    if email:
+        updates["emails"] = email.strip().lower()
+    if phone:
+        updates["phones"] = phone.strip()
+
+    if not updates:
+        return
+
+    try:
+        updated = ListOfSubscriber.objects.filter(code=subscriber_code).update(**updates)
+        if updated:
+            logger.info(
+                "[DB] Contactos guardados en ListOfSubscriber (%s): %s",
+                subscriber_code,
+                updates,
+            )
+        else:
+            logger.warning(
+                "[DB] No se encontró ListOfSubscriber para actualizar contactos (%s)",
+                subscriber_code,
+            )
+    except Exception as exc:
+        logger.error(
+            "[DB] Error actualizando contactos en ListOfSubscriber (%s): %s",
+            subscriber_code,
+            exc,
+            exc_info=True,
+        )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([RegisterThrottle])
@@ -257,8 +302,8 @@ def create_subscriber_view(request):
         except ValueError:
             return Response({
                 'success': False,
-                'message': 'Datos inválidos',
-                'errors': {'phone': ['Teléfono inválido. Verifica el formato e inténtalo de nuevo.']}
+                'message': PHONE_INVALID_MESSAGE,
+                'errors': {'phone': [PHONE_INVALID_MESSAGE]}
             }, status=status.HTTP_400_BAD_REQUEST)
     
     from wind.models import ListOfSubscriber
@@ -584,6 +629,12 @@ def create_subscriber_view(request):
             except Exception as e:
                 contacts_errors.append({'type': 'phone', 'error': str(e)})
                 logger.error(f"Excepción al agregar teléfono: {str(e)}", exc_info=True)
+
+        _persist_subscriber_contacts_to_db(
+            subscriber_code,
+            email=email_normalized,
+            phone=phone_normalized,
+        )
         
         response_data = {
             'success': True,

@@ -24,6 +24,29 @@ def _display_name(first_name: str, last_name: str, email: str) -> str:
     return local_part or "Usuario"
 
 
+def resolve_subscriber_login_email(
+    *,
+    subscriber_code: str,
+    email_hint: str = "",
+) -> str:
+    """Email del suscriptor para mostrar como usuario (correo, pantalla credenciales)."""
+    email = (email_hint or "").strip().lower()
+    if email:
+        return email
+
+    from wind.models import ListOfSubscriber, SubscriberEmailRegistry
+
+    reg = SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).first()
+    if reg and reg.email:
+        return reg.email.strip().lower()
+
+    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    if sub and sub.emails:
+        return sub.emails.strip().lower()
+
+    return ""
+
+
 def _resolve_credentials(
     *,
     email: str,
@@ -31,21 +54,21 @@ def _resolve_credentials(
     is_social_account: bool,
 ) -> tuple[str, str]:
     """Devuelve (usuario, contraseña) para mostrar en el correo."""
+    username = (email or "").strip().lower()
     if is_social_account:
-        return email, EmailConfig.SOCIAL_PASSWORD_MESSAGE
+        return username, EmailConfig.SOCIAL_PASSWORD_MESSAGE
 
     try:
         login_info = CallGetSubscriberLoginInfo(subscriber_code=subscriber_code)
     except Exception as exc:
         logger.warning(
             "No se pudieron obtener credenciales PanAccess para %s (%s): %s",
-            email,
+            username,
             subscriber_code,
             exc,
         )
-        return email, "No pudimos cargar tu contraseña. Revisa el portal WindTV o contacta soporte."
+        return username, "No pudimos cargar tu contraseña. Revisa el portal WindTV o contacta soporte."
 
-    username = (login_info.get("login2") or "").strip() or email
     password = (login_info.get("password") or "").strip()
     if not password:
         password = "No pudimos cargar tu contraseña. Revisa el portal WindTV o contacta soporte."

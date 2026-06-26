@@ -18,6 +18,7 @@ from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 
 from appConfig import EmailConfig
 from wind.models import ListOfSubscriber
+from wind.services.welcome_email import resolve_subscriber_login_email
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -889,7 +890,10 @@ def credentials_view(request):
 
     try:
         login_info = CallGetSubscriberLoginInfo(subscriber_code=subscriber_code)
-        username = (email_from_token or "").strip() or (login_info.get("login2") or "")
+        username = resolve_subscriber_login_email(
+            subscriber_code=subscriber_code,
+            email_hint=email_from_token,
+        )
         context = _credentials_page_context(
             full_name=_full_name_for_subscriber(subscriber_code, username),
             username=username,

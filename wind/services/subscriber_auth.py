@@ -182,6 +182,55 @@ def _resolve_email_for_subscriber(subscriber_code: str) -> str:
     return f"{subscriber_code}@subscribers.wind.local"
 
 
+def mark_portal_email_verified(user: User, email: str) -> None:
+    """
+    Marca el email como verificado en allauth.
+
+    Los abonados registrados vía PanAccess ya validaron el contacto (validateContactOfSubscriber).
+    Sin esto, ACCOUNT_EMAIL_VERIFICATION=mandatory bloquea el login del portal web.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return
+
+    try:
+        from allauth.account.models import EmailAddress
+    except ImportError:
+        return
+
+    email_address, _ = EmailAddress.objects.get_or_create(
+        user=user,
+        email=email,
+        defaults={"primary": True, "verified": True},
+    )
+    updated_fields: list[str] = []
+    if not email_address.verified:
+        email_address.verified = True
+        updated_fields.append("verified")
+    if not email_address.primary:
+        EmailAddress.objects.filter(user=user, primary=True).exclude(
+            pk=email_address.pk
+        ).update(primary=False)
+        email_address.primary = True
+        updated_fields.append("primary")
+    if updated_fields:
+        email_address.save(update_fields=updated_fields)
+
+
+def ensure_subscriber_portal_email_verified(user: User, login: str = "") -> None:
+    """Marca el email verificado si el usuario está vinculado a un abonado PanAccess."""
+    email = (user.email or login or "").strip().lower()
+    if not email:
+        return
+
+    is_subscriber = (
+        SubscriberEmailRegistry.objects.filter(email__iexact=email).exists()
+        or bool(resolve_subscriber_code(login or email))
+    )
+    if is_subscriber:
+        mark_portal_email_verified(user, email)
+
+
 def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
     """Crea o actualiza un User de Django vinculado al abonado PanAccess."""
     code = login_record.subscriberCode or ""
@@ -206,6 +255,7 @@ def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
         user.set_password(raw_password)
     user.is_active = True
     user.save()
+    mark_portal_email_verified(user, email)
     return user
 
 
@@ -221,6 +271,7 @@ def authenticate_portal_user(login: str, password: str):
     user = authenticate(username=login, password=password)
     if user:
         user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
+        ensure_subscriber_portal_email_verified(user, login)
         return user
 
     if "@" in login:
@@ -229,12 +280,14 @@ def authenticate_portal_user(login: str, password: str):
             user = authenticate(username=by_email.get_username(), password=password)
             if user:
                 user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
+                ensure_subscriber_portal_email_verified(user, login)
                 return user
 
     login_record = verify_panaccess_credentials(login, password)
     if login_record:
         user = get_or_create_portal_user(login_record)
         user.backend = "django.contrib.auth.backends.ModelBackend"
+        ensure_subscriber_portal_email_verified(user, login)
         return user
 
     return None
