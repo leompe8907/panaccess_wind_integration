@@ -14,7 +14,7 @@ Plantillas listas para copiar: carpeta [`deploy/`](../deploy/) (systemd, nginx, 
 2. [Requisitos del servidor](#requisitos-del-servidor)
 3. [Perfil recomendado: 32 GB / 16 cores](#perfil-recomendado-32-gb--16-cores)
 4. [Pasos 1–10: instalación y configuración](#paso-1-conexión-ssh-y-actualización-inicial)
-5. [Paso 11: diagnóstico y mantenimiento](#paso-11-comandos-de-diagnóstico-y-mantenimiento)
+5. [Paso 11: diagnóstico, refresco y mantenimiento](#paso-11-comandos-de-diagnóstico-y-mantenimiento)
 6. [Paso 12: verificación post-despliegue](#paso-12-verificación-post-despliegue)
 7. [Paso 13: solución de problemas](#paso-13-solución-de-problemas)
 8. [Paso 14: checklist final](#paso-14-checklist-final)
@@ -192,14 +192,23 @@ Sube ese valor con cuidado si PanAccess tolera más llamadas paralelas; no aumen
 
 ### 6. Reinicio tras deploy (perfil escalado)
 
+Resumen rápido (deploy normal). Para reset duro o verificación ampliada, ver [Paso 11](#paso-11-comandos-de-diagnóstico-y-mantenimiento).
+
 ```bash
 cd /opt/panaccess-wind
-git pull && source env/bin/activate
+source env/bin/activate
+git pull
 pip install -r requirements.txt
-python manage.py migrate
+python manage.py migrate --noinput
 python manage.py collectstatic --noinput
-DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh restart
-sudo systemctl restart panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+python manage.py check
+
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
+sudo deploy/manage_services.sh restart
+sudo nginx -t && sudo systemctl reload nginx
+
+curl -sk https://backend.wind.do/ready/
+curl -sk https://backend.wind.do/health/
 ```
 
 ---
@@ -248,17 +257,53 @@ sudo ufw --force enable
     ```bash
     sudo -i -u postgres psql
     ```
-4.  **Crea la base de datos y el usuario con privilegios:**
-    Ejecuta las siguientes consultas SQL dentro del prompt (`psql`):
+4.  **Crea la base de datos y el usuario con privilegios** (conectado a la base `postgres`):
     ```sql
     CREATE DATABASE wind_db;
-    CREATE USER wind_user WITH PASSWORD 'parana771';
+    CREATE USER wind_user WITH PASSWORD 'CONTRASEÑA_FUERTE_POSTGRES';
     ALTER ROLE wind_user SET client_encoding TO 'utf8';
     ALTER ROLE wind_user SET default_transaction_isolation TO 'read committed';
     ALTER ROLE wind_user SET timezone TO 'UTC';
     GRANT ALL PRIVILEGES ON DATABASE wind_db TO wind_user;
+    ```
+5.  **Conecta a `wind_db` y otorga permisos en el esquema `public`** (obligatorio; los `GRANT` anteriores no aplican a tablas ya existentes):
+    ```sql
+    \c wind_db
+
+    GRANT ALL ON SCHEMA public TO wind_user;
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO wind_user;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO wind_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO wind_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO wind_user;
+
+    ALTER DATABASE wind_db OWNER TO wind_user;
+    ALTER SCHEMA public OWNER TO wind_user;
+    ```
+6.  **Si la base ya tenía tablas creadas por `postgres`** (p. ej. tras un `migrate` ejecutado como superusuario), transfiere la propiedad de los objetos de aplicación:
+    > `REASSIGN OWNED BY postgres TO wind_user` puede fallar con *«objetos requeridos por el sistema»*. Usa este bloque en su lugar:
+    ```sql
+    DO $$
+    DECLARE r RECORD;
+    BEGIN
+        FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+        LOOP
+            EXECUTE format('ALTER TABLE public.%I OWNER TO wind_user', r.tablename);
+        END LOOP;
+        FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'
+        LOOP
+            EXECUTE format('ALTER SEQUENCE public.%I OWNER TO wind_user', r.sequencename);
+        END LOOP;
+    END $$;
+    ```
+    Sal del prompt:
+    ```sql
     \q
     ```
+7.  **Verifica la conexión con el usuario de la aplicación:**
+    ```bash
+    psql -U wind_user -d wind_db -h 127.0.0.1 -c "SELECT 1;"
+    ```
+    La contraseña debe coincidir con `DB_PASSWORD` en `.env`.
 
 ---
 
@@ -802,6 +847,158 @@ Espera 10–30 s tras el boot: PostgreSQL/Redis pueden tardar; Daphne tiene `Res
 
 ## Paso 11: Comandos de Diagnóstico y Mantenimiento
 
+Hay **dos flujos** de actualización en producción. Úsalos según el caso:
+
+| Flujo | Cuándo | Downtime | Script |
+|-------|--------|----------|--------|
+| **[Deploy normal](#deploy-normal-recomendado)** | `git pull`, migraciones, deploy rutinario | Breve (segundos) | `deploy/refresh_stack.sh` |
+| **[Reset duro](#reset-duro-troubleshooting)** | 502 persistente, servicios colgados, estado raro tras cambio de infra | Total (30–60 s) | `deploy/reset_stack.sh` |
+
+> **No ejecutes `makemigrations` en producción.** Las migraciones se generan en desarrollo, se commitean al repo y en el servidor solo corres `migrate`.
+
+#### ¿Reset duro: bueno o malo?
+
+**No es malo**, pero **no es el procedimiento por defecto**.
+
+- **Bueno para:** depurar problemas (workers zombie, conexiones PostgreSQL colgadas, Redis en estado inconsistente, Nginx sirviendo mientras Daphne está caído), tras cambios en `postgresql.conf` / `redis.conf`, o cuando un `restart` normal no resuelve el síntoma.
+- **Malo como rutina:** cada deploy corta API, WebSockets y colas Celery durante el `stop` + arranque; las tareas en vuelo en Redis pueden perderse; el downtime es mayor que un simple `restart`.
+
+**Regla práctica:** deploy diario → **deploy normal**. Si algo sigue roto después → **reset duro**.
+
+---
+
+### Deploy normal (recomendado)
+
+Usa este bloque tras `git pull`, cambios de dependencias o migraciones en el día a día.
+
+**Perfil escalado (8 Daphne, producción Wind):**
+
+```bash
+cd /opt/panaccess-wind
+source env/bin/activate
+
+# --- 1. Código y Django ---
+git pull
+pip install -r requirements.txt
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+python manage.py check
+
+# --- 2. Reinicio de aplicación (sin parar PostgreSQL/Redis) ---
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
+sudo deploy/manage_services.sh restart
+sudo nginx -t && sudo systemctl reload nginx
+
+# --- 3. Verificación rápida ---
+sudo systemctl is-active postgresql redis-server nginx
+redis-cli ping
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+sudo deploy/manage_services.sh status
+curl -sk https://backend.wind.do/ready/ | python3 -m json.tool
+curl -sk https://backend.wind.do/health/ | python3 -m json.tool
+```
+
+**Perfil mínimo (1 instancia Daphne, `panaccess-wind.service`):**
+
+```bash
+cd /opt/panaccess-wind
+source env/bin/activate
+git pull
+pip install -r requirements.txt
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+python manage.py check
+
+sudo systemctl restart panaccess-wind.service
+sudo deploy/manage_services.sh restart
+sudo nginx -t && sudo systemctl reload nginx
+
+sudo systemctl is-active postgresql redis-server nginx panaccess-wind
+redis-cli ping
+curl -sk https://backend.wind.do/health/ | python3 -m json.tool
+```
+
+#### Script: `deploy/refresh_stack.sh` (deploy normal)
+
+```bash
+cd /opt/panaccess-wind
+sudo chmod +x deploy/refresh_stack.sh
+DAPHNE_INSTANCES=8 ./deploy/refresh_stack.sh
+```
+
+---
+
+### Reset duro (troubleshooting)
+
+Para **último recurso** o cuando el deploy normal no corrige el problema. Detiene todo el stack, espera a que los procesos liberen puertos/conexiones y arranca de cero.
+
+**Perfil escalado (8 Daphne):**
+
+```bash
+cd /opt/panaccess-wind
+source env/bin/activate
+
+# --- 1. Código y Django (opcional: omitir si solo reinicias infra) ---
+git pull
+pip install -r requirements.txt
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+python manage.py check
+
+# --- 2. Detención completa ---
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh stop
+sudo deploy/manage_services.sh stop
+sudo systemctl stop nginx
+sudo systemctl stop redis-server postgresql
+sleep 3
+
+# --- 3. Arranque en orden (infra → app → proxy) ---
+sudo systemctl start postgresql redis-server
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh start
+sudo deploy/manage_services.sh start
+sudo nginx -t && sudo systemctl start nginx
+
+# --- 4. Verificación ---
+sudo systemctl is-active postgresql redis-server nginx
+redis-cli ping
+sudo -u postgres psql -d wind_db -c "SELECT 1;"
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+sudo deploy/manage_services.sh status
+sudo ss -tlnp | grep -E '800[0-7]'
+curl -sk https://backend.wind.do/ready/ | python3 -m json.tool
+curl -sk https://backend.wind.do/health/ | python3 -m json.tool
+```
+
+> Tras `systemctl stop nginx`, usa **`start`** (no `reload`): `reload` solo funciona si Nginx ya está en ejecución.
+
+#### Script: `deploy/reset_stack.sh` (reset duro)
+
+```bash
+cd /opt/panaccess-wind
+sudo chmod +x deploy/reset_stack.sh
+DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
+```
+
+Para reset **sin** `git pull` ni migraciones (solo reiniciar servicios):
+
+```bash
+SKIP_DJANGO=1 DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
+```
+
+---
+
+**Qué reiniciar según el cambio:**
+
+| Cambio | Flujo recomendado |
+|--------|-------------------|
+| Código Python, migraciones, `.env` de la app | Deploy normal |
+| Solo `collectstatic` o plantilla nginx | `sudo nginx -t && sudo systemctl reload nginx` |
+| Config PostgreSQL / Redis | Reset duro (o stop app → restart infra → start app) |
+| 502, workers colgados, estado inconsistente | Reset duro |
+| Solo reiniciar sin actualizar código | [Reinicio rápido](#reinicio-rápido-sin-actualizar-código) |
+
+> Los templates HTML (`.html`) no requieren `collectstatic`. En producción (`DEBUG=False`), reinicia Daphne si no ves cambios tras guardar.
+
 ### Logs en tiempo real
 
 ```bash
@@ -812,25 +1009,47 @@ sudo journalctl -u panaccess-celery-beat.service -f
 sudo tail -f /var/log/nginx/error.log
 ```
 
-### Reinicio rápido de servicios de aplicación
+### Reinicio rápido (sin actualizar código)
+
+**Perfil escalado:**
 
 ```bash
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh restart
+sudo /opt/panaccess-wind/deploy/manage_services.sh restart
+sudo nginx -t && sudo systemctl reload nginx
+DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh status
+sudo /opt/panaccess-wind/deploy/manage_services.sh status
+```
+
+**Perfil mínimo (1 Daphne):**
+
+```bash
+sudo systemctl restart panaccess-wind.service
 sudo /opt/panaccess-wind/deploy/manage_services.sh restart
 sudo /opt/panaccess-wind/deploy/manage_services.sh status
 ```
 
-> Tras `git pull`, reinicia **solo** servicios que ejecutan código Python (Daphne + Celery). Nginx, PostgreSQL y Redis no suelen necesitarlo.
-
 ### Actualizar la aplicación tras cambios de código
+
+Equivalente al [deploy normal](#deploy-normal-recomendado):
+
+```bash
+DAPHNE_INSTANCES=8 ./deploy/refresh_stack.sh
+```
+
+O manualmente:
 
 ```bash
 cd /opt/panaccess-wind
-git pull
 source env/bin/activate
+git pull
 pip install -r requirements.txt
-python manage.py migrate
+python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+python manage.py check
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
 sudo deploy/manage_services.sh restart
+curl -sk https://backend.wind.do/ready/
 ```
 
 ### Monitoreo básico
@@ -845,7 +1064,42 @@ ps aux --sort=-%mem | head -10
 
 ## Paso 12: Verificación Post-Despliegue
 
-Ejecuta este bloque tras completar los pasos 1–10:
+Ejecuta este bloque tras completar los pasos 1–10 o tras un [deploy normal](#deploy-normal-recomendado) / [reset duro](#reset-duro-troubleshooting).
+
+### Perfil escalado (8 Daphne — producción Wind)
+
+```bash
+echo "=== Infraestructura ==="
+sudo systemctl is-active postgresql redis-server nginx
+
+echo "=== PostgreSQL ==="
+sudo -u postgres psql -d wind_db -c "SELECT current_database(), current_user;"
+
+echo "=== Redis ==="
+redis-cli ping
+
+echo "=== Daphne (8000–8007) ==="
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+sudo ss -tlnp | grep -E '800[0-7]'
+
+echo "=== Celery ==="
+sudo deploy/manage_services.sh status
+
+echo "=== Health (local vía Nginx) ==="
+curl -sk https://localhost/ready/ | python3 -m json.tool
+curl -sk https://localhost/health/ | python3 -m json.tool
+
+echo "=== Health (dominio público) ==="
+curl -sk https://backend.wind.do/ready/ | python3 -m json.tool
+curl -sk https://backend.wind.do/health/ | python3 -m json.tool
+
+echo "=== Django ==="
+cd /opt/panaccess-wind && source env/bin/activate
+python manage.py check
+python manage.py showmigrations --plan | tail -20
+```
+
+### Perfil mínimo (1 Daphne)
 
 ```bash
 echo "=== Servicios ==="
@@ -861,14 +1115,25 @@ echo "=== Puertos ==="
 sudo ss -tlnp | grep -E '(443|8000|5432|6379)'
 
 echo "=== Health ==="
-curl -sk https://localhost/health/
-curl -sk https://localhost/ready/
+curl -sk https://localhost/health/ | python3 -m json.tool
+curl -sk https://localhost/ready/ | python3 -m json.tool
 ```
 
-Desde tu máquina local (sustituye el dominio):
+### Respuestas esperadas
+
+| Comprobación | Resultado OK |
+|--------------|--------------|
+| `redis-cli ping` | `PONG` |
+| `psql ... SELECT 1` | Una fila con `1` |
+| `/ready/` | `{"ready": true}` |
+| `/health/` | `{"healthy": true, "checks": {"database": "ok", "cache": "ok", "panaccess": "ok"}}` |
+| `systemctl is-active` | `active` |
+| Daphne `status` | `active (running)` en cada puerto |
+
+Desde tu máquina local:
 
 ```bash
-curl -s https://backend.wind.do/health/
+curl -sk https://backend.wind.do/health/ | python3 -m json.tool
 ```
 
 Probar WebSocket (emparejamiento Smart TV):
@@ -878,21 +1143,54 @@ sudo apt install -y websocat
 websocat -k wss://backend.wind.do/ws/auth/
 ```
 
-Respuesta esperada de `/health/`: JSON con `"healthy": true` y checks de DB, caché y sesión PanAccess.
-
 ---
 
 ## Paso 13: Solución de Problemas
 
 ### Error 502 Bad Gateway (Nginx)
 
-Daphne no está escuchando o falló al arrancar:
+Daphne no está escuchando o falló al arrancar.
+
+**Perfil escalado:**
+
+```bash
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
+sudo journalctl -u panaccess-wind@8000.service -n 50
+sudo ss -tlnp | grep -E '800[0-7]'
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
+curl -s http://127.0.0.1:8000/health/
+```
+
+**Perfil mínimo:**
 
 ```bash
 sudo systemctl status panaccess-wind.service
 sudo journalctl -u panaccess-wind.service -n 50
 sudo ss -tlnp | grep 8000
-sudo deploy/manage_services.sh restart
+sudo systemctl restart panaccess-wind.service
+```
+
+### Permisos PostgreSQL (`permiso denegado` / `debe ser dueño de la tabla`)
+
+Suele ocurrir si `wind_user` no tiene permisos en `wind_db` o las tablas pertenecen a `postgres`:
+
+```bash
+sudo -u postgres psql -d wind_db
+```
+
+```sql
+GRANT ALL ON SCHEMA public TO wind_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO wind_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO wind_user;
+ALTER DATABASE wind_db OWNER TO wind_user;
+ALTER SCHEMA public OWNER TO wind_user;
+```
+
+Si `migrate` sigue fallando al alterar tablas existentes, ejecuta el bloque `DO $$ ... $$` del [Paso 3](#paso-3-instalación-y-configuración-de-postgresql) (paso 6). Luego:
+
+```bash
+cd /opt/panaccess-wind && source env/bin/activate
+python manage.py migrate
 ```
 
 ### Celery no procesa tareas
@@ -927,20 +1225,22 @@ Los certificados aún no existen en `/etc/nginx/`. Copia `cdn1.wind.do.crt` y `c
 ```bash
 cd /opt/panaccess-wind && source env/bin/activate
 pip install -r requirements.txt
+DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart
 sudo deploy/manage_services.sh restart
 ```
 
 ### Reinicio completo (último recurso)
 
+Usa el [reset duro](#reset-duro-troubleshooting) o el script:
+
 ```bash
-sudo deploy/manage_services.sh stop
-sudo systemctl stop nginx
-sudo systemctl stop redis-server postgresql
-sleep 3
-sudo systemctl start postgresql redis-server
-sudo deploy/manage_services.sh start
-sudo systemctl start nginx
-sudo deploy/manage_services.sh status
+DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
+```
+
+Solo reinicio de servicios (sin `git pull` ni migraciones):
+
+```bash
+SKIP_DJANGO=1 DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
 ```
 
 ---

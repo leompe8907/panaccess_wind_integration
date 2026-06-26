@@ -42,4 +42,20 @@ curl -sk https://backend.wind.do/health/
 DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh status
 ```
 
-Guía completa: [`docs/DEPLOYMENT_UBUNTU_NATIVE.md`](../docs/DEPLOYMENT_UBUNTU_NATIVE.md).
+### Deploy normal (día a día)
+
+```bash
+sudo chmod +x deploy/refresh_stack.sh
+DAPHNE_INSTANCES=8 ./deploy/refresh_stack.sh
+```
+
+### Reset duro (troubleshooting)
+
+```bash
+sudo chmod +x deploy/reset_stack.sh
+DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
+# Solo reiniciar servicios, sin git/migrate:
+SKIP_DJANGO=1 DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
+```
+
+Guía completa: [`docs/DEPLOYMENT_UBUNTU_NATIVE.md`](../docs/DEPLOYMENT_UBUNTU_NATIVE.md) — Paso 11.
