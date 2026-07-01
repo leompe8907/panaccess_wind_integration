@@ -209,6 +209,8 @@ DEFAULT_FROM_EMAIL = EmailConfig.DEFAULT_FROM
 
 # Adaptador personalizado para conectar Google con PanAccess
 SOCIALACCOUNT_ADAPTER = 'wind.adapters.PanAccessSocialAccountAdapter'
+# El proveedor social (Google/Facebook) ya verifica el email.
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
 
 
 # ============================================================================

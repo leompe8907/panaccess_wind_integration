@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 
 from wind.models import SubscriberEmailRegistry, ListOfSubscriber
 from wind.functions.create_subscriber import create_subscriber_view
+from wind.services.subscriber_auth import mark_portal_email_verified
 
 logger = logging.getLogger(__name__)
 
@@ -164,5 +165,6 @@ class PanAccessSocialAccountAdapter(DefaultSocialAccountAdapter):
         user.first_name = extra_data.get('given_name', user.first_name)
         user.last_name = extra_data.get('family_name', user.last_name)
         user.save()
-        
+        mark_portal_email_verified(user, user.email)
+
         return user

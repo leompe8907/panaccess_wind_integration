@@ -5,7 +5,10 @@ from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
 
-from wind.auth_serializers import GoogleIdTokenSocialLoginSerializer
+from wind.auth_serializers import (
+    GoogleIdTokenSocialLoginSerializer,
+    PanAccessSocialLoginSerializer,
+)
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 from wind.models import SubscriberEmailRegistry
 
@@ -114,6 +117,7 @@ class FacebookLoginView(SocialLoginView):
 
     adapter_class = FacebookOAuth2Adapter
     client_class = OAuth2Client
+    serializer_class = PanAccessSocialLoginSerializer
 
     def get_response(self):
         response = super().get_response()
