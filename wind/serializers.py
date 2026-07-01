@@ -109,7 +109,9 @@ class JWTUserDetailsSerializer(serializers.ModelSerializer):
         if not obj or not getattr(obj, 'email', None):
             return None
         try:
-            return SubscriberEmailRegistry.objects.get(email=obj.email).subscriber_code
+            return SubscriberEmailRegistry.objects.get(
+                email__iexact=obj.email,
+            ).subscriber_code
         except SubscriberEmailRegistry.DoesNotExist:
             return None
 
