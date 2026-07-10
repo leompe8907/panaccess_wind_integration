@@ -803,7 +803,7 @@
                   || firstServerError(data.errors, "document_number")
                   || "Este documento ya está registrado o no es válido.";
                 const emailMsg = firstServerError(data.errors, "email")
-                  || "Este email ya está registrado o no es válido.";
+                  || "Este email ya está registrado.";
                 markInvalid("code", codeMsg);
                 markInvalid("email", emailMsg);
                 currentStep = 2;

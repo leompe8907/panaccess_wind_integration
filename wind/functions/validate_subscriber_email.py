@@ -53,7 +53,7 @@ def validate_subscriber_email_view(request):
 
     if has_active_local:
         is_valid = False
-        validation_message = "Este email ya está en uso por otro suscriptor."
+        validation_message = "Este email ya está registrado."
 
     exists = email_registry is not None or has_active_local
     available = is_valid

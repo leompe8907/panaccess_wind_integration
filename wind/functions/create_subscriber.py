@@ -355,7 +355,7 @@ def create_subscriber_view(request):
     if email_exists:
         subscriber_with_email = ListOfSubscriber.objects.filter(emails__iexact=email_normalized).first()
         logger.warning(f"Email '{email_normalized}' ya existe en suscriptor: code={subscriber_with_email.code if subscriber_with_email else 'N/A'}")
-        errors['email'] = ['Este email ya está en uso por otro suscriptor.']
+        errors['email'] = ['Este email ya está registrado.']
     
     if errors:
         return Response({

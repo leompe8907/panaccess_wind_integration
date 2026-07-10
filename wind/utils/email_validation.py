@@ -41,7 +41,7 @@ def validate_email_for_registration(email):
 
         if _allows_reregistration(registry):
             if _has_active_local_subscriber_for_email(email_lower):
-                message = "Este email ya está en uso por una cuenta activa."
+                message = "Este email ya está registrado."
                 logger.warning("Re-registro bloqueado: email %s con suscriptor activo local", email_lower)
                 return False, message, registry
             logger.info(
@@ -50,7 +50,7 @@ def validate_email_for_registration(email):
             )
             return True, "Email válido para re-registro", registry
 
-        message = "Este email ya está registrado. No se pueden crear múltiples cuentas con el mismo email."
+        message = "Este email ya está registrado."
         logger.warning(f"Intento de registro duplicado con email {email_lower}")
         return False, message, registry
 
