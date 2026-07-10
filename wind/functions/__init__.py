@@ -21,6 +21,7 @@ from wind.functions.sync_smartcards import (
     smartcards_stats_view,
 )
 from wind.functions.create_subscriber import create_subscriber_view
+from wind.functions.validate_subscriber_email import validate_subscriber_email_view
 from wind.functions.change_password import change_password_view
 from wind.functions.full_sync import full_sync_view
 
@@ -87,6 +88,7 @@ __all__ = [
     'test_call_list_smartcards',
     'smartcards_stats_view',
     'create_subscriber_view',
+    'validate_subscriber_email_view',
     'change_password_view',
     'full_sync_view',
 ]

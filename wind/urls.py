@@ -12,6 +12,7 @@ from wind.functions import (
     test_call_list_smartcards,
     smartcards_stats_view,
     create_subscriber_view,
+    validate_subscriber_email_view,
     change_password_view,
     full_sync_view,
 )
@@ -82,6 +83,9 @@ urlpatterns = [
     
     # Endpoint para crear suscriptores
     path('create-subscriber/', create_subscriber_view, name='create_subscriber'),
+
+    # Validar si el email del suscriptor ya existe
+    path('validate-subscriber-email/', validate_subscriber_email_view, name='validate_subscriber_email'),
 
     # Cambio de contraseña (PanAccess)
     path('change-password/', change_password_view, name='change_password'),

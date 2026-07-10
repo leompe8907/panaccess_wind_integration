@@ -165,6 +165,10 @@ class CreateSubscriberSerializer(serializers.Serializer):
     comment = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
+class ValidateSubscriberEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True, help_text="Email a validar contra registros existentes")
+
+
 class UDIDAuthRequestSerializer(serializers.ModelSerializer):
     temp_token = serializers.CharField(read_only=True)
     attempts_count = serializers.IntegerField(read_only=True)
