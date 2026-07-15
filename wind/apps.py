@@ -37,6 +37,30 @@ def _should_initialize_panaccess() -> bool:
     return True
 
 
+def _check_sync_admin_ip_allowlist() -> None:
+    """
+    Avisa en el arranque si la restricción por IP de las rutas
+    administrativas/sync está desactivada (SyncAdminIPRestrictionMiddleware
+    no se activa sin SYNC_ADMIN_IP_ALLOWLIST). Antes esto podía pasar
+    desapercibido: esas rutas quedaban protegidas solo por IsAdminUser, sin
+    la capa adicional de restricción por IP, sin ningún aviso de que esa
+    capa estaba desactivada.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, "SYNC_ADMIN_IP_ALLOWLIST", None):
+        logger.warning(
+            "SYNC_ADMIN_IP_ALLOWLIST no está configurado: las rutas "
+            "administrativas/sync (/wind/sync-*, /wind/full-sync, "
+            "/wind/singleton, /wind/ops/*, /wind/logged-in, /wind/*-stats, "
+            "/api/v1/tasks/*) sólo quedan protegidas por autenticación de "
+            "admin (IsAdminUser), sin la capa adicional de restricción por "
+            "IP. Si es intencional (por ejemplo, otra capa de red ya lo "
+            "cubre) puedes ignorar este aviso; si no, define "
+            "SYNC_ADMIN_IP_ALLOWLIST en el entorno."
+        )
+
+
 class WindConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'wind'
@@ -44,6 +68,8 @@ class WindConfig(AppConfig):
     def ready(self):
         if not _should_initialize_panaccess():
             return
+
+        _check_sync_admin_ip_allowlist()
 
         try:
             from wind.services.panaccess_singleton import initialize_panaccess

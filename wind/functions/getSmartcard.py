@@ -21,6 +21,7 @@ from wind.exceptions import PanAccessException
 logger = logging.getLogger(__name__)
 
 _CHAR_FIELD_MAX_LENGTHS: dict[str, int] | None = None
+_DATETIME_FIELD_NAMES: frozenset[str] | None = None
 
 
 def _smartcard_char_max_lengths() -> dict[str, int]:
@@ -34,10 +35,53 @@ def _smartcard_char_max_lengths() -> dict[str, int]:
     return _CHAR_FIELD_MAX_LENGTHS
 
 
+def _smartcard_datetime_field_names() -> frozenset[str]:
+    global _DATETIME_FIELD_NAMES
+    if _DATETIME_FIELD_NAMES is None:
+        from django.db import models as dj_models
+
+        _DATETIME_FIELD_NAMES = frozenset(
+            f.name
+            for f in ListOfSmartcards._meta.get_fields()
+            if isinstance(f, dj_models.DateTimeField)
+        )
+    return _DATETIME_FIELD_NAMES
+
+
+def _ensure_aware_datetime(value):
+    """Convierte fechas naive/string de PanAccess a datetime aware (UTC)."""
+    if value is None or value == "":
+        return None
+
+    from datetime import datetime
+
+    if isinstance(value, str):
+        try:
+            from dateutil import parser as date_parser
+
+            value = date_parser.parse(value)
+        except Exception:
+            from django.utils.dateparse import parse_datetime
+
+            value = parse_datetime(value)
+            if value is None:
+                return None
+
+    if not isinstance(value, datetime):
+        return value
+
+    if timezone.is_naive(value):
+        return timezone.make_aware(value, dt_timezone.utc)
+    return value
+
+
 def normalize_smartcard_row(item: dict) -> dict:
-    """Filtra campos del modelo y trunca strings que excedan max_length."""
+    """Filtra campos del modelo, normaliza datetimes y trunca strings largos."""
     model_fields = {f.name for f in ListOfSmartcards._meta.get_fields()}
     normalized = {k: v for k, v in item.items() if k in model_fields}
+    for key in _smartcard_datetime_field_names():
+        if key in normalized:
+            normalized[key] = _ensure_aware_datetime(normalized.get(key))
     for key, max_len in _smartcard_char_max_lengths().items():
         value = normalized.get(key)
         if value is None:

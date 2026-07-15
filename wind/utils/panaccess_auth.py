@@ -11,10 +11,34 @@ from wind.exceptions import (
     PanAccessAuthenticationError,
     PanAccessConnectionError,
     PanAccessTimeoutError,
-    PanAccessAPIError
+    PanAccessAPIError,
+    PanAccessRateLimitError,
 )
 
 logger = logging.getLogger(__name__)
+
+# Palabras clave para detectar el límite de PanAccess de ~20 logins en 5
+# minutos a partir del texto de error (la API no documenta un errorCode
+# específico para este caso). Ajustar/confirmar esta lista contra la
+# documentación oficial de PanAccess si el mensaje real difiere.
+_RATE_LIMIT_KEYWORDS = (
+    "rate limit",
+    "too many",
+    "demasiados intentos",
+    "muchos intentos",
+    "límite de intentos",
+    "limite de intentos",
+    "try again later",
+    "intente más tarde",
+    "intenta más tarde",
+)
+
+
+def _is_rate_limit_error(error_message: str) -> bool:
+    if not error_message:
+        return False
+    text = error_message.lower()
+    return any(keyword in text for keyword in _RATE_LIMIT_KEYWORDS)
 
 
 def hash_password(password: str, salt: str = None) -> str:
@@ -89,7 +113,16 @@ def login() -> str:
             error_message = json_response.get("errorMessage", "Login fallido sin mensaje explícito")
             answer = json_response.get("answer")
             logger.error(f"Login fallido: {error_message}")
-            
+
+            if _is_rate_limit_error(error_message):
+                logger.error(
+                    "Login rechazado por límite de intentos de PanAccess (rate limit): %s",
+                    error_message,
+                )
+                raise PanAccessRateLimitError(
+                    f"Límite de intentos de login excedido en PanAccess: {error_message}"
+                )
+
             if answer == "false" or error_message:
                 raise PanAccessAuthenticationError(
                     f"Error de autenticación: {error_message}"

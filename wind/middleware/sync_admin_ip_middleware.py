@@ -19,6 +19,12 @@ _PROTECTED_PREFIXES = (
     "/wind/singleton",
     "/wind/ops/",
     "/api/v1/tasks/",
+    # Añadidos: quedaban fuera del allowlist pese a ser endpoints de
+    # diagnóstico/operación equivalentes a los de arriba (ver auditoría).
+    "/wind/logged-in",
+    "/wind/test-call-list-",
+    "/wind/products-stats",
+    "/wind/smartcards-stats",
 )
 
 

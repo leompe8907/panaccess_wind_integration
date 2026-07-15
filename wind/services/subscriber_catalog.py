@@ -32,15 +32,29 @@ _SUBSCRIBER_MODEL_FIELDS = {f.name for f in ListOfSubscriber._meta.get_fields()}
 def _parse_panaccess_datetime(value):
     if value is None:
         return None
-    if hasattr(value, "isoformat"):
-        return value
-    if isinstance(value, str):
+
+    from datetime import datetime, timezone as dt_timezone
+
+    from django.utils import timezone
+
+    parsed = None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
         try:
             from dateutil import parser as date_parser
-            return date_parser.parse(value)
+
+            parsed = date_parser.parse(value)
         except Exception:
-            return parse_datetime(value)
-    return None
+            parsed = parse_datetime(value)
+    elif hasattr(value, "isoformat"):
+        parsed = value
+
+    if parsed is None:
+        return None
+    if isinstance(parsed, datetime) and timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, dt_timezone.utc)
+    return parsed
 
 
 def _format_datetime(value) -> str | None:

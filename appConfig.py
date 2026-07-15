@@ -71,8 +71,39 @@ class DjangoConfig:
     SECRET_KEY = _strip_env(os.getenv("SECRET_KEY"))
     DEBUG = _env_bool("DEBUG", False)
     ALLOWED_HOSTS = [_normalize_host(h) for h in _csv("ALLOWED_HOSTS")]
-    PRODUCTION_HTTPS = _env_bool("PRODUCTION_HTTPS", False)
+    # Valor crudo de la variable (None si no está definida en el entorno) —
+    # se necesita distinguir "no configurada" de "configurada en false" para
+    # poder avisar cuando alguien la desactiva a propósito en producción.
+    PRODUCTION_HTTPS_RAW = os.getenv("PRODUCTION_HTTPS")
     SYNC_ADMIN_IP_ALLOWLIST = _csv("SYNC_ADMIN_IP_ALLOWLIST")
+
+    @classmethod
+    def production_https(cls, *, debug: bool) -> bool:
+        """
+        Si aplicar HSTS, cookies seguras y redirect SSL.
+
+        Por defecto se activa automáticamente cuando DEBUG=False, en vez de
+        depender de que alguien recuerde definir PRODUCTION_HTTPS=true (antes
+        el default era False siempre, así que un despliegue en producción sin
+        esa variable quedaba sin estas protecciones sin ningún aviso).
+
+        Se puede seguir desactivando explícitamente con PRODUCTION_HTTPS=false
+        (p. ej. un staging con DEBUG=False detrás de un balanceador que ya
+        termina TLS y aplica sus propias cabeceras) — settings.py deja
+        constancia en el log cuando se hace esa combinación explícita.
+        """
+        if cls.PRODUCTION_HTTPS_RAW is not None:
+            return _env_bool("PRODUCTION_HTTPS", False)
+        return not debug
+
+    @classmethod
+    def production_https_explicitly_disabled(cls, *, debug: bool) -> bool:
+        """True si con DEBUG=False alguien puso PRODUCTION_HTTPS=false a propósito."""
+        return (
+            not debug
+            and cls.PRODUCTION_HTTPS_RAW is not None
+            and not _env_bool("PRODUCTION_HTTPS", False)
+        )
 
     @classmethod
     def validate(cls):
@@ -337,7 +368,27 @@ class RedisConfig:
 
     @classmethod
     @contextmanager
-    def task_lock(cls, key: str, *, timeout: int = 600):
+    def task_lock(
+        cls,
+        key: str,
+        *,
+        timeout: int = 600,
+        blocking: bool = False,
+        blocking_timeout: float | None = None,
+    ):
+        """Lock distribuido en Redis.
+
+        Por defecto (``blocking=False``) se comporta como antes: intenta
+        adquirir el lock una sola vez y no espera — usado por las tareas
+        Celery de sync, que deben saltarse si otra instancia ya está
+        corriendo, no esperar a que termine.
+
+        Con ``blocking=True`` espera hasta ``blocking_timeout`` segundos a
+        que el lock se libere antes de rendirse. Lo usa
+        ``panaccess_session_store.refresh_lock()`` para que los procesos que
+        no consiguen el lock esperen a que el que sí lo tiene termine de
+        autenticarse contra PanAccess, en vez de autenticarse también.
+        """
         from django.conf import settings
 
         if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
@@ -347,7 +398,7 @@ class RedisConfig:
         from redis.lock import Lock
 
         lock = Lock(cls.get_client(), key, timeout=timeout)
-        acquired = lock.acquire(blocking=False)
+        acquired = lock.acquire(blocking=blocking, blocking_timeout=blocking_timeout)
         try:
             yield acquired
         finally:
@@ -418,8 +469,20 @@ class PanaccessConfig:
 
     # Dynamic registration default product ID from .env
     REGISTRATION_PRODUCT_ID = _strip_env(os.getenv("PANACCESS_REGISTRATION_PRODUCT_ID"))
-    REMOVE_PRODUCT_API = _strip_env(os.getenv("PANACCESS_REMOVE_PRODUCT_API")) or "removeProductFromSmartcard"
+
+    # Nombres de operacion confirmados contra el WSDL oficial de operador
+    # (https://cv01.panaccess.com/?requestMode=wsdl&v=4.3&r=operator, v4.3).
+    # Los valores por defecto anteriores ("removeProductFromSmartcard",
+    # singular, sin prefijo "cv") no existen como operacion documentada.
+    GET_ORDERS_API = _strip_env(os.getenv("PANACCESS_GET_ORDERS_API")) or "getOrdersOfSubscriber"
+    REMOVE_LICENSE_BLOCK_API = _strip_env(os.getenv("PANACCESS_REMOVE_LICENSE_BLOCK_API")) or "removeLicenseBlockFromSubscriber"
+    # removeProductFromSmartcards / removeSmartcardFromOrder se probaron y no
+    # hacian falta -- cleanSmartcards por si sola limpia todo, confirmado en
+    # una prueba real de punta a punta (backend + PanAccess).
+    CLEAN_SMARTCARDS_API = _strip_env(os.getenv("PANACCESS_CLEAN_SMARTCARDS_API")) or "cleanSmartcards"
     REMOVE_SMARTCARD_API = _strip_env(os.getenv("PANACCESS_REMOVE_SMARTCARD_API")) or "removeSmartcardFromSubscriber"
+    DELETE_SUBSCRIBER_API = _strip_env(os.getenv("PANACCESS_DELETE_SUBSCRIBER_API")) or "deleteSubscriber"
+    DISABLE_ORDER_API = _strip_env(os.getenv("PANACCESS_DISABLE_ORDER_API")) or "disableOrderOfSubscriber"
     REGISTRATION_TRIAL_DAYS = _env_int("REGISTRATION_TRIAL_DAYS", 30)
 
     # Alias usados por wind.utils / panaccess_client (retrocompatibilidad)
@@ -464,6 +527,21 @@ class PanaccessConfig:
     )
     SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE = _env_bool(
         "PANACCESS_SMARTCARD_PIPELINE_COMPLETE_EACH_CYCLE", True
+    )
+
+    # HTTP hacia PanAccess: timeout por intento y reintentos con backoff.
+    # Defaults bajados a propósito respecto al histórico (60s / 3 intentos):
+    # ese peor caso podía bloquear un worker/thread hasta ~192s si PanAccess
+    # estaba lento. Con los defaults de abajo el peor caso baja a ~54s
+    # (2 intentos x 25s + 1 pausa de 4s), y siguen siendo configurables por
+    # entorno sin tener que tocar código.
+    HTTP_TIMEOUT_SECONDS = max(5, _env_int("PANACCESS_HTTP_TIMEOUT_SECONDS", 25))
+    HTTP_MAX_RETRIES = max(1, min(_env_int("PANACCESS_HTTP_MAX_RETRIES", 2), 5))
+    HTTP_RETRY_INITIAL_DELAY_SECONDS = max(
+        1, _env_int("PANACCESS_HTTP_RETRY_INITIAL_DELAY_SECONDS", 2)
+    )
+    HTTP_RETRY_MAX_DELAY_SECONDS = max(
+        1, _env_int("PANACCESS_HTTP_RETRY_MAX_DELAY_SECONDS", 10)
     )
 
     @classmethod

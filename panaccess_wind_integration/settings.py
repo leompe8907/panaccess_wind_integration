@@ -49,7 +49,7 @@ SECRET_KEY = DjangoConfig.SECRET_KEY
 DEBUG = DjangoConfig.DEBUG
 ALLOWED_HOSTS = DjangoConfig.ALLOWED_HOSTS or ['localhost', '127.0.0.1']
 
-PRODUCTION_HTTPS = DjangoConfig.PRODUCTION_HTTPS
+PRODUCTION_HTTPS = DjangoConfig.production_https(debug=DEBUG)
 if PRODUCTION_HTTPS and not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
@@ -58,6 +58,18 @@ if PRODUCTION_HTTPS and not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+elif DjangoConfig.production_https_explicitly_disabled(debug=DEBUG):
+    # DEBUG=False y alguien puso PRODUCTION_HTTPS=false a propósito: se deja
+    # constancia bien visible, porque HSTS/cookies seguras/redirect SSL
+    # quedan desactivados y antes esto podía pasar desapercibido.
+    import logging as _logging
+
+    _logging.getLogger("wind").warning(
+        "PRODUCTION_HTTPS=false con DEBUG=false: HSTS, cookies seguras y "
+        "redirect SSL están DESACTIVADOS. Confirma que es intencional "
+        "(p. ej. TLS terminado en un balanceador externo con su propia "
+        "política de seguridad)."
+    )
 
 SYNC_ADMIN_IP_ALLOWLIST = DjangoConfig.SYNC_ADMIN_IP_ALLOWLIST
 

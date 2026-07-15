@@ -144,11 +144,24 @@ def close_subscriber_account(
         subscriber.closed_reason = reason or ""
         subscriber.save(update_fields=["smartcards", "status", "closed_at", "closed_reason"])
     else:
-        ListOfSubscriber.objects.filter(code=subscriber_code).update(
-            smartcards=[],
-            status=ListOfSubscriber.STATUS_CLOSED,
-            closed_at=closed_at,
-            closed_reason=reason or "",
+        # No habia fila local para este suscriptor (nunca se habia
+        # sincronizado desde PanAccess). Un .filter(...).update(...) sobre
+        # cero filas no crea nada y no avisa -- eso dejaba el cierre sin
+        # tombstone local, y el siguiente sync (periodic_sync_pipeline_task /
+        # full_sync_task) volvia a insertar al suscriptor como "active" con
+        # los datos que todavia tuviera PanAccess, deshaciendo el cierre en
+        # la cache local. Con update_or_create siempre queda una fila
+        # cerrada, exista o no de antes (y es seguro ante condiciones de
+        # carrera con un sync concurrente).
+        ListOfSubscriber.objects.update_or_create(
+            code=subscriber_code,
+            defaults={
+                "id": subscriber_code,
+                "smartcards": [],
+                "status": ListOfSubscriber.STATUS_CLOSED,
+                "closed_at": closed_at,
+                "closed_reason": reason or "",
+            },
         )
 
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)

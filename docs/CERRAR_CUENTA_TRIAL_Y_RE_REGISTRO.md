@@ -221,7 +221,7 @@ PANACCESS_REMOVE_SMARTCARD_API=removeSmartcardFromSubscriber
 | **2** | `subscriber_closure.py` cierre local, tombstone registry, comando `close_subscriber` | Hecho (base) |
 | **3** | `panaccess_deprovision.py`, integración PA, reintentos | En código (confirmar APIs PA) |
 | **4** | Endpoint HTTP admin, autoservicio dashboard | Pendiente |
-| **5** | Sync ignora `closed`, tests E2E, README | Pendiente |
+| **5** | Sync ignora `closed`, tests E2E, README | Hecho (sync no borra/reactiva `closed`/`pending_closure`) |
 
 ---
 

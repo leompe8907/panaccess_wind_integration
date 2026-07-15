@@ -57,8 +57,20 @@ def clear_session_id() -> None:
         logger.warning("No se pudo borrar sesión PanAccess en Redis: %s", exc)
 
 
-def refresh_lock():
-    """Lock distribuido para un solo login PanAccess entre workers."""
+def refresh_lock(*, blocking: bool = True, blocking_timeout: float = 15.0):
+    """Lock distribuido para un solo login PanAccess entre workers.
+
+    Es bloqueante por defecto: un proceso que no consigue el lock espera
+    hasta ``blocking_timeout`` segundos a que el que sí lo tiene termine de
+    autenticarse y publique el sessionId en Redis, en vez de autenticarse
+    también (eso causaba "login storms" contra PanAccess — varios workers
+    haciendo login al mismo tiempo y disparando su límite de intentos).
+    """
     from appConfig import RedisConfig
 
-    return RedisConfig.task_lock(SESSION_LOCK_KEY, timeout=120)
+    return RedisConfig.task_lock(
+        SESSION_LOCK_KEY,
+        timeout=120,
+        blocking=blocking,
+        blocking_timeout=blocking_timeout,
+    )

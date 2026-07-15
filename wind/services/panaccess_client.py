@@ -25,11 +25,14 @@ class PanAccessClient:
     """
     Cliente para interactuar con la API de PanAccess.
     """
-    
-    # Configuración de reintentos para errores de conexión/timeout
-    MAX_RETRY_ATTEMPTS = 3
-    INITIAL_RETRY_DELAY = 2  # segundos
-    MAX_RETRY_DELAY = 30  # segundos
+
+    # Configuración de reintentos para errores de conexión/timeout.
+    # Tomados de PanaccessConfig (configurables por entorno vía .env) para
+    # poder ajustar el peor caso de bloqueo sin tener que tocar código.
+    MAX_RETRY_ATTEMPTS = PanaccessConfig.HTTP_MAX_RETRIES
+    INITIAL_RETRY_DELAY = PanaccessConfig.HTTP_RETRY_INITIAL_DELAY_SECONDS  # segundos
+    MAX_RETRY_DELAY = PanaccessConfig.HTTP_RETRY_MAX_DELAY_SECONDS  # segundos
+    DEFAULT_TIMEOUT = PanaccessConfig.HTTP_TIMEOUT_SECONDS  # segundos por intento
     
     def __init__(self, base_url: str = None):
         PanaccessConfig.validate()
@@ -83,27 +86,33 @@ class PanAccessClient:
             self.authenticate()
             return
     
-    def call(self, func_name: str, parameters: Dict[str, Any] = None, timeout: int = 60) -> Dict[str, Any]:
+    def call(self, func_name: str, parameters: Dict[str, Any] = None, timeout: int = None) -> Dict[str, Any]:
         """
         Llama a una función remota del API PanAccess con reintentos automáticos y backoff exponencial.
         """
-        if parameters is None:
-            parameters = {}
-        
+        if timeout is None:
+            timeout = self.DEFAULT_TIMEOUT
+
+        # Nunca mutar el dict que nos pasó el llamador: se trabaja siempre
+        # sobre una copia propia. Antes se escribía sessionId directamente
+        # en el dict original del caller, que podía terminar reutilizándolo
+        # (para loggear, reintentar, etc.) creyendo que seguía "limpio".
+        parameters = dict(parameters) if parameters else {}
+
         # Asegurar sesión válida antes de hacer la llamada (excepto para login)
         if func_name != 'login' and func_name != 'cvLoggedIn':
             self._ensure_valid_session()
-        
+
+        # Agregar sessionId a los parámetros (a nuestra copia) si existe y no es login
+        if self.session_id and func_name != 'login' and func_name != 'cvLoggedIn':
+            parameters['sessionId'] = self.session_id
+
         # Preparar parámetros para logging (ocultar sessionId por seguridad)
         log_parameters = parameters.copy()
         if 'sessionId' in log_parameters:
             session_id_value = log_parameters['sessionId']
             if session_id_value:
-                log_parameters['sessionId'] = f"{session_id_value[:20]}..." if len(str(session_id_value)) > 20 else "[REDACTED]"
-        
-        # Agregar sessionId a los parámetros si existe y no es login
-        if self.session_id and func_name != 'login' and func_name != 'cvLoggedIn':
-            parameters['sessionId'] = self.session_id
+                log_parameters['sessionId'] = "[REDACTED]"
         
         # Construir URL
         url = f"{self.base_url}?f={func_name}&requestMode=function"

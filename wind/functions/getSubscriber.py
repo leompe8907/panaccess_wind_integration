@@ -70,9 +70,20 @@ def _parse_subscriber_datetime(value, parser):
     if not value:
         return None
     try:
-        if parser:
-            return parser.parse(value)
-        return value
+        from datetime import datetime, timezone as dt_timezone
+
+        from django.utils import timezone
+
+        if isinstance(value, datetime):
+            parsed = value
+        elif parser:
+            parsed = parser.parse(value)
+        else:
+            return value
+
+        if timezone.is_naive(parsed):
+            return timezone.make_aware(parsed, dt_timezone.utc)
+        return parsed
     except Exception as e:
         logger.warning("Error parseando fecha %s: %s", value, e)
         return None
@@ -120,8 +131,20 @@ def extended_subscriber_row_to_data(row, parser=None):
     }
 
 
+def _is_closure_tombstone(subscriber) -> bool:
+    """Cuentas cerradas / en cierre: no borrar ni reactivar desde sync PanAccess."""
+    status = getattr(subscriber, "status", None)
+    return status in (
+        ListOfSubscriber.STATUS_CLOSED,
+        ListOfSubscriber.STATUS_PENDING_CLOSURE,
+    )
+
+
 def _update_subscriber_from_row(local_obj, row, parser=None):
     """Actualiza un suscriptor local si difiere de la fila remota. Retorna True si guardó cambios."""
+    if _is_closure_tombstone(local_obj):
+        return False
+
     if parser is None:
         parser = _get_dateutil_parser()
 
@@ -182,10 +205,31 @@ def _update_subscriber_from_row(local_obj, row, parser=None):
 
 
 def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
-    """Elimina suscriptores locales y credenciales que no existen en PanAccess."""
-    codes_to_delete = local_codes - remote_codes
+    """Elimina suscriptores locales y credenciales que no existen en PanAccess.
+
+    Conserva filas con status closed / pending_closure (tombstone de cierre de cuenta).
+    """
+    missing_remotely = local_codes - remote_codes
+    preserved_codes = set(
+        ListOfSubscriber.objects.filter(
+            code__in=missing_remotely,
+            status__in=(
+                ListOfSubscriber.STATUS_CLOSED,
+                ListOfSubscriber.STATUS_PENDING_CLOSURE,
+            ),
+        ).values_list("code", flat=True)
+    )
+    codes_to_delete = missing_remotely - preserved_codes
     total_deleted = 0
     credentials_deleted = {}
+
+    if preserved_codes:
+        logger.info(
+            "Sync conserva %s suscriptores closed/pending_closure ausentes en PanAccess "
+            "(muestra): %s",
+            len(preserved_codes),
+            list(preserved_codes)[:10],
+        )
 
     if codes_to_delete:
         try:
@@ -202,6 +246,7 @@ def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
     return {
         "deleted": total_deleted,
         "codes_to_delete_count": len(codes_to_delete),
+        "preserved_closed": len(preserved_codes),
         "credentials_deleted": credentials_deleted,
     }
 
@@ -322,9 +367,13 @@ def store_all_subscribers_in_chunks(data_batch, chunk_size=100):
                 existing = existing_by_id[subscriber_id]
             
             if existing:
+                if _is_closure_tombstone(existing):
+                    continue
                 changed = False
                 changed_fields = []
                 for key, val in validated.items():
+                    if key == "status":
+                        continue
                     current_val = getattr(existing, key, None)
                     if isinstance(current_val, list) and isinstance(val, list):
                         if current_val != val:
@@ -530,7 +579,11 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
             remote_codes.add(code)
 
             if code in local_data:
-                if _update_subscriber_from_row(local_data[code], row, parser):
+                local_obj = local_data[code]
+                if _is_closure_tombstone(local_obj):
+                    # No reactivar ni sobrescribir cuentas cerradas desde PanAccess.
+                    continue
+                if _update_subscriber_from_row(local_obj, row, parser):
                     total_updated += 1
             else:
                 subscriber_data = extended_subscriber_row_to_data(row, parser)
@@ -562,6 +615,7 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
         "create_errors": create_errors,
         "deleted": delete_result["deleted"],
         "codes_to_delete_count": delete_result["codes_to_delete_count"],
+        "preserved_closed": delete_result.get("preserved_closed", 0),
         "invalid_deleted": invalid_deleted,
         "credentials_deleted": delete_result["credentials_deleted"],
         "remote_count": len(remote_codes),
@@ -658,6 +712,74 @@ def CallGetSubscriber(session_id=None, subscriber_code=None):
     raise PanAccessException(
         last_error or f"No se pudo obtener el suscriptor {code} por API directa"
     )
+
+
+def _normalize_orders_answer(answer) -> list[dict]:
+    """Normaliza la respuesta de getOrdersOfSubscriber a una lista de dicts."""
+    if answer is None:
+        return []
+    rows = answer
+    if isinstance(rows, dict):
+        for key in ("orders", "Orders", "rows", "answer"):
+            nested = rows.get(key)
+            if isinstance(nested, list):
+                rows = nested
+                break
+        else:
+            rows = [rows] if rows else []
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def CallGetOrdersOfSubscriber(session_id=None, subscriber_code=None, include_expired=True):
+    """
+    Trae las ordenes reales del suscriptor (getOrdersOfSubscriber): cada orden
+    trae orderId, productId, sn (smartcard) y expiryTime/disabled.
+
+    Es la fuente correcta para saber que producto tiene cada smartcard -- a
+    diferencia de leer 'products'/'productEntries' de la fila de
+    getSubscriber, que no esta garantizado que venga desglosado por tarjeta.
+    """
+    del session_id  # singleton
+
+    if not subscriber_code or not str(subscriber_code).strip():
+        raise ValueError("subscriber_code es requerido")
+
+    code = str(subscriber_code).strip()
+    panaccess = get_panaccess()
+
+    # El resto de las llamadas del proyecto no usan el prefijo "cv"
+    # (getSubscriber, addSubscriber, addLicenseBlockToSubscriber, etc.), y la
+    # cuenta de servicio confirmó en pruebas reales que NO tiene permiso para
+    # la variante "cv" de esta función -- se prueba primero sin prefijo,
+    # igual que las demás, y "cv..." queda solo como respaldo por si algún
+    # otro entorno sí lo tiene habilitado.
+    attempts = (
+        ("getOrdersOfSubscriber", {"subscriberCode": code, "includeExpiredOrders": include_expired}),
+        ("cvGetOrdersOfSubscriber", {"subscriberCode": code, "includeExpiredOrders": include_expired}),
+    )
+    last_error = None
+
+    for api_name, parameters in attempts:
+        try:
+            response = panaccess.call(api_name, parameters)
+            if not response.get("success"):
+                last_error = response.get("errorMessage", api_name)
+                continue
+            orders = _normalize_orders_answer(response.get("answer"))
+            logger.info("Ordenes de %s obtenidas vía %s (%d)", code, api_name, len(orders))
+            return orders
+        except PanAccessException as exc:
+            last_error = str(exc)
+            logger.debug("%s no disponible para %s: %s", api_name, code, exc)
+
+    logger.warning(
+        "No se pudieron obtener las órdenes de %s (%s); se continúa sin ellas",
+        code,
+        last_error,
+    )
+    return []
 
 
 def CallListExtendedSubscribers(session_id=None, offset=0, limit=100):

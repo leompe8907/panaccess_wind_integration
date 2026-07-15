@@ -11,7 +11,7 @@ from rest_framework import status
 
 from appConfig import FeatureConfig
 from wind.utils.panaccess_auth import logged_in
-from wind.services import PanAccessClient
+from wind.services import get_panaccess
 from wind.exceptions import (
     PanAccessAuthenticationError,
     PanAccessConnectionError,
@@ -43,12 +43,20 @@ def logged_in_view(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    client = PanAccessClient()
+    # Reutiliza la sesión compartida del singleton (igual que
+    # /wind/singleton/ y /wind/ops/panaccess-session/) en vez de crear un
+    # PanAccessClient nuevo y autenticarse desde cero: antes, cada visita a
+    # este endpoint de diagnóstico generaba un login real contra PanAccess
+    # que nunca se cerraba, dejando sesiones huérfanas y consumiendo cupo
+    # del límite de logins de la cuenta de servicio (compartido con el
+    # resto del sistema).
+    panaccess = get_panaccess()
 
     try:
-        session_id = client.authenticate()
+        panaccess.ensure_session()
+        session_id = panaccess.client.session_id
         is_valid_direct = logged_in(session_id)
-        is_valid_client = client.check_session()
+        is_valid_client = panaccess.client.check_session()
 
         return Response(
             {

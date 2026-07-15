@@ -17,6 +17,7 @@ from wind.exceptions import (
     PanAccessTimeoutError,
     PanAccessAPIError,
     PanAccessSessionError,
+    PanAccessRateLimitError,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,15 +50,21 @@ class PanAccessSingleton:
         return cls._instance
     
     def __init__(self):
-        if self._initialized:
-            return
-        
-        self.client = PanAccessClient()
-        self._initialized = True
-        self._retry_count = 0
-        self._last_alert_sent = False
-        self._validation_thread = None
-        self._stop_validation = threading.Event()
+        # Igual que __new__, protegido por el lock de clase: sin esto, dos
+        # hilos pidiendo el singleton por primera vez casi al mismo tiempo
+        # pueden ver ambos "todavía no inicializado" y pisarse el cliente y
+        # el resto del estado interno entre sí (condición de carrera única
+        # en el primer arranque concurrente del proceso).
+        with self.__class__._lock:
+            if self._initialized:
+                return
+
+            self.client = PanAccessClient()
+            self._retry_count = 0
+            self._last_alert_sent = False
+            self._validation_thread = None
+            self._stop_validation = threading.Event()
+            self._initialized = True
         
     def _authenticate_with_retry(self) -> str:
         """
@@ -97,6 +104,20 @@ class PanAccessSingleton:
                 
                 time.sleep(delay)
             
+            except PanAccessRateLimitError as e:
+                # PanAccess ya está rechazando logins por exceso de intentos
+                # (rate limit propio, ~20 logins/5min). Reintentar de
+                # inmediato con el backoff corto de este método solo
+                # empeoraría el bloqueo, así que no se reintenta aquí: se
+                # deja constancia clara en el log y se propaga el error para
+                # que el llamador (o el circuit breaker) decida cómo
+                # degradar en vez de seguir insistiendo.
+                logger.error(
+                    "PanAccess en rate limit de logins; no se reintenta "
+                    "automáticamente para no empeorar el bloqueo: %s",
+                    str(e),
+                )
+                raise
             except PanAccessException as e:
                 raise
             except Exception as e:
@@ -134,31 +155,46 @@ class PanAccessSingleton:
             self.client.session_id = stored
             return
 
-        if panaccess_session_store.is_enabled():
-            with panaccess_session_store.refresh_lock() as acquired:
-                if not acquired:
-                    stored = panaccess_session_store.get_session_id()
-                    if stored:
-                        self.client.session_id = stored
-                        return
-                if not self.client.session_id:
-                    stored = panaccess_session_store.get_session_id()
-                    if stored:
-                        self.client.session_id = stored
-                    else:
-                        logger.info("No hay sesión, autenticando...")
-                        self.client.session_id = self._authenticate_with_retry()
+        if not panaccess_session_store.is_enabled():
+            logger.info("No hay sesión, autenticando...")
+            self.client.session_id = self._authenticate_with_retry()
             return
 
-        logger.info("No hay sesión, autenticando...")
-        self.client.session_id = self._authenticate_with_retry()
+        # Con sesión compartida en Redis: sólo un proceso debe autenticarse
+        # a la vez. El lock es bloqueante (espera hasta blocking_timeout) para
+        # que los procesos que no lo consiguen le den tiempo al que sí lo
+        # tiene a publicar el sessionId, en vez de autenticarse también.
+        with panaccess_session_store.refresh_lock(blocking=True, blocking_timeout=15.0) as acquired:
+            # Pudo haberse publicado una sesión mientras esperábamos el lock
+            # (la hayamos adquirido o no) — siempre se revisa primero.
+            stored = panaccess_session_store.get_session_id()
+            if stored:
+                self.client.session_id = stored
+                return
+
+            if not acquired:
+                # Ni conseguimos el lock ni apareció una sesión tras esperar:
+                # el proceso que lo tiene puede haber fallado o estar
+                # tardando más de lo esperado. Es un caso degradado y poco
+                # frecuente (no la carrera rutinaria de antes) — se deja
+                # constancia en el log y se autentica como último recurso
+                # para no dejar el sistema sin sesión indefinidamente.
+                logger.warning(
+                    "No se pudo adquirir el lock de sesión PanAccess tras "
+                    "esperar %.0fs y no hay sesión publicada; autenticando "
+                    "como último recurso.",
+                    15.0,
+                )
+
+            logger.info("No hay sesión, autenticando...")
+            self.client.session_id = self._authenticate_with_retry()
 
     def ensure_session(self):
         with self._session_lock:
             self._load_or_authenticate_session()
             return
     
-    def call(self, func_name: str, parameters: dict = None, timeout: int = 60) -> dict:
+    def call(self, func_name: str, parameters: dict = None, timeout: int = None) -> dict:
         """
         Llama a una función de la API PanAccess de manera segura y controlada.
         """
@@ -180,7 +216,7 @@ class PanAccessSingleton:
             return panaccess_circuit_breaker.get_circuit_breaker().execute(_invoke)
         return _invoke()
 
-    def _call_once(self, func_name: str, parameters: dict = None, timeout: int = 60) -> dict:
+    def _call_once(self, func_name: str, parameters: dict = None, timeout: int = None) -> dict:
         if func_name not in ('login', 'cvLoggedIn'):
             if not self.client.session_id:
                 logger.warning("No hay sesión activa, obteniendo una...")
@@ -198,40 +234,67 @@ class PanAccessSingleton:
     
     def _periodic_validation(self):
         logger.info(f"Validación periódica iniciada (intervalo: {self.VALIDATION_INTERVAL}s)")
-        
+
         while not self._stop_validation.is_set():
             try:
                 if self._stop_validation.wait(timeout=self.VALIDATION_INTERVAL):
                     break
-                
+
+                # Sólo se lee el session_id actual bajo lock (operación
+                # instantánea). La llamada de red a PanAccess y una eventual
+                # reautenticación se hacen SIN sostener _session_lock, para
+                # no bloquear el resto de la aplicación (que también usa
+                # este lock en cada llamada) durante lo que puede tardar
+                # hasta ~150s en el peor caso.
                 with self._session_lock:
-                    if not self.client.session_id:
+                    current_session_id = self.client.session_id
+
+                if not current_session_id:
+                    continue
+
+                needs_refresh = False
+                try:
+                    is_valid = logged_in(current_session_id)
+                    needs_refresh = not is_valid
+                except (PanAccessConnectionError, PanAccessTimeoutError) as e:
+                    logger.warning(f"⚠️ Error de conexión en validación periódica: {str(e)}. Manteniendo sesión actual.")
+                    continue
+                except PanAccessAPIError as e:
+                    error_code = getattr(e, 'error_code', None)
+                    if error_code == 'no_access_to_function':
+                        logger.debug("⚠️ Error de permisos en validación periódica, manteniendo sesión")
                         continue
-                    
-                    try:
-                        is_valid = logged_in(self.client.session_id)
-                        if not is_valid:
-                            logger.info("Sesión caducada, refrescando...")
-                            panaccess_session_store.clear_session_id()
-                            self.client.session_id = self._authenticate_with_retry()
-                    except (PanAccessConnectionError, PanAccessTimeoutError) as e:
-                        logger.warning(f"⚠️ Error de conexión en validación periódica: {str(e)}. Manteniendo sesión actual.")
-                    except PanAccessAPIError as e:
-                        error_code = getattr(e, 'error_code', None)
-                        if error_code == 'no_access_to_function':
-                            logger.debug("⚠️ Error de permisos en validación periódica, manteniendo sesión")
-                        else:
-                            logger.warning(f"⚠️ Error de API en validación periódica: {str(e)}. Intentando refrescar...")
-                            try:
-                                self.client.session_id = self._authenticate_with_retry()
-                            except Exception:
-                                logger.error("❌ Error al refrescar sesión en validación periódica")
-                
-                logger.debug("✅ Validación periódica completada")
-                
+                    logger.warning(f"⚠️ Error de API en validación periódica: {str(e)}. Intentando refrescar...")
+                    needs_refresh = True
+
+                if not needs_refresh:
+                    logger.debug("✅ Validación periódica completada")
+                    continue
+
+                logger.info("Sesión caducada o inválida, refrescando...")
+                try:
+                    new_session_id = self._authenticate_with_retry()
+                except Exception:
+                    logger.error("❌ Error al refrescar sesión en validación periódica")
+                    continue
+
+                with self._session_lock:
+                    # Sólo reemplazar si nadie más (otro hilo/petición) ya
+                    # refrescó la sesión mientras autenticábamos sin el lock
+                    # — evita pisar una sesión más nueva con una más vieja.
+                    if self.client.session_id == current_session_id:
+                        self.client.session_id = new_session_id
+                    else:
+                        logger.debug(
+                            "La sesión ya había sido refrescada por otra vía; "
+                            "se descarta este login redundante."
+                        )
+
+                logger.debug("✅ Validación periódica completada (sesión refrescada)")
+
             except Exception as e:
                 logger.error(f"❌ Error en validación periódica: {str(e)}")
-        
+
         logger.info("Validación periódica detenida")
     
     def start_periodic_validation(self):
@@ -274,11 +337,11 @@ def initialize_panaccess():
         singleton.ensure_session()
         logger.info("PanAccess inicializado y autenticado")
         singleton.start_periodic_validation()
-        
+
     except PanAccessException as e:
         logger.error(f"Error inicializando PanAccess: {str(e)}")
         logger.warning("El sistema intentará autenticarse en el primer request")
-        
+
         try:
             singleton.start_periodic_validation()
         except Exception as ve:
