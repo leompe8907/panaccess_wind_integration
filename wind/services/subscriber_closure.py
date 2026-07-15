@@ -69,7 +69,7 @@ def close_subscriber_account(
     skip_panaccess: bool = False,
 ) -> dict[str, Any]:
     """
-    Cierra la cuenta: PanAccess (productos → smartcards) + local (sin borrar registry).
+    Cierra la cuenta: PanAccess (productos -> smartcards) + local (sin borrar registry).
     """
     subscriber_code = (subscriber_code or "").strip()
     if not subscriber_code:
@@ -165,7 +165,7 @@ def close_subscriber_account(
         )
 
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)
-    local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)s(subscriber_code)
+    local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)
     local_result["udid_revoked"] = _revoke_udid_requests(subscriber_code)
 
     log_status = SubscriberClosureLog.STATUS_COMPLETED
