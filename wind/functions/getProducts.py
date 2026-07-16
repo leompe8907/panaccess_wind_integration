@@ -3,6 +3,7 @@ Funciones para obtener y sincronizar productos desde PanAccess.
 """
 import logging
 from django.db import transaction
+from appConfig import PanaccessConfig
 from wind.models import ListOfProducts
 from wind.services import get_panaccess
 from wind.exceptions import PanAccessException
@@ -24,10 +25,11 @@ def LastProduct():
     return ListOfProducts.objects.order_by('-productId').first()
 
 
-def store_all_products_in_chunks(data_batch, chunk_size=100):
+def store_all_products_in_chunks(data_batch, chunk_size=None):
     """
     Almacena productos en la base de datos en bloques para mejorar el rendimiento.
     """
+    chunk_size = chunk_size or PanaccessConfig.DB_WRITE_CHUNK_SIZE
     total = len(data_batch)
     if total == 0:
         return

@@ -1,6 +1,7 @@
 import logging
 from django.db import transaction
 from django.utils import timezone
+from appConfig import PanaccessConfig
 from wind.models import (
     ListOfSubscriber,
     SubscriberLoginInfo,
@@ -323,7 +324,8 @@ def LastSubscriber():
         return None
 
 
-def store_all_subscribers_in_chunks(data_batch, chunk_size=100):
+def store_all_subscribers_in_chunks(data_batch, chunk_size=None):
+    chunk_size = chunk_size or PanaccessConfig.DB_WRITE_CHUNK_SIZE
     total = len(data_batch)
     if total == 0:
         return (0, 0)

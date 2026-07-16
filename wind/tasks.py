@@ -230,7 +230,12 @@ def compare_and_update_subscribers_task(self, limit=None):
         return _skipped_during_full_sync("compare_and_update_subscribers_task")
 
     lock_key = "celery:lock:compare_and_update_subscribers_task"
-    lock_timeout = 600
+    # El TTL del lock debe cubrir al menos lo que dura el time_limit de la
+    # tarea (ver CELERY_BEAT_SCHEDULE["compare-subscribers-frequent"] en
+    # settings.py) -- si el lock expirara antes de que termine una corrida
+    # larga, un disparo posterior de Beat podría creer que está libre y
+    # arrancar una segunda corrida en paralelo sobre el mismo catálogo.
+    lock_timeout = CeleryConfig.COMPARE_SUBSCRIBERS_LOCK_TIMEOUT
 
     with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
         if not acquired:
@@ -245,7 +250,7 @@ def compare_and_update_subscribers_task(self, limit=None):
 
         try:
             env_limit = CeleryConfig.SYNC_LIMIT
-            limit = limit or env_limit or 200
+            limit = limit or env_limit or 1000
 
             logger.info(
                 "[Celery] Iniciando compare_and_update_subscribers_task limit=%s", limit

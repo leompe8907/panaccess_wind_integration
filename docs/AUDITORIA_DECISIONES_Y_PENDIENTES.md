@@ -241,3 +241,20 @@ De paso se corrigió un `NameError` real en la misma función (`_deactivate_port
 - **`subscriber_auth.py` (paginación de catálogo en login):** el equipo confirmó que `login1` siempre existe porque PanAccess lo crea automáticamente al crear el suscriptor, así que `_discover_login_by_login1` no debería activarse en la práctica. No se tocó código; queda como salvaguarda para casos borde, sin acción adicional.
 
 Migración: `wind/migrations/0003_closure_retry_password_reset_security_profile.py` (campo `closure_retry_count` en `ListOfSubscriber`, modelos `PasswordResetTokenUse` y `UserSecurityProfile`). Escrita a mano siguiendo el estilo de `0002_*` porque el entorno de esta auditoría no tiene Django instalado con acceso a Postgres para correr `makemigrations` — **correr `python manage.py migrate` y revisar el diff de la migración antes de desplegar**.
+
+### 15. `compare_and_update_subscribers_task` pasa a ser periódica (cada 5 min) + lotes de 1000 + cola/worker dedicados
+
+**Decisión del cliente:** a pesar de que esta tarea escala con el tamaño TOTAL del catálogo (no con lo que cambió — pagina todo PanAccess y carga toda la tabla local para comparar), se pidió correrla cada 5 minutos en vez de solo nocturna. Implementado con las siguientes salvaguardas para que no se acumulen corridas:
+
+- Cola propia `compare_reconcile` (`CeleryConfig.COMPARE_SUBSCRIBERS_QUEUE`), separada de `sync_pipeline` y `full_sync`, para poder levantarle un worker dedicado sin que compita con la sync incremental: `celery -A panaccess_wind_integration worker -Q compare_reconcile -c 1`.
+- `expires` en el schedule (`CELERY_COMPARE_SUBSCRIBERS_MINUTES * 60`): si una corrida se atrasa más que el intervalo, la siguiente invocación se descarta en vez de encolarse en cadena.
+- El lock de Redis de la tarea (que antes tenía un TTL fijo de 600s, más corto que su `time_limit`) ahora usa `CeleryConfig.COMPARE_SUBSCRIBERS_LOCK_TIMEOUT` (default 1800s) para evitar que el lock expire mientras la tarea sigue corriendo y se disparen dos reconciliaciones en paralelo.
+- Sigue respetando `is_full_sync_in_progress()` (se omite si el `full_sync_task` nocturno está en curso).
+
+**Riesgo que queda documentado (no resuelto, aceptado por el cliente):** si el catálogo crece lo suficiente como para que una corrida tarde más de 5 minutos, `expires` empieza a descartar corridas en vez de acumularlas — en la práctica dejaría de reconciliar cada 5 min exactos y pasaría a reconciliar "cada vez que una corrida logra completar". Si esto se vuelve frecuente en los logs, la alternativa es reescribir la tarea para reconciliar en bloques con cursor (procesar una porción del catálogo por corrida en vez de todo), pendiente si se necesita.
+
+**Lotes subidos a 1000** (antes 100-200) en descarga y escritura a BD, para subscribers, smartcards, products y login info: `CELERY_SYNC_LIMIT`, `PANACCESS_LOGIN_INFO_PAGE_LIMIT`, `PANACCESS_SMARTCARD_PAGE_LIMIT`, `PANACCESS_LOGIN_INFO_DB_CHUNK` y el nuevo `PANACCESS_DB_WRITE_CHUNK_SIZE` (usado por defecto en `store_all_subscribers_in_chunks`/`store_all_smartcards_in_chunks`/`store_all_products_in_chunks`). Todos configurables por variable de entorno.
+
+### 16. Hallazgo nuevo, aún sin resolver — login no revisa `status=closed` localmente
+
+Al revisar el flujo de login a raíz de una pregunta sobre cuentas cerradas: `authenticate_portal_user`/`verify_panaccess_credentials` nunca consultan `ListOfSubscriber.status`, y `get_or_create_portal_user` (`subscriber_auth.py:256`) pone `user.is_active = True` sin condición en cada login exitoso por credenciales de PanAccess. Si PanAccess todavía acepta esas credenciales (recordar la duda abierta sobre si `deleteSubscriber` borra de verdad — sección 10), un suscriptor "cerrado" localmente podría seguir iniciando sesión con normalidad, y si su `User` de Django había quedado desactivado por el cierre, este mismo login lo reactiva sin darse cuenta. Los productos de prueba no se ven afectados por esto (solo se otorgan en el registro, nunca en el login), pero el acceso en sí a una cuenta "cerrada" sí queda expuesto. Pendiente de confirmación del cliente para implementar el chequeo explícito.

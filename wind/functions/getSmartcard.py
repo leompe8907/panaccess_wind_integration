@@ -116,10 +116,11 @@ def LastSmartcard():
         return None
 
 
-def store_all_smartcards_in_chunks(data_batch, chunk_size=100):
+def store_all_smartcards_in_chunks(data_batch, chunk_size=None):
     """
     Almacena smartcards en la base de datos en bloques para mejorar el rendimiento.
     """
+    chunk_size = chunk_size or PanaccessConfig.DB_WRITE_CHUNK_SIZE
     total = len(data_batch)
     if total == 0:
         return

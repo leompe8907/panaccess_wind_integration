@@ -425,11 +425,25 @@ class CeleryConfig:
 
     SYNC_MINUTES = max(1, _env_int("CELERY_SYNC_MINUTES", 10))
     SMARTCARD_SYNC_MINUTES = max(1, _env_int("CELERY_SMARTCARD_SYNC_MINUTES", 10))
-    SYNC_LIMIT = max(1, _env_int("CELERY_SYNC_LIMIT", 200))
+    # Tamaño de página para descargas de PanAccess (subscribers/smartcards/
+    # products) en las tareas periódicas.
+    SYNC_LIMIT = max(1, _env_int("CELERY_SYNC_LIMIT", 1000))
     SYNC_PIPELINE_QUEUE = (
         _strip_env(os.getenv("CELERY_SYNC_PIPELINE_QUEUE")) or "sync_pipeline"
     )
     FULL_SYNC_QUEUE = _strip_env(os.getenv("CELERY_FULL_SYNC_QUEUE")) or "full_sync"
+    # Cola dedicada para compare_and_update_subscribers_task (reconciliación
+    # completa cada pocos minutos) -- separada de sync_pipeline/full_sync
+    # para poder darle su propio worker sin que compita con la sync
+    # incremental ni con el full_sync nocturno.
+    COMPARE_SUBSCRIBERS_QUEUE = (
+        _strip_env(os.getenv("CELERY_COMPARE_SUBSCRIBERS_QUEUE")) or "compare_reconcile"
+    )
+    COMPARE_SUBSCRIBERS_ENABLED = _env_bool("CELERY_COMPARE_SUBSCRIBERS_ENABLED", True)
+    COMPARE_SUBSCRIBERS_MINUTES = max(1, _env_int("CELERY_COMPARE_SUBSCRIBERS_MINUTES", 5))
+    COMPARE_SUBSCRIBERS_LOCK_TIMEOUT = max(
+        300, _env_int("CELERY_COMPARE_SUBSCRIBERS_LOCK_TIMEOUT", 1800)
+    )
     # Alias legacy (HTTP / docs antiguos)
     SYNC_QUEUE = _strip_env(os.getenv("CELERY_SYNC_QUEUE")) or SYNC_PIPELINE_QUEUE
     PIPELINE_LOCK_TIMEOUT = max(
@@ -442,6 +456,16 @@ class CeleryConfig:
     FULL_SYNC_MINUTE = max(0, min(59, _env_int("CELERY_FULL_SYNC_MINUTE", 0)))
     FULL_SYNC_TIME_LIMIT = max(600, _env_int("CELERY_FULL_SYNC_TIME_LIMIT", 3600))
     FULL_SYNC_SOFT_TIME_LIMIT = max(540, _env_int("CELERY_FULL_SYNC_SOFT_TIME_LIMIT", 3300))
+    # compare_and_update_all_subscribers/smartcards escalan con el tamaño
+    # TOTAL del catálogo (pagina todo PanAccess + carga toda la tabla local),
+    # no con lo que cambió -- por eso corre nocturno, no cada pocos minutos.
+    # Si el worker/broker estuvo caído y el mensaje de Beat quedó encolado
+    # más de FULL_SYNC_EXPIRES_SECONDS sin arrancar, Celery lo descarta en
+    # vez de ejecutarlo tarde -- evita que se acumulen corridas completas
+    # una detrás de otra (cada una bloquea la sync incremental mientras dura).
+    FULL_SYNC_EXPIRES_SECONDS = max(
+        FULL_SYNC_TIME_LIMIT, _env_int("CELERY_FULL_SYNC_EXPIRES_SECONDS", 6 * 3600)
+    )
 
     # Reintento automático de cierres de cuenta que quedaron en
     # PENDING_CLOSURE (PanAccess falló a medias -- ver
@@ -503,14 +527,19 @@ class PanaccessConfig:
     CB_FAILURE_THRESHOLD = max(1, _env_int("PANACCESS_CB_FAILURE_THRESHOLD", 5))
     CB_RECOVERY_SECONDS = max(10, _env_int("PANACCESS_CB_RECOVERY_SECONDS", 60))
 
+    # Tamaño de lote para escrituras masivas a la BD local (bulk_create/
+    # bulk_update) al guardar lo descargado de PanAccess -- subscribers,
+    # smartcards y products comparten este default.
+    DB_WRITE_CHUNK_SIZE = max(1, _env_int("PANACCESS_DB_WRITE_CHUNK_SIZE", 1000))
+
     LOGIN_INFO_TRY_LIST_API = _env_bool("PANACCESS_LOGIN_INFO_TRY_LIST_API", True)
     LOGIN_INFO_CONCURRENCY = max(1, min(_env_int("PANACCESS_LOGIN_INFO_CONCURRENCY", 10), 32))
-    LOGIN_INFO_PAGE_LIMIT = _env_int("PANACCESS_LOGIN_INFO_PAGE_LIMIT", 200)
-    LOGIN_INFO_DB_CHUNK = _env_int("PANACCESS_LOGIN_INFO_DB_CHUNK", 200)
+    LOGIN_INFO_PAGE_LIMIT = _env_int("PANACCESS_LOGIN_INFO_PAGE_LIMIT", 1000)
+    LOGIN_INFO_DB_CHUNK = _env_int("PANACCESS_LOGIN_INFO_DB_CHUNK", 1000)
     LOGIN_DISCOVERY_MAX_CALLS = _env_int("PANACCESS_LOGIN_DISCOVERY_MAX_CALLS", 40)
 
     SMARTCARD_SUBSCRIBER_MAX_PAGES = _env_int("PANACCESS_SMARTCARD_SUBSCRIBER_MAX_PAGES", 5)
-    SMARTCARD_PAGE_LIMIT = _env_int("PANACCESS_SMARTCARD_PAGE_LIMIT", 100)
+    SMARTCARD_PAGE_LIMIT = _env_int("PANACCESS_SMARTCARD_PAGE_LIMIT", 1000)
     SMARTCARD_SN_CONCURRENCY = max(1, min(_env_int("PANACCESS_SMARTCARD_SN_CONCURRENCY", 5), 16))
     SMARTCARD_GLOBAL_FALLBACK = _env_bool("PANACCESS_SMARTCARD_GLOBAL_FALLBACK", False)
     SMARTCARD_SYNC_MAX_PAGES = _env_int("PANACCESS_SMARTCARD_SYNC_MAX_PAGES", 15)

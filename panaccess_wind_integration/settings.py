@@ -360,15 +360,18 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = not CELERY_TASK_ALWAYS_EAGER
 CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = TIME_ZONE
 
-# Colas: pipeline incremental (serie) vs full_sync (nocturno, exclusivo)
+# Colas: pipeline incremental (serie), full_sync (nocturno, exclusivo), y
+# compare_reconcile (reconciliación completa de subscribers cada pocos
+# minutos -- cola propia para poder darle un worker dedicado, ver abajo).
 _PIPELINE_QUEUE = CeleryConfig.SYNC_PIPELINE_QUEUE
 _FULL_SYNC_QUEUE = CeleryConfig.FULL_SYNC_QUEUE
 _SYNC_QUEUE = CeleryConfig.SYNC_QUEUE  # alias legacy
+_COMPARE_SUBSCRIBERS_QUEUE = CeleryConfig.COMPARE_SUBSCRIBERS_QUEUE
 
 CELERY_TASK_ROUTES = {
     'wind.tasks.periodic_sync_pipeline_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.sync_subscribers_task': {'queue': _PIPELINE_QUEUE},
-    'wind.tasks.compare_and_update_subscribers_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.compare_and_update_subscribers_task': {'queue': _COMPARE_SUBSCRIBERS_QUEUE},
     'wind.tasks.sync_smartcards_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.compare_and_update_smartcards_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.sync_products_task': {'queue': _PIPELINE_QUEUE},
@@ -401,6 +404,10 @@ CELERY_BEAT_SCHEDULE = {
             "queue": _PIPELINE_QUEUE,
             "soft_time_limit": _PIPELINE_LOCK_TIMEOUT,
             "time_limit": _PIPELINE_LOCK_TIMEOUT + 60,
+            # Si un mensaje quedó encolado más de un intervalo sin arrancar,
+            # se descarta en vez de correr atrasado y encimarse con el
+            # siguiente disparo de Beat.
+            "expires": _SYNC_MINUTES * 60,
         },
         "args": (_SYNC_LIMIT,),
     },
@@ -414,6 +421,32 @@ if _FULL_SYNC_ENABLED:
             "queue": _FULL_SYNC_QUEUE,
             "soft_time_limit": _FULL_SYNC_SOFT_LIMIT,
             "time_limit": _FULL_SYNC_TIME_LIMIT,
+            # Si el mensaje quedó encolado más de esto sin arrancar (broker/
+            # worker caído esa noche), se descarta en vez de correr tarde y
+            # posiblemente solaparse con la corrida del día siguiente.
+            "expires": CeleryConfig.FULL_SYNC_EXPIRES_SECONDS,
+        },
+        "kwargs": {"limit": _SYNC_LIMIT},
+    }
+
+if CeleryConfig.COMPARE_SUBSCRIBERS_ENABLED:
+    # Reconciliación completa de subscribers (compara TODO el catálogo local
+    # contra TODO el remoto -- puede crear, actualizar o borrar filas) cada
+    # CELERY_COMPARE_SUBSCRIBERS_MINUTES (default 5). A diferencia del resto
+    # de tareas periódicas, esta escala con el tamaño TOTAL del catálogo, no
+    # con lo que cambió -- por eso tiene cola y worker propios
+    # (compare_reconcile) para no competir con la sync incremental, y
+    # "expires" para descartar corridas atrasadas en vez de encolarlas en
+    # cadena si el catálogo crece y una corrida empieza a tardar más que el
+    # intervalo.
+    CELERY_BEAT_SCHEDULE["compare-subscribers-frequent"] = {
+        "task": "wind.tasks.compare_and_update_subscribers_task",
+        "schedule": timedelta(minutes=CeleryConfig.COMPARE_SUBSCRIBERS_MINUTES),
+        "options": {
+            "queue": _COMPARE_SUBSCRIBERS_QUEUE,
+            "soft_time_limit": CeleryConfig.COMPARE_SUBSCRIBERS_LOCK_TIMEOUT,
+            "time_limit": CeleryConfig.COMPARE_SUBSCRIBERS_LOCK_TIMEOUT + 60,
+            "expires": CeleryConfig.COMPARE_SUBSCRIBERS_MINUTES * 60,
         },
         "kwargs": {"limit": _SYNC_LIMIT},
     }
@@ -422,7 +455,10 @@ if CeleryConfig.CLOSURE_RETRY_ENABLED:
     CELERY_BEAT_SCHEDULE["retry-partial-closures"] = {
         "task": "wind.tasks.retry_partial_closures_task",
         "schedule": timedelta(minutes=CeleryConfig.CLOSURE_RETRY_MINUTES),
-        "options": {"queue": _PIPELINE_QUEUE},
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": CeleryConfig.CLOSURE_RETRY_MINUTES * 60,
+        },
     }
 
 
