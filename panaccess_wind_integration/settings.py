@@ -376,6 +376,10 @@ CELERY_TASK_ROUTES = {
     'wind.tasks.compare_and_update_smartcards_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.sync_products_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.full_sync_task': {'queue': _FULL_SYNC_QUEUE},
+    # Refresh puntual de un suscriptor (disparado desde GET de perfil,
+    # subscriber_catalog.py) -- va a la misma cola liviana del pipeline
+    # incremental, no necesita cola dedicada.
+    'wind.tasks.refresh_subscriber_profile_task': {'queue': _PIPELINE_QUEUE},
 }
 
 _SYNC_MINUTES = CeleryConfig.SYNC_MINUTES
@@ -414,18 +418,26 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 if _FULL_SYNC_ENABLED:
+    _full_sync_options = {
+        "queue": _FULL_SYNC_QUEUE,
+        # Si el mensaje quedó encolado más de esto sin arrancar (broker/
+        # worker caído esa noche), se descarta en vez de correr tarde y
+        # posiblemente solaparse con la corrida del día siguiente. Esto es
+        # sobre el tiempo en cola SIN ARRANCAR -- no limita cuánto puede
+        # durar la tarea una vez que ya arrancó.
+        "expires": CeleryConfig.FULL_SYNC_EXPIRES_SECONDS,
+    }
+    if not CeleryConfig.FULL_SYNC_NO_TIME_LIMIT:
+        # Comportamiento anterior: límites duros de Celery. Con el default
+        # (FULL_SYNC_NO_TIME_LIMIT=true) se omiten a propósito -- ver
+        # wind/tasks.py:full_sync_task.
+        _full_sync_options["soft_time_limit"] = _FULL_SYNC_SOFT_LIMIT
+        _full_sync_options["time_limit"] = _FULL_SYNC_TIME_LIMIT
+
     CELERY_BEAT_SCHEDULE["full-sync-nightly"] = {
         "task": "wind.tasks.full_sync_task",
         "schedule": crontab(hour=_FULL_SYNC_HOUR, minute=_FULL_SYNC_MINUTE),
-        "options": {
-            "queue": _FULL_SYNC_QUEUE,
-            "soft_time_limit": _FULL_SYNC_SOFT_LIMIT,
-            "time_limit": _FULL_SYNC_TIME_LIMIT,
-            # Si el mensaje quedó encolado más de esto sin arrancar (broker/
-            # worker caído esa noche), se descarta en vez de correr tarde y
-            # posiblemente solaparse con la corrida del día siguiente.
-            "expires": CeleryConfig.FULL_SYNC_EXPIRES_SECONDS,
-        },
+        "options": _full_sync_options,
         "kwargs": {"limit": _SYNC_LIMIT},
     }
 

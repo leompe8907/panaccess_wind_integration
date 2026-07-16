@@ -559,6 +559,9 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
     offset = 0
     remote_total_count = None
     total_updated = 0
+    pagination_complete = False
+    empty_page_retries = 0
+    max_empty_page_retries = 2
 
     while True:
         response = CallListExtendedSubscribers(session_id, offset, limit)
@@ -571,8 +574,33 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
             or response.get("rows", [])
         )
         if not remote_list:
+            # Pagina vacia. Si ya vimos tantos codigos como PanAccess dijo
+            # que habia (o nunca dijo un total), es el fin normal. Si NO
+            # hemos llegado al total esperado, puede ser un glitch
+            # transitorio de la API -- se reintenta el mismo offset un par
+            # de veces antes de darse por vencido, en vez de asumir "fin de
+            # catalogo" (eso es lo que antes causaba que se borraran
+            # suscriptores que en realidad si existen, ver auditoria).
+            if (
+                remote_total_count
+                and len(remote_codes) < remote_total_count
+                and empty_page_retries < max_empty_page_retries
+            ):
+                empty_page_retries += 1
+                logger.warning(
+                    "Pagina vacia en offset=%s con solo %s/%s codigos vistos -- "
+                    "reintento %s/%s antes de asumir fin de catalogo",
+                    offset,
+                    len(remote_codes),
+                    remote_total_count,
+                    empty_page_retries,
+                    max_empty_page_retries,
+                )
+                continue
+            pagination_complete = not remote_total_count or len(remote_codes) >= remote_total_count
             break
 
+        empty_page_retries = 0
         for row in remote_list:
             code = row.get("subscriberCode")
             if not code or not str(code).strip():
@@ -594,6 +622,7 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
 
         offset += limit
         if remote_total_count and len(remote_codes) >= remote_total_count:
+            pagination_complete = True
             break
 
     total_created = 0
@@ -601,15 +630,33 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
     if new_subscriber_rows:
         total_created, create_errors = store_all_subscribers_in_chunks(new_subscriber_rows)
 
-    delete_result = _delete_local_subscribers_not_in_remote(set(local_data.keys()), remote_codes)
+    if pagination_complete:
+        delete_result = _delete_local_subscribers_not_in_remote(set(local_data.keys()), remote_codes)
+    else:
+        logger.error(
+            "Paginacion de suscriptores incompleta (vistos %s de %s esperados tras "
+            "%s reintentos) -- se OMITE el borrado de suscriptores/credenciales "
+            "locales en esta corrida para no eliminar abonados que en realidad si "
+            "existen en PanAccess.",
+            len(remote_codes),
+            remote_total_count,
+            max_empty_page_retries,
+        )
+        delete_result = {
+            "deleted": 0,
+            "codes_to_delete_count": 0,
+            "preserved_closed": 0,
+            "credentials_deleted": {},
+        }
     invalid_deleted = _cleanup_invalid_local_subscribers()
 
     login_deleted_not_in_remote = 0
-    try:
-        from wind.functions.getSubscriberLoginInfo import cleanup_login_info_not_in_remote
-        login_deleted_not_in_remote = cleanup_login_info_not_in_remote(remote_codes)
-    except Exception as e:
-        logger.error("Error limpiando login info fuera de PanAccess: %s", e)
+    if pagination_complete:
+        try:
+            from wind.functions.getSubscriberLoginInfo import cleanup_login_info_not_in_remote
+            login_deleted_not_in_remote = cleanup_login_info_not_in_remote(remote_codes)
+        except Exception as e:
+            logger.error("Error limpiando login info fuera de PanAccess: %s", e)
 
     return {
         "updated": total_updated,
@@ -624,6 +671,7 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
         "remote_api_count": remote_total_count,
         "local_count_before": local_total_count,
         "login_deleted_not_in_remote": login_deleted_not_in_remote,
+        "pagination_complete": pagination_complete,
     }
 
 

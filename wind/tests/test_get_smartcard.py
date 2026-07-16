@@ -78,18 +78,74 @@ class CompareSmartcardsBySubscriberTestCase(SimpleTestCase):
             return qs
 
         mock_smartcard_model.objects.filter.side_effect = smartcard_filter
-        mock_fetch.return_value = [
-            {
-                "sn": "111111111111111",
-                "subscriberCode": "SUB001",
-                "firstName": "Ana",
-                "lastName": "Perez",
-            }
-        ]
+        mock_fetch.return_value = (
+            [
+                {
+                    "sn": "111111111111111",
+                    "subscriberCode": "SUB001",
+                    "firstName": "Ana",
+                    "lastName": "Perez",
+                }
+            ],
+            False,
+        )
 
         result = compare_and_update_smartcards_by_subscribers(limit=100)
 
         self.assertEqual(result["deleted"], 1)
+
+    @patch("wind.functions.getSmartcard.PanaccessConfig")
+    @patch("wind.functions.getSmartcard.ListOfSmartcards")
+    @patch("wind.functions.getSmartcard.ListOfSubscriber")
+    @patch("wind.functions.getSmartcard._fetch_smartcards_for_subscriber")
+    def test_skips_deletion_when_pagination_truncated(
+        self,
+        mock_fetch,
+        mock_subscriber_model,
+        mock_smartcard_model,
+        mock_config,
+    ):
+        """
+        Si _fetch_smartcards_for_subscriber avisa que se cortó por el tope
+        de páginas (truncated=True), no debe borrar ninguna smartcard local
+        que no haya visto -- podría ser válida y solo no entró al muestreo.
+        """
+        mock_config.SMARTCARD_SUBSCRIBER_CONCURRENCY = 1
+        mock_subscriber_model.objects.exclude.return_value.exclude.return_value.values_list.return_value = [
+            "SUB001"
+        ]
+        mock_smartcard_model.objects.count.return_value = 2
+
+        existing = MagicMock(sn="111111111111111")
+        orphan = MagicMock(sn="999999999999999")
+
+        def smartcard_filter(**kwargs):
+            qs = MagicMock()
+            if kwargs.get("subscriberCode") == "SUB001":
+                if kwargs.get("sn__in"):
+                    self.fail("No debería borrar nada cuando la paginación quedó truncada")
+                qs.exclude.return_value.exclude.return_value = [existing, orphan]
+                qs.count.return_value = 1
+            else:
+                qs.first.return_value = None
+            return qs
+
+        mock_smartcard_model.objects.filter.side_effect = smartcard_filter
+        mock_fetch.return_value = (
+            [
+                {
+                    "sn": "111111111111111",
+                    "subscriberCode": "SUB001",
+                    "firstName": "Ana",
+                    "lastName": "Perez",
+                }
+            ],
+            True,  # truncated
+        )
+
+        result = compare_and_update_smartcards_by_subscribers(limit=100)
+
+        self.assertEqual(result["deleted"], 0)
 
     @patch("wind.functions.getSmartcard.PanaccessConfig")
     @patch("wind.functions.getSmartcard._compare_and_update_all_smartcards_full")

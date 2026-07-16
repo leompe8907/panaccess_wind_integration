@@ -130,7 +130,7 @@ def profile_subscriber_view(request):
         return Response(
             {
                 "success": False,
-                "message": "No se encontró información del suscriptor. Ejecuta sincronización.",
+                "message": "No se encontró información del suscriptor todavía. Se disparó una sincronización en segundo plano, intenta de nuevo en unos segundos.",
             },
             status=status.HTTP_404_NOT_FOUND,
         )

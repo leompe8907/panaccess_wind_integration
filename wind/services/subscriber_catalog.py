@@ -314,6 +314,27 @@ def _upsert_smartcard_entry(entry: dict) -> None:
     ListOfSmartcards.objects.update_or_create(sn=filtered["sn"], defaults=filtered)
 
 
+def _trigger_background_refresh(
+    subscriber_code: str, target_sns: list[str] | None = None
+) -> None:
+    """
+    Encola refresh_subscriber_profile_task (wind.tasks) para traer la fila
+    del suscriptor y sus smartcards desde PanAccess fuera del request. No
+    lanza excepciones hacia el caller: si Celery/Redis no están
+    disponibles, el GET debe poder seguir sirviendo lo que haya en caché.
+    """
+    try:
+        from wind.tasks import refresh_subscriber_profile_task
+
+        refresh_subscriber_profile_task.delay(subscriber_code, target_sns)
+    except Exception:
+        logger.warning(
+            "No se pudo encolar refresh_subscriber_profile_task para %s",
+            subscriber_code,
+            exc_info=True,
+        )
+
+
 def _sync_subscriber_row_from_panaccess(subscriber_code: str) -> ListOfSubscriber | None:
     code = str(subscriber_code).strip() if subscriber_code else ""
     if not code:
@@ -333,7 +354,7 @@ def _sync_subscriber_row_from_panaccess(subscriber_code: str) -> ListOfSubscribe
     return ListOfSubscriber.objects.filter(code=code).first()
 
 
-def _serialize_subscriber_detail(sub: ListOfSubscriber) -> dict:
+def _serialize_subscriber_detail(sub: ListOfSubscriber, *, pending_sync: bool = False) -> dict:
     login_info = SubscriberLoginInfo.objects.filter(subscriberCode=sub.code).first()
     phones = _format_contact_list(sub.phones)
     mobiles = _format_contact_list(sub.mobiles)
@@ -361,16 +382,28 @@ def _serialize_subscriber_detail(sub: ListOfSubscriber) -> dict:
         "comment": sub.comment,
         "address": _format_address(sub.address1),
         "caf": sub.caf,
+        "pending_sync": pending_sync,
     }
 
 
 def get_subscriber_record(
     subscriber_code: str, *, refresh_if_missing: bool = True
 ) -> ListOfSubscriber | None:
+    """
+    Lee el suscriptor SIEMPRE desde la caché local (ListOfSubscriber).
+
+    Antes, un GET de perfil con caché incompleta disparaba una llamada
+    síncrona a PanAccess (CallGetSubscriber) dentro del propio request --
+    auditoría, sección 18: eso hacía un endpoint que debería ser rápido
+    dependiente de la latencia/disponibilidad de PanAccess en vivo. Ahora,
+    si la fila no existe o luce incompleta, se encola un refresh en
+    background (Celery) y se devuelve lo que haya en caché (puede ser
+    None); la siguiente consulta ya lo encuentra actualizado.
+    """
     sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
     needs_refresh = not sub or (not sub.firstName and not sub.lastName and not sub.emails)
     if refresh_if_missing and needs_refresh:
-        sub = _sync_subscriber_row_from_panaccess(subscriber_code) or sub
+        _trigger_background_refresh(subscriber_code)
     return sub
 
 
@@ -380,7 +413,8 @@ def build_subscriber_detail_payload(
     sub = get_subscriber_record(subscriber_code, refresh_if_missing=refresh_if_missing)
     if not sub:
         return None
-    return _serialize_subscriber_detail(sub)
+    needs_refresh = not sub.firstName and not sub.lastName and not sub.emails
+    return _serialize_subscriber_detail(sub, pending_sync=needs_refresh)
 
 
 def refresh_smartcards_from_panaccess(
@@ -414,15 +448,16 @@ def build_subscriber_products_payload(subscriber_code: str, *, refresh_if_empty:
     subscriber = get_subscriber_record(subscriber_code, refresh_if_missing=refresh_if_empty)
     smartcards_qs = get_smartcards_for_subscriber(subscriber_code)
 
+    # Antes, si no había smartcards en caché, este GET llamaba a PanAccess
+    # en vivo (getSubscriber + smartcards) antes de responder. Ahora se
+    # encola el refresh en background y se responde de una vez con lo que
+    # haya (puede ser vacío) más `pending_sync=True`, para que el cliente
+    # pueda reconsultar en unos segundos -- auditoría, sección 18.
+    pending_sync = False
     if refresh_if_empty and not smartcards_qs.exists():
-        subscriber = _sync_subscriber_row_from_panaccess(subscriber_code) or subscriber
+        pending_sync = True
         sns = _subscriber_smartcard_sns(subscriber)
-        refresh_smartcards_from_panaccess(
-            subscriber_code,
-            target_sns=sns,
-            profile_mode=True,
-        )
-        smartcards_qs = get_smartcards_for_subscriber(subscriber_code)
+        _trigger_background_refresh(subscriber_code, target_sns=sns or None)
 
     cards = list(smartcards_qs)
     all_product_ids: set[int] = set()
@@ -491,4 +526,5 @@ def build_subscriber_products_payload(subscriber_code: str, *, refresh_if_empty:
         "subscriber": subscriber_detail,
         "smartcards": smartcards_payload,
         "smartcards_count": len(smartcards_payload),
+        "pending_sync": pending_sync,
     }

@@ -487,26 +487,45 @@ def _fetch_smartcards_for_subscriber(
     session_id=None,
     subscriber_code: str = "",
     limit: int = 100,
-) -> list[dict]:
-    """Descarga smartcards de un abonado usando filters.subscriberCode en PanAccess."""
+) -> tuple[list[dict], bool]:
+    """
+    Descarga smartcards de un abonado usando filters.subscriberCode en
+    PanAccess.
+
+    Devuelve (entries, truncated). truncated=True significa que NO se llegó
+    a ver el catálogo completo de ese abonado (se cortó por el tope de
+    páginas) -- el llamador no debe usar "sn no visto" como sinónimo de
+    "sn ya no existe" cuando esto pasa, porque borraría smartcards válidas
+    que simplemente no entraron en el muestreo.
+    """
     code = str(subscriber_code).strip()
     if not code:
-        return []
+        return [], False
 
     offset = 0
     entries: list[dict] = []
     remote_total_count = None
     max_pages = PanaccessConfig.SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES
     page_num = 0
+    truncated = False
 
     while True:
         if max_pages > 0 and page_num >= max_pages:
-            logger.warning(
-                "Smartcards abonado %s: tope de %s páginas alcanzado. "
-                "Use PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES=0 para sin límite.",
-                code,
-                max_pages,
-            )
+            # Si ya vimos todo lo que el propio PanAccess dijo que había
+            # (remote_total_count), el tope se alcanzó justo al terminar --
+            # no es un corte real. Si no, sí quedó contenido sin ver.
+            truncated = bool(remote_total_count) and len(entries) < remote_total_count
+            if truncated:
+                logger.warning(
+                    "Smartcards abonado %s: tope de %s páginas alcanzado con solo "
+                    "%s/%s vistas -- NO se borrarán huérfanas en esta corrida para "
+                    "no eliminar smartcards válidas que quedaron fuera del muestreo. "
+                    "Use PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES=0 para sin límite.",
+                    code,
+                    max_pages,
+                    len(entries),
+                    remote_total_count,
+                )
             break
 
         response = CallListSmartcards(
@@ -538,14 +557,23 @@ def _fetch_smartcards_for_subscriber(
         if remote_total_count and offset >= remote_total_count:
             break
 
-    return entries
+    return entries, truncated
 
 
 def _reconcile_subscriber_smartcards(
     subscriber_code: str,
     remote_list: list[dict],
+    *,
+    truncated: bool = False,
 ) -> dict:
-    """Compara smartcards remotas de un abonado con las locales y aplica cambios."""
+    """
+    Compara smartcards remotas de un abonado con las locales y aplica
+    cambios. Si `truncated=True` (no se vio el catálogo remoto completo de
+    este abonado), se aplican altas/actualizaciones igual -- son seguras,
+    vienen de datos reales que sí se vieron -- pero se omite el borrado de
+    huérfanas, porque "no visto" no es lo mismo que "ya no existe" cuando
+    la paginación se cortó antes de tiempo.
+    """
     code = str(subscriber_code).strip()
     local_by_sn = {
         obj.sn: obj
@@ -613,19 +641,25 @@ def _reconcile_subscriber_smartcards(
             ListOfSmartcards.objects.filter(subscriberCode=code).count() - before,
         )
 
-    extra_sns = set(local_by_sn.keys()) - remote_sns
     deleted = 0
-    if extra_sns:
-        deleted = ListOfSmartcards.objects.filter(
-            subscriberCode=code,
-            sn__in=extra_sns,
-        ).delete()[0]
+    skipped_deletion = False
+    if truncated:
+        skipped_deletion = True
+    else:
+        extra_sns = set(local_by_sn.keys()) - remote_sns
+        if extra_sns:
+            deleted = ListOfSmartcards.objects.filter(
+                subscriberCode=code,
+                sn__in=extra_sns,
+            ).delete()[0]
 
     return {
         "updated": total_updated,
         "created": total_created,
         "deleted": deleted,
         "remote_count": len(remote_sns),
+        "truncated": truncated,
+        "skipped_deletion": skipped_deletion,
     }
 
 
@@ -634,8 +668,8 @@ def _process_subscriber_smartcard_sync(
     session_id=None,
     limit: int = 100,
 ) -> dict:
-    remote_list = _fetch_smartcards_for_subscriber(session_id, subscriber_code, limit)
-    stats = _reconcile_subscriber_smartcards(subscriber_code, remote_list)
+    remote_list, truncated = _fetch_smartcards_for_subscriber(session_id, subscriber_code, limit)
+    stats = _reconcile_subscriber_smartcards(subscriber_code, remote_list, truncated=truncated)
     stats["subscriber_code"] = subscriber_code
     return stats
 
@@ -663,6 +697,12 @@ def compare_and_update_smartcards_by_subscribers(session_id=None, limit=100):
         "remote_count": 0,
         "subscribers_processed": 0,
         "subscribers_failed": 0,
+        # Abonados donde la paginación se cortó por el tope de páginas antes
+        # de ver su catálogo completo de smartcards -- en esos casos no se
+        # borró nada localmente para ese abonado (ver _reconcile_subscriber_
+        # smartcards). Si este número sube mucho, subir
+        # PANACCESS_SMARTCARD_SUBSCRIBER_SYNC_MAX_PAGES.
+        "subscribers_truncated": 0,
     }
     concurrency = PanaccessConfig.SMARTCARD_SUBSCRIBER_CONCURRENCY
 
@@ -672,6 +712,8 @@ def compare_and_update_smartcards_by_subscribers(session_id=None, limit=100):
         totals["deleted"] += stats.get("deleted", 0)
         totals["remote_count"] += stats.get("remote_count", 0)
         totals["subscribers_processed"] += 1
+        if stats.get("truncated"):
+            totals["subscribers_truncated"] += 1
 
     if concurrency <= 1 or len(subscriber_codes) <= 1:
         for code in subscriber_codes:

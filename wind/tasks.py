@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 
 from celery import shared_task
@@ -368,7 +369,12 @@ def sync_smartcards_task(self, limit=None):
             raise
 
 
-@shared_task(
+# A pedido del cliente: full_sync_task debe poder terminar sin importar
+# cuánto dure -- el catálogo puede crecer y dejar de caber en 3600s. Con
+# CELERY_FULL_SYNC_NO_TIME_LIMIT=true (default) no se le pone time_limit ni
+# soft_time_limit a la tarea, así que Celery nunca la mata por tiempo. Si se
+# pone en false, vuelve al comportamiento anterior (límites duros).
+_full_sync_task_kwargs = dict(
     bind=True,
     autoretry_for=(
         PanAccessConnectionError,
@@ -382,19 +388,50 @@ def sync_smartcards_task(self, limit=None):
     retry_jitter=True,
     max_retries=3,
 )
+if not CeleryConfig.FULL_SYNC_NO_TIME_LIMIT:
+    _full_sync_task_kwargs["time_limit"] = CeleryConfig.FULL_SYNC_TIME_LIMIT
+    _full_sync_task_kwargs["soft_time_limit"] = CeleryConfig.FULL_SYNC_SOFT_TIME_LIMIT
+
+
+@shared_task(**_full_sync_task_kwargs)
 def full_sync_task(self, limit=None):
     lock_key = "celery:lock:full_sync_task"
+    # Timeout base del lock/flag -- con auto_extend=True (más abajo) esto no
+    # es un tope real de duración, es solo el TTL inicial que se va
+    # renovando solo cada mitad de este valor mientras la tarea siga viva.
+    # Si el proceso muere sin avisar (crash/kill externo), el lock y el
+    # flag se autolimpian solos pasado este tiempo sin renovación -- sigue
+    # habiendo recuperación automática ante fallas, solo que ya no hay techo
+    # para una corrida que sigue viva y progresando.
     lock_timeout = CeleryConfig.FULL_SYNC_TIME_LIMIT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    with RedisConfig.task_lock(
+        lock_key, timeout=lock_timeout, auto_extend=CeleryConfig.FULL_SYNC_NO_TIME_LIMIT
+    ) as acquired:
         if not acquired:
             logger.warning("[Celery] full_sync_task ya está ejecutándose, se omite")
             return {"success": False, "skipped": True, "message": "Task already running"}
 
         RedisConfig.set_full_sync_in_progress(timeout=lock_timeout)
+
+        stop_flag_heartbeat = None
+        flag_heartbeat_thread = None
+        if CeleryConfig.FULL_SYNC_NO_TIME_LIMIT:
+            stop_flag_heartbeat = threading.Event()
+            flag_interval = max(30, lock_timeout // 2)
+
+            def _renew_progress_flag():
+                while not stop_flag_heartbeat.wait(flag_interval):
+                    RedisConfig.set_full_sync_in_progress(timeout=lock_timeout)
+
+            flag_heartbeat_thread = threading.Thread(
+                target=_renew_progress_flag, name="full-sync-flag-heartbeat", daemon=True
+            )
+            flag_heartbeat_thread.start()
+
         try:
             env_limit = CeleryConfig.SYNC_LIMIT
-            limit = limit or env_limit or 200
+            limit = limit or env_limit or 1000
             started = time.monotonic()
             logger.info("[Celery] Iniciando full_sync_task con limit=%s", limit)
             result = run_full_sync(limit=limit)
@@ -414,6 +451,9 @@ def full_sync_task(self, limit=None):
             logger.exception("[Celery] Error inesperado en full_sync_task")
             raise
         finally:
+            if stop_flag_heartbeat is not None:
+                stop_flag_heartbeat.set()
+                flag_heartbeat_thread.join(timeout=5)
             RedisConfig.clear_full_sync_in_progress()
 
 
@@ -457,7 +497,7 @@ def finish_subscriber_provisioning_task(
         extract_first_email,
         extract_first_phone,
     )
-    from wind.models import ListOfSubscriber, SubscriberDocumentRegistry, SubscriberEmailRegistry
+    from wind.models import ListOfSubscriber
     from wind.services import get_panaccess
     from wind.services.subscriber_trial import mark_trial_granted, registration_trial_days
     from wind.services.welcome_email import enqueue_welcome_credentials_email
@@ -465,28 +505,15 @@ def finish_subscriber_provisioning_task(
     panaccess = get_panaccess()
     result = {"subscriber_code": subscriber_code}
 
-    # 1) Registros locales de unicidad (idénticos a los que ya hacía la
-    #    ruta síncrona antes de este cambio).
-    SubscriberEmailRegistry.objects.update_or_create(
-        email=email_normalized,
-        defaults={
-            "subscriber_code": subscriber_code,
-            "account_closed_at": None,
-            "closed_subscriber_code": None,
-        },
-    )
-    if user_provided_code:
-        SubscriberDocumentRegistry.objects.update_or_create(
-            document=user_provided_code,
-            defaults={
-                "subscriber_code": subscriber_code,
-                "email": email_normalized,
-                "account_closed_at": None,
-                "closed_subscriber_code": None,
-            },
-        )
+    # Nota: los registros de unicidad (SubscriberEmailRegistry /
+    # SubscriberDocumentRegistry) ya los escribió create_subscriber_view de
+    # forma síncrona, ANTES de encolar esta tarea y de soltar el lock de
+    # registro (auditoría, sección 16) -- incluyendo la reserva de trial
+    # (eligible_for_trial=False) si grant_registration_trial venía en True.
+    # Si el producto de prueba no termina otorgándose de verdad más abajo,
+    # esa reserva se revierte al final de esta tarea.
 
-    # 2) Buscar el suscriptor recién creado en el catálogo para traer sus
+    # 1) Buscar el suscriptor recién creado en el catálogo para traer sus
     #    smartcards y guardar la fila local (ListOfSubscriber).
     def _find_in_catalog():
         offset = 0
@@ -615,6 +642,16 @@ def finish_subscriber_provisioning_task(
                     logger.exception("[Async] Error PanAccess asignando producto de prueba a %s", subscriber_code)
             else:
                 logger.info("[Async] Trial omitido para %s (no elegible)", subscriber_code)
+
+    if grant_registration_trial and not result.get("trial_granted"):
+        # Se había reservado el trial (eligible_for_trial=False) al
+        # escribir los registries en create_subscriber_view, pero acá no
+        # se llegó a otorgar de verdad (sin licencia, sin smartcards, o
+        # falló addProductToSmartcards) -- se revierte para no bloquear un
+        # reintento legítimo.
+        from wind.functions.create_subscriber import revert_trial_reservation
+
+        revert_trial_reservation(email_normalized, user_provided_code or None)
 
     # 5) Correo de bienvenida (ya es async por su cuenta).
     try:
@@ -783,6 +820,62 @@ def send_password_reset_email_task(email: str, reset_link: str):
     except Exception as e:
         logger.exception("Error al enviar email de recuperación a %s", email)
         return {"success": False, "error": str(e), "email": email}
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=15)
+def refresh_subscriber_profile_task(self, subscriber_code, target_sns=None):
+    """
+    Refresca en background la fila de un suscriptor (ListOfSubscriber) y
+    sus smartcards desde PanAccess.
+
+    Reemplaza las llamadas síncronas a PanAccess que antes hacía
+    subscriber_catalog.py dentro de un GET de perfil (auditoría, sección
+    18): ahora ese módulo solo lee de caché y encola esta tarea cuando la
+    caché luce incompleta o vacía; la próxima consulta del usuario ya
+    encuentra el dato actualizado.
+
+    Lock por subscriber_code (corto, TTL 60s) para no pisarse si el mismo
+    perfil dispara varios refresh casi al mismo tiempo (ej. el usuario
+    recarga el dashboard).
+    """
+    lock_key = f"celery:lock:refresh_subscriber_profile:{subscriber_code}"
+    with RedisConfig.task_lock(lock_key, timeout=60) as acquired:
+        if not acquired:
+            return _skipped_already_running(
+                f"refresh_subscriber_profile_task[{subscriber_code}]"
+            )
+
+        from wind.services.subscriber_catalog import (
+            _subscriber_smartcard_sns,
+            _sync_subscriber_row_from_panaccess,
+            refresh_smartcards_from_panaccess,
+        )
+
+        try:
+            subscriber = _sync_subscriber_row_from_panaccess(subscriber_code)
+            sns = target_sns if target_sns is not None else _subscriber_smartcard_sns(subscriber)
+            saved = refresh_smartcards_from_panaccess(
+                subscriber_code,
+                target_sns=sns,
+                profile_mode=True,
+            )
+            return {
+                "success": True,
+                "subscriber_code": subscriber_code,
+                "found": subscriber is not None,
+                "smartcards_saved": saved,
+            }
+        except Exception as exc:
+            logger.warning(
+                "No se pudo refrescar perfil de suscriptor %s en background: %s",
+                subscriber_code,
+                exc,
+                exc_info=True,
+            )
+            try:
+                raise self.retry(exc=exc)
+            except self.MaxRetriesExceededError:
+                return {"success": False, "subscriber_code": subscriber_code, "error": str(exc)}
 
 
 @shared_task

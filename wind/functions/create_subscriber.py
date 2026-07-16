@@ -24,6 +24,10 @@ from wind.services.subscriber_trial import (
     mark_trial_granted,
     registration_trial_days,
 )
+from wind.services.registration_lock import (
+    acquire_registration_locks,
+    release_registration_locks,
+)
 
 from appConfig import FeatureConfig, PanaccessConfig
 
@@ -220,6 +224,34 @@ def _create_subscriber_public_enabled() -> bool:
     return FeatureConfig.CREATE_SUBSCRIBER_PUBLIC_ENABLED
 
 
+def revert_trial_reservation(email_normalized: str, document: str | None = None) -> None:
+    """
+    Revierte la reserva de trial (eligible_for_trial=False, hecha al
+    escribir los registries de unicidad en create_subscriber_view/
+    finish_subscriber_provisioning_task) si el producto de prueba
+    finalmente no se otorgó de verdad (fallo de licencia, sin smartcards,
+    error de PanAccess, etc.) -- para que un reintento legítimo no quede
+    bloqueado por un trial que nunca llegó a entregarse. No hace nada si el
+    trial ya quedó marcado como usado (mark_trial_granted ya corrió).
+    """
+    try:
+        from wind.models import SubscriberEmailRegistry
+
+        SubscriberEmailRegistry.objects.filter(
+            email=email_normalized, trial_used=False,
+        ).update(eligible_for_trial=True)
+        if document:
+            from wind.models import SubscriberDocumentRegistry
+
+            SubscriberDocumentRegistry.objects.filter(
+                document=document, trial_used=False,
+            ).update(eligible_for_trial=True)
+    except Exception:
+        logger.warning(
+            "No se pudo revertir la reserva de trial para %s", email_normalized, exc_info=True
+        )
+
+
 def _persist_subscriber_contacts_to_db(
     subscriber_code: str,
     *,
@@ -313,18 +345,33 @@ def create_subscriber_view(request):
     
     from wind.models import ListOfSubscriber
     errors = {}
-    
+
+    user_provided_code = (data.get('code') or data.get('document_number') or "").strip()
+
+    # Cierra el hueco de doble alta / doble trial (auditoria, seccion 16):
+    # sin este lock, dos requests concurrentes para el mismo email o
+    # documento podian pasar ambas la validacion de "no existe todavia"
+    # antes de que cualquiera escribiera nada, y cada una crear su propio
+    # suscriptor en PanAccess y/o llevarse el producto de prueba. Se libera
+    # en cada punto de salida de esta vista (ver mas abajo).
+    registration_locks = acquire_registration_locks(email_normalized, user_provided_code or None)
+    if registration_locks is None:
+        return Response({
+            'success': False,
+            'message': 'Ya hay un registro en curso con este correo o documento. Intenta de nuevo en unos segundos.',
+            'error_type': 'RegistrationInProgress',
+        }, status=status.HTTP_409_CONFLICT)
+
     grant_registration_trial = is_eligible_for_trial(
         email=email_normalized,
-        document=(data.get('code') or data.get('document_number') or "").strip() or None,
+        document=user_provided_code or None,
     )
     logger.info(
         "Elegibilidad trial de registro para %s: grant=%s",
         email_normalized,
         grant_registration_trial,
     )
-    
-    user_provided_code = (data.get('code') or data.get('document_number') or "").strip()
+
     if user_provided_code:
         subscriber_code_provided = user_provided_code
         logger.info(f"Validando código proporcionado: '{subscriber_code_provided}'")
@@ -358,13 +405,14 @@ def create_subscriber_view(request):
         errors['email'] = ['Este email ya está registrado.']
     
     if errors:
+        release_registration_locks(registration_locks)
         return Response({
             'success': False,
             'message': 'Los parámetros proporcionados ya existen en la base de datos',
             'error_type': 'DuplicateData',
             'errors': errors
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         panaccess = get_panaccess()
         
@@ -413,6 +461,50 @@ def create_subscriber_view(request):
         
         logger.info(f"Suscriptor {subscriber_code} creado exitosamente")
 
+        # Registros de unicidad (email/documento) -- siempre síncronos, sin
+        # importar el modo async: son escrituras locales baratas, y deben
+        # quedar hechas ANTES de soltar el lock de registro para cerrar el
+        # hueco de doble alta (auditoría, sección 16). Si corresponde
+        # trial, se "reserva" de una vez (eligible_for_trial=False) para
+        # que ninguna otra request pueda tomarlo mientras se termina de
+        # otorgar el producto -- si el otorgamiento llega a fallar más
+        # adelante, se revierte (ver más abajo y
+        # finish_subscriber_provisioning_task).
+        email_registry_defaults = {
+            'subscriber_code': subscriber_code,
+            'account_closed_at': None,
+            'closed_subscriber_code': None,
+        }
+        if grant_registration_trial:
+            email_registry_defaults['eligible_for_trial'] = False
+        email_registry, email_created = SubscriberEmailRegistry.objects.update_or_create(
+            email=email_normalized,
+            defaults=email_registry_defaults,
+        )
+        if email_created:
+            logger.info(f"Registro de email creado: {email_normalized} -> {subscriber_code}")
+        else:
+            logger.info(f"Registro de email actualizado: {email_normalized} -> {subscriber_code}")
+
+        if user_provided_code:
+            from wind.models import SubscriberDocumentRegistry
+            doc_registry_defaults = {
+                'subscriber_code': subscriber_code,
+                'email': email_normalized,
+                'account_closed_at': None,
+                'closed_subscriber_code': None,
+            }
+            if grant_registration_trial:
+                doc_registry_defaults['eligible_for_trial'] = False
+            doc_registry, doc_created = SubscriberDocumentRegistry.objects.update_or_create(
+                document=user_provided_code,
+                defaults=doc_registry_defaults,
+            )
+            if doc_created:
+                logger.info(f"Registro de documento creado: {subscriber_code} -> {email_normalized}")
+            else:
+                logger.info(f"Registro de documento actualizado: {subscriber_code} -> {email_normalized}")
+
         if FeatureConfig.CREATE_SUBSCRIBER_ASYNC_ENRICHMENT:
             # Modo async (opt-in, ver appConfig.FeatureConfig): el resto del
             # registro encadenaba 6-9 llamadas síncronas más a PanAccess
@@ -450,6 +542,10 @@ def create_subscriber_view(request):
                 "(CREATE_SUBSCRIBER_ASYNC_ENRICHMENT=true)",
                 subscriber_code,
             )
+            # El lock de registro ya cumplió su función (uniqueness escrita
+            # + trial reservado si aplica); el resto lo hace la tarea async
+            # sin necesidad de mantenerlo tomado.
+            release_registration_locks(registration_locks)
             return Response({
                 "success": True,
                 "message": (
@@ -592,38 +688,12 @@ def create_subscriber_view(request):
                 
         except Exception as e:
             logger.error(f"[DB] Error obteniendo información del suscriptor desde PanAccess: {str(e)}", exc_info=True)
-        
-        email_registry, email_created = SubscriberEmailRegistry.objects.update_or_create(
-            email=email_normalized,
-            defaults={
-                'subscriber_code': subscriber_code,
-                'account_closed_at': None,
-                'closed_subscriber_code': None,
-            }
-        )
-        
-        if email_created:
-            logger.info(f"Registro de email creado: {email_normalized} -> {subscriber_code}")
-        else:
-            logger.info(f"Registro de email actualizado: {email_normalized} -> {subscriber_code}")
 
-        # Registrar documento en el registro de unicidad local
-        if user_provided_code:
-            from wind.models import SubscriberDocumentRegistry
-            doc_registry, doc_created = SubscriberDocumentRegistry.objects.update_or_create(
-                document=user_provided_code,
-                defaults={
-                    'subscriber_code': subscriber_code,
-                    'email': email_normalized,
-                    'account_closed_at': None,
-                    'closed_subscriber_code': None,
-                }
-            )
-            if doc_created:
-                logger.info(f"Registro de documento creado: {subscriber_code} -> {email_normalized}")
-            else:
-                logger.info(f"Registro de documento actualizado: {subscriber_code} -> {email_normalized}")
-        
+        # Nota: los registros de unicidad (SubscriberEmailRegistry /
+        # SubscriberDocumentRegistry) ya se escribieron más arriba, antes de
+        # la rama sync/async, para que queden protegidos por el lock de
+        # registro (ver auditoría, sección 16).
+
         contacts_added = []
         contacts_errors = []
         email_validated = False
@@ -911,6 +981,9 @@ def create_subscriber_view(request):
         response_data['assigned_smartcards'] = assigned_smartcards
         response_data['product_add_result'] = product_add_result
 
+        if grant_registration_trial and not (product_add_result or {}).get('trial_granted'):
+            revert_trial_reservation(email_normalized, user_provided_code or None)
+
         try:
             from wind.services.welcome_email import enqueue_welcome_credentials_email
 
@@ -925,18 +998,21 @@ def create_subscriber_view(request):
         except Exception as e:
             logger.warning("No se pudo encolar el correo de bienvenida: %s", e)
 
+        release_registration_locks(registration_locks)
         return Response(response_data, status=status.HTTP_201_CREATED)
-        
+
     except PanAccessException as e:
         logger.error(f"Error de PanAccess: {str(e)}")
+        release_registration_locks(registration_locks)
         return Response({
             'success': False,
             'error_type': 'PanAccessException',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
     except Exception as e:
         logger.error(f"Error inesperado: {str(e)}", exc_info=True)
+        release_registration_locks(registration_locks)
         return Response({
             'success': False,
             'error_type': 'Exception',

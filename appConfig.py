@@ -5,6 +5,7 @@ settings.py y el resto del código importan desde estas clases.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from contextlib import contextmanager
@@ -14,6 +15,8 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +378,7 @@ class RedisConfig:
         timeout: int = 600,
         blocking: bool = False,
         blocking_timeout: float | None = None,
+        auto_extend: bool = False,
     ):
         """Lock distribuido en Redis.
 
@@ -388,6 +392,13 @@ class RedisConfig:
         ``panaccess_session_store.refresh_lock()`` para que los procesos que
         no consiguen el lock esperen a que el que sí lo tiene termine de
         autenticarse contra PanAccess, en vez de autenticarse también.
+
+        Con ``auto_extend=True`` se lanza un hilo en segundo plano que
+        renueva el TTL del lock cada ``timeout/2`` segundos mientras el
+        bloque ``with`` sigue corriendo -- para tareas que deben poder
+        durar más de ``timeout`` sin que el lock expire solo y otra
+        instancia crea que ya no está corriendo (ver ``full_sync_task``,
+        que ahora puede tardar lo que haga falta).
         """
         from django.conf import settings
 
@@ -395,13 +406,39 @@ class RedisConfig:
             yield True
             return
 
+        import threading
+
         from redis.lock import Lock
 
         lock = Lock(cls.get_client(), key, timeout=timeout)
         acquired = lock.acquire(blocking=blocking, blocking_timeout=blocking_timeout)
+
+        stop_heartbeat = None
+        heartbeat_thread = None
+        if acquired and auto_extend:
+            stop_heartbeat = threading.Event()
+            interval = max(5, timeout // 2)
+
+            def _renew():
+                while not stop_heartbeat.wait(interval):
+                    try:
+                        lock.extend(timeout, replace_ttl=True)
+                    except Exception:
+                        logger.warning(
+                            "No se pudo extender el lock '%s' (auto_extend)", key, exc_info=True
+                        )
+
+            heartbeat_thread = threading.Thread(
+                target=_renew, name=f"lock-heartbeat-{key}", daemon=True
+            )
+            heartbeat_thread.start()
+
         try:
             yield acquired
         finally:
+            if stop_heartbeat is not None:
+                stop_heartbeat.set()
+                heartbeat_thread.join(timeout=5)
             if acquired:
                 try:
                     lock.release()
@@ -456,6 +493,14 @@ class CeleryConfig:
     FULL_SYNC_MINUTE = max(0, min(59, _env_int("CELERY_FULL_SYNC_MINUTE", 0)))
     FULL_SYNC_TIME_LIMIT = max(600, _env_int("CELERY_FULL_SYNC_TIME_LIMIT", 3600))
     FULL_SYNC_SOFT_TIME_LIMIT = max(540, _env_int("CELERY_FULL_SYNC_SOFT_TIME_LIMIT", 3300))
+    # A pedido del cliente: full_sync_task debe poder terminar sin importar
+    # cuánto tarde (el catálogo puede crecer y ya no caber en 3600s). Con
+    # esto en True (default), el task NO lleva time_limit/soft_time_limit de
+    # Celery -- nada la mata por tiempo. El lock distribuido y el flag
+    # "full_sync_in_progress" se renuevan solos mientras la tarea sigue viva
+    # (auto_extend en RedisConfig.task_lock), así que tampoco expiran antes
+    # de que termine, sin importar la duración real.
+    FULL_SYNC_NO_TIME_LIMIT = _env_bool("CELERY_FULL_SYNC_NO_TIME_LIMIT", True)
     # compare_and_update_all_subscribers/smartcards escalan con el tamaño
     # TOTAL del catálogo (pagina todo PanAccess + carga toda la tabla local),
     # no con lo que cambió -- por eso corre nocturno, no cada pocos minutos.
