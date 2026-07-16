@@ -443,6 +443,13 @@ class CeleryConfig:
     FULL_SYNC_TIME_LIMIT = max(600, _env_int("CELERY_FULL_SYNC_TIME_LIMIT", 3600))
     FULL_SYNC_SOFT_TIME_LIMIT = max(540, _env_int("CELERY_FULL_SYNC_SOFT_TIME_LIMIT", 3300))
 
+    # Reintento automático de cierres de cuenta que quedaron en
+    # PENDING_CLOSURE (PanAccess falló a medias -- ver
+    # wind/tasks.retry_partial_closures_task).
+    CLOSURE_RETRY_ENABLED = _env_bool("CELERY_CLOSURE_RETRY_ENABLED", True)
+    CLOSURE_RETRY_MINUTES = max(5, _env_int("CELERY_CLOSURE_RETRY_MINUTES", 30))
+    CLOSURE_RETRY_MAX_ATTEMPTS = max(1, _env_int("CELERY_CLOSURE_RETRY_MAX_ATTEMPTS", 5))
+
 
 # ---------------------------------------------------------------------------
 # Caché
@@ -609,6 +616,10 @@ class EmailConfig:
         or "Bienvenido a WindTV — tus datos de acceso"
     )
     SUPPORT_ADDRESS = _strip_env(os.getenv("EMAIL_SUPPORT_ADDRESS")) or "info@wind.do"
+    # A dónde avisar cuando un cierre de cuenta agota los reintentos
+    # automáticos (retry_partial_closures_task). Por defecto, el mismo
+    # correo de soporte.
+    OPS_ALERT_ADDRESS = _strip_env(os.getenv("EMAIL_OPS_ALERT_ADDRESS")) or SUPPORT_ADDRESS
     SUPPORT_PHONE = _strip_env(os.getenv("EMAIL_SUPPORT_PHONE")) or "809.200.3000"
     TERMS_URL = _strip_env(os.getenv("EMAIL_TERMS_URL")) or ""
     GOOGLE_PLAY_URL = _strip_env(os.getenv("WIND_APP_GOOGLE_PLAY_URL")) or ""
@@ -719,6 +730,15 @@ class FeatureConfig:
     FULL_SYNC_HTTP_ENABLED = _env_bool("FULL_SYNC_HTTP_ENABLED", False)
     PANACCESS_OPS_HTTP_ENABLED = _env_bool("PANACCESS_OPS_HTTP_ENABLED", False)
     CREATE_SUBSCRIBER_PUBLIC_ENABLED = _env_bool("CREATE_SUBSCRIBER_PUBLIC_ENABLED", True)
+    # Por defecto OFF: el registro público sigue encadenando sync las 6-9
+    # llamadas a PanAccess (comportamiento actual, sin cambios). Si se activa,
+    # create_subscriber_view solo hace addSubscriber sync y devuelve de una
+    # vez; el resto (contactos, license block, producto/trial, búsqueda de
+    # smartcards) corre en background (finish_subscriber_provisioning_task).
+    # OJO: en modo async la respuesta YA NO incluye "token"/"credentials_url"/
+    # "license_block_added"/"contacts_added"/"assigned_smartcards" de forma
+    # síncrona -- coordinar con el equipo de frontend antes de activarlo.
+    CREATE_SUBSCRIBER_ASYNC_ENRICHMENT = _env_bool("CREATE_SUBSCRIBER_ASYNC_ENRICHMENT", False)
     CLOSE_SUBSCRIBER_HTTP_ENABLED = _env_bool("CLOSE_SUBSCRIBER_HTTP_ENABLED", False)
     CLOSE_SUBSCRIBER_DASHBOARD_ENABLED = _env_bool("CLOSE_SUBSCRIBER_DASHBOARD_ENABLED", True)
 

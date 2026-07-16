@@ -15,8 +15,9 @@ from django.contrib.auth import get_user_model
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 
 from wind.exceptions import PanAccessException
-from wind.models import SubscriberEmailRegistry, SubscriberLoginInfo
+from wind.models import PasswordResetTokenUse, SubscriberEmailRegistry, SubscriberLoginInfo
 from wind.services import get_panaccess
+from wind.services.jwt_invalidation import mark_password_changed
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -62,16 +63,32 @@ def _token_used_key(token: str) -> str:
 
 
 def is_reset_token_used(token: str) -> bool:
+    """
+    La BD es la fuente de verdad (no falla "abierto" si Redis está caído --
+    antes, is_reset_token_used dependía solo de Redis y una caída dejaba
+    reutilizable cualquier token filtrado durante toda la ventana de la
+    caída). Redis se usa además como caché rápida best-effort.
+    """
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    if PasswordResetTokenUse.objects.filter(token_hash=digest).exists():
+        return True
+
     try:
         from appConfig import RedisConfig
 
         return RedisConfig.get_client().get(_token_used_key(token)) is not None
     except Exception:
-        logger.warning("No se pudo verificar token de reset en Redis", exc_info=True)
+        logger.warning("No se pudo verificar token de reset en Redis (se usó solo la BD)", exc_info=True)
         return False
 
 
 def mark_reset_token_used(token: str) -> None:
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        PasswordResetTokenUse.objects.get_or_create(token_hash=digest)
+    except Exception:
+        logger.warning("No se pudo marcar token de reset como usado en BD", exc_info=True)
+
     try:
         from appConfig import RedisConfig
 
@@ -81,7 +98,7 @@ def mark_reset_token_used(token: str) -> None:
             ex=PASSWORD_RESET_MAX_AGE_SECONDS,
         )
     except Exception:
-        logger.warning("No se pudo marcar token de reset como usado en Redis", exc_info=True)
+        logger.warning("No se pudo marcar token de reset como usado en Redis (ya quedó en BD)", exc_info=True)
 
 
 def reset_password_in_panaccess(subscriber_code: str, new_pass: str) -> None:
@@ -107,6 +124,11 @@ def sync_password_locally(subscriber_code: str, email: str, new_pass: str) -> No
     if user:
         user.set_password(new_pass)
         user.save(update_fields=["password"])
+        # Invalida sesiones JWT previas (access + refresh) -- ver
+        # wind/services/jwt_invalidation.py. Cubre tanto "olvidé mi
+        # contraseña" como "cambiar contraseña" desde el perfil, porque
+        # ambos flujos llaman a esta misma función.
+        mark_password_changed(user)
 
 
 def request_password_reset(email: str, reset_page_url: str) -> dict:

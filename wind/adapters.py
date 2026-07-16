@@ -49,6 +49,31 @@ class PanAccessSocialAccountAdapter(DefaultSocialAccountAdapter):
             )
             return app
 
+    @staticmethod
+    def _is_email_verified_by_provider(sociallogin, email: str) -> bool:
+        """
+        No confiar en el email del proveedor social sin chequear que él
+        mismo lo marque como verificado -- si no, alguien podría "entrar"
+        con un correo que no controla de verdad y quedar fusionado con la
+        cuenta local existente de otra persona (account takeover).
+
+        allauth ya normaliza esto en `sociallogin.email_addresses` (lista de
+        EmailAddress con `.verified`, poblada según cada provider). Como
+        respaldo se revisa también `extra_data.email_verified` (Google la
+        expone ahí directamente).
+        """
+        for addr in getattr(sociallogin, "email_addresses", None) or []:
+            if normalize_social_email(getattr(addr, "email", "")) == email:
+                return bool(getattr(addr, "verified", False))
+
+        extra_data = sociallogin.account.extra_data or {}
+        if "email_verified" in extra_data:
+            return bool(extra_data.get("email_verified"))
+
+        # El proveedor no informa nada sobre verificación: no se asume que
+        # está verificado.
+        return False
+
     def pre_social_login(self, request, sociallogin):
         """
         Invocado tras el login social exitoso pero antes de iniciar sesión en Django.
@@ -59,6 +84,16 @@ class PanAccessSocialAccountAdapter(DefaultSocialAccountAdapter):
             raise ValidationError("Se requiere un correo electrónico del proveedor social.")
 
         sociallogin.user.email = user_email
+
+        if not self._is_email_verified_by_provider(sociallogin, user_email):
+            logger.warning(
+                "Login social rechazado: el proveedor no confirma que %s esté verificado",
+                user_email,
+            )
+            raise ValidationError(
+                "Tu proveedor social no confirma que este correo esté verificado. "
+                "Verifica tu correo con el proveedor e intenta de nuevo."
+            )
 
         existing_local_user = get_user_model().objects.filter(email__iexact=user_email).first()
         if existing_local_user and sociallogin.user and sociallogin.user.pk != existing_local_user.pk:

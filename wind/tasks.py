@@ -2,6 +2,7 @@ import logging
 import time
 
 from celery import shared_task
+from django.utils import timezone
 
 from wind.functions.getSubscriber import (
     compare_and_update_all_subscribers,
@@ -409,6 +410,309 @@ def full_sync_task(self, limit=None):
             raise
         finally:
             RedisConfig.clear_full_sync_in_progress()
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def finish_subscriber_provisioning_task(
+    self,
+    *,
+    subscriber_code,
+    data,
+    email_normalized,
+    phone_normalized,
+    user_provided_code,
+    grant_registration_trial,
+    request_extra,
+    is_social_account,
+):
+    """
+    Continúa el registro de un suscriptor ya creado en PanAccess
+    (`addSubscriber` ya corrió sync en `create_subscriber_view`): registros
+    de unicidad local, contactos (email/teléfono), license block y producto
+    de prueba. Solo se dispara si `FeatureConfig.CREATE_SUBSCRIBER_ASYNC_ENRICHMENT`
+    está activado -- ver `wind/functions/create_subscriber.py`.
+
+    Nota: en este modo el cliente ya recibió su respuesta (201) sin
+    "token"/"credentials_url"/"license_block_added" -- esos ya no se pueden
+    devolver sync porque dependen de estas mismas llamadas. El correo de
+    bienvenida (ya async por su cuenta) sigue siendo el mecanismo para que
+    el usuario reciba sus credenciales.
+    """
+    from datetime import timedelta
+
+    from appConfig import PanaccessConfig
+    from wind.exceptions import PanAccessException
+    from wind.functions.create_subscriber import (
+        _persist_subscriber_contacts_to_db,
+        _resolve_email_contact_id,
+        _validate_email_contact_of_subscriber,
+    )
+    from wind.functions.getSubscriber import (
+        CallListExtendedSubscribers,
+        extract_first_email,
+        extract_first_phone,
+    )
+    from wind.models import ListOfSubscriber, SubscriberDocumentRegistry, SubscriberEmailRegistry
+    from wind.services import get_panaccess
+    from wind.services.subscriber_trial import mark_trial_granted, registration_trial_days
+    from wind.services.welcome_email import enqueue_welcome_credentials_email
+
+    panaccess = get_panaccess()
+    result = {"subscriber_code": subscriber_code}
+
+    # 1) Registros locales de unicidad (idénticos a los que ya hacía la
+    #    ruta síncrona antes de este cambio).
+    SubscriberEmailRegistry.objects.update_or_create(
+        email=email_normalized,
+        defaults={
+            "subscriber_code": subscriber_code,
+            "account_closed_at": None,
+            "closed_subscriber_code": None,
+        },
+    )
+    if user_provided_code:
+        SubscriberDocumentRegistry.objects.update_or_create(
+            document=user_provided_code,
+            defaults={
+                "subscriber_code": subscriber_code,
+                "email": email_normalized,
+                "account_closed_at": None,
+                "closed_subscriber_code": None,
+            },
+        )
+
+    # 2) Buscar el suscriptor recién creado en el catálogo para traer sus
+    #    smartcards y guardar la fila local (ListOfSubscriber).
+    def _find_in_catalog():
+        offset = 0
+        limit = 100
+        for _ in range(3):
+            try:
+                page = CallListExtendedSubscribers(session_id=None, offset=offset, limit=limit)
+            except Exception:
+                logger.exception("[Async] Error buscando %s en catálogo PanAccess", subscriber_code)
+                return None
+            rows = page.get("extendedSubscriberEntries") or page.get("subscriberEntries") or page.get("rows", [])
+            for row in rows:
+                if row.get("subscriberCode") == subscriber_code:
+                    return row
+            if len(rows) < limit:
+                break
+            offset += limit
+        return None
+
+    found = _find_in_catalog()
+    smartcards_list = found.get("smartcards") if found else None
+    subscriber_obj = None
+    if found:
+        try:
+            subscriber_obj, _created = ListOfSubscriber.objects.update_or_create(
+                code=subscriber_code,
+                defaults={
+                    "id": subscriber_code,
+                    "lastName": found.get("lastName"),
+                    "firstName": found.get("firstName"),
+                    "smartcards": smartcards_list,
+                    "regionId": found.get("regionId") or request_extra.get("regionId"),
+                    "countryCode": found.get("countryCode") or request_extra.get("countryCode"),
+                    "caf": found.get("caf") or request_extra.get("caf"),
+                    "supervisor": found.get("supervisor", "AUTOMATICO"),
+                    "comment": found.get("comment") or data.get("comment"),
+                    "emails": extract_first_email(found.get("emails")) or email_normalized,
+                    "phones": extract_first_phone(found.get("phones")),
+                    "created": timezone.now(),
+                },
+            )
+        except Exception:
+            logger.exception("[Async] Error guardando %s en ListOfSubscriber", subscriber_code)
+    else:
+        logger.warning("[Async] No se encontró %s en el catálogo de PanAccess tras crearlo", subscriber_code)
+    result["found_in_catalog"] = bool(found)
+
+    # 3) Contactos: email (+ validación) y teléfono si vino.
+    contacts_added = []
+    try:
+        add_resp = panaccess.call(
+            "addContactToSubscriber",
+            {"code": subscriber_code, "type": "email", "isBusiness": False, "contact": email_normalized},
+        )
+        if add_resp.get("success"):
+            contacts_added.append("email")
+            contact_id = _resolve_email_contact_id(panaccess, subscriber_code, add_resp, email_normalized)
+            if contact_id is not None:
+                _validate_email_contact_of_subscriber(panaccess, subscriber_code, contact_id, email_normalized)
+        else:
+            logger.error("[Async] addContactToSubscriber (email) falló para %s: %s", subscriber_code, add_resp.get("errorMessage"))
+    except PanAccessException:
+        logger.exception("[Async] Error PanAccess agregando contacto email para %s", subscriber_code)
+
+    if phone_normalized:
+        try:
+            phone_resp = panaccess.call(
+                "addContactToSubscriber",
+                {"code": subscriber_code, "type": "phone", "isBusiness": False, "contact": phone_normalized},
+            )
+            if phone_resp.get("success"):
+                contacts_added.append("phone")
+            else:
+                logger.error("[Async] addContactToSubscriber (phone) falló para %s: %s", subscriber_code, phone_resp.get("errorMessage"))
+        except PanAccessException:
+            logger.exception("[Async] Error PanAccess agregando contacto phone para %s", subscriber_code)
+
+    _persist_subscriber_contacts_to_db(subscriber_code, email=email_normalized, phone=phone_normalized)
+    result["contacts_added"] = contacts_added
+
+    # 4) License block + producto de prueba (solo si quedaron smartcards).
+    license_block_success = False
+    try:
+        license_resp = panaccess.call("addLicenseBlockToSubscriber", {"code": subscriber_code})
+        license_block_success = bool(license_resp.get("success"))
+        if not license_block_success:
+            logger.warning("[Async] addLicenseBlockToSubscriber falló para %s: %s", subscriber_code, license_resp.get("errorMessage"))
+    except PanAccessException:
+        logger.exception("[Async] Error PanAccess en license block para %s", subscriber_code)
+    result["license_block_added"] = license_block_success
+
+    if license_block_success:
+        found_after = _find_in_catalog()
+        updated_smartcards = found_after.get("smartcards") if found_after else None
+        if updated_smartcards and subscriber_obj is not None:
+            try:
+                subscriber_obj.smartcards = updated_smartcards
+                subscriber_obj.save(update_fields=["smartcards"])
+            except Exception:
+                logger.exception("[Async] Error actualizando smartcards de %s tras license block", subscriber_code)
+
+            if grant_registration_trial:
+                try:
+                    trial_days = registration_trial_days()
+                    expiry_time = timezone.now() + timedelta(days=trial_days)
+                    product_params = {
+                        "productId": PanaccessConfig.REGISTRATION_PRODUCT_ID,
+                        "hcId": PanaccessConfig.HCID,
+                        "expiryTime": expiry_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    for idx, sn in enumerate(updated_smartcards):
+                        if sn:
+                            product_params[f"smartcards[{idx}]"] = str(sn)
+                    product_resp = panaccess.call("addProductToSmartcards", product_params)
+                    if product_resp.get("success"):
+                        mark_trial_granted(
+                            email=email_normalized,
+                            document=user_provided_code or None,
+                            subscriber_code=subscriber_code,
+                            granted_at=timezone.now(),
+                        )
+                        result["trial_granted"] = True
+                    else:
+                        logger.warning("[Async] addProductToSmartcards falló para %s: %s", subscriber_code, product_resp.get("errorMessage"))
+                except PanAccessException:
+                    logger.exception("[Async] Error PanAccess asignando producto de prueba a %s", subscriber_code)
+            else:
+                logger.info("[Async] Trial omitido para %s (no elegible)", subscriber_code)
+
+    # 5) Correo de bienvenida (ya es async por su cuenta).
+    try:
+        enqueue_welcome_credentials_email(
+            first_name=data.get("firstName", ""),
+            last_name=data.get("lastName", ""),
+            email=email_normalized,
+            subscriber_code=subscriber_code,
+            is_social_account=is_social_account,
+        )
+    except Exception:
+        logger.warning("[Async] No se pudo encolar el correo de bienvenida para %s", subscriber_code, exc_info=True)
+
+    logger.info("[Async] Aprovisionamiento adicional completado para %s: %s", subscriber_code, result)
+    return {"success": True, **result}
+
+
+@shared_task(bind=True)
+def retry_partial_closures_task(self):
+    """
+    Reintenta cierres de cuenta que quedaron a medias en PanAccess
+    (ListOfSubscriber.status == PENDING_CLOSURE, nunca llegó a CLOSED).
+
+    close_subscriber_account ya es idempotente (deja un tombstone
+    PENDING_CLOSURE desde el primer intento, y solo pasa a CLOSED si
+    PanAccess responde success), así que reintentar es simplemente volver a
+    llamarlo. Cada suscriptor lleva su propio contador
+    (closure_retry_count); al llegar a CLOSURE_RETRY_MAX_ATTEMPTS se deja de
+    reintentar automáticamente y se manda una alerta por correo para que
+    alguien lo revise a mano.
+    """
+    from appConfig import CeleryConfig, EmailConfig
+    from wind.models import ListOfSubscriber
+    from wind.services.subscriber_closure import close_subscriber_account
+
+    if not CeleryConfig.CLOSURE_RETRY_ENABLED:
+        return {"success": True, "skipped": True, "message": "CLOSURE_RETRY_ENABLED=false"}
+
+    max_attempts = CeleryConfig.CLOSURE_RETRY_MAX_ATTEMPTS
+    stuck = ListOfSubscriber.objects.filter(
+        status=ListOfSubscriber.STATUS_PENDING_CLOSURE,
+        closure_retry_count__lt=max_attempts,
+    )
+
+    retried = []
+    exhausted = []
+
+    for subscriber in stuck:
+        code = subscriber.code or subscriber.id
+        logger.info(
+            "[Celery] Reintentando cierre parcial de %s (intento %s/%s)",
+            code,
+            subscriber.closure_retry_count + 1,
+            max_attempts,
+        )
+        try:
+            result = close_subscriber_account(code, reason="retry_automatico_cierre_parcial")
+        except Exception:
+            logger.exception("[Celery] Error inesperado reintentando cierre de %s", code)
+            result = {"success": False}
+
+        if result.get("success"):
+            retried.append(code)
+            logger.info("[Celery] Reintento de cierre exitoso para %s", code)
+            continue
+
+        subscriber.closure_retry_count += 1
+        subscriber.save(update_fields=["closure_retry_count"])
+
+        if subscriber.closure_retry_count >= max_attempts:
+            exhausted.append(code)
+            logger.error(
+                "[Celery] Cierre de %s sigue parcial tras %s intentos; se deja de reintentar automáticamente",
+                code,
+                subscriber.closure_retry_count,
+            )
+            _alert_closure_exhausted(code, subscriber.closure_retry_count, EmailConfig.OPS_ALERT_ADDRESS)
+
+    return {
+        "success": True,
+        "checked": stuck.count(),
+        "retried_ok": retried,
+        "exhausted": exhausted,
+    }
+
+
+def _alert_closure_exhausted(subscriber_code: str, attempts: int, to_address: str) -> None:
+    if not to_address:
+        return
+    try:
+        send_verification_email_task.delay(
+            to_address,
+            f"[Wind] Cierre de cuenta {subscriber_code} sigue parcial tras {attempts} intentos",
+            (
+                f"El cierre de cuenta del suscriptor {subscriber_code} lleva {attempts} "
+                "intentos automáticos fallidos y quedó en PENDING_CLOSURE. "
+                "Revisar SubscriberClosureLog para ese código y reintentar manualmente "
+                "(python manage.py close_subscriber --code "
+                f"{subscriber_code} --reason \"retry manual\")."
+            ),
+        )
+    except Exception:
+        logger.exception("No se pudo encolar la alerta de cierre agotado para %s", subscriber_code)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

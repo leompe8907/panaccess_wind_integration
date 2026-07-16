@@ -69,7 +69,12 @@ class ListOfSubscriber(models.Model):
     )
     closed_at = models.DateTimeField(null=True, blank=True)
     closed_reason = models.TextField(null=True, blank=True)
-    
+    # Cuántas veces retry_partial_closures_task reintentó un cierre que
+    # quedó en PENDING_CLOSURE sin completarse. Se resetea a 0 en cuanto el
+    # cierre termina en CLOSED. Al llegar a CeleryConfig.CLOSURE_RETRY_MAX_ATTEMPTS
+    # se deja de reintentar automáticamente y se manda una alerta.
+    closure_retry_count = models.PositiveIntegerField(default=0)
+
     class Meta:
         indexes = [
             models.Index(fields=['code']),
@@ -390,6 +395,42 @@ class SubscriberClosureLog(models.Model):
 
     def __str__(self):
         return f"Closure {self.subscriber_code} ({self.status})"
+
+
+class PasswordResetTokenUse(models.Model):
+    """
+    Registro en BD de tokens de reset de contraseña ya usados.
+
+    Antes esto vivía solo en Redis (is_reset_token_used/mark_reset_token_used
+    en wind/services/password_reset.py); si Redis estaba caído, el chequeo
+    fallaba "abierto" (trataba cualquier token como no usado), permitiendo
+    reutilizar un enlace de reset filtrado durante toda la caída. La BD es
+    la fuente de verdad ahora; Redis puede seguir usándose como caché rápido
+    pero ya no es indispensable para la seguridad del flujo.
+    """
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    used_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"PasswordResetTokenUse({self.token_hash[:8]}...)"
+
+
+class UserSecurityProfile(models.Model):
+    """
+    Metadatos de seguridad por usuario que no viven en auth.User (no se
+    customizó AUTH_USER_MODEL). Por ahora solo guarda cuándo fue el último
+    cambio/reset de contraseña, para poder invalidar JWTs emitidos antes de
+    ese momento (ver wind/services/jwt_invalidation.py).
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="security_profile",
+    )
+    password_changed_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"SecurityProfile({self.user_id})"
 
 
 # ============================================================================

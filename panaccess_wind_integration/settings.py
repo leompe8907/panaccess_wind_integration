@@ -155,7 +155,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Igual que JWTAuthentication, pero además rechaza access tokens
+        # emitidos antes del último cambio de contraseña del usuario (ver
+        # wind/services/jwt_invalidation.py) -- el blacklist de simplejwt
+        # solo cubre refresh tokens ya rotados.
+        'wind.services.jwt_invalidation.PasswordAwareJWTAuthentication',
     ),
     'DEFAULT_THROTTLE_CLASSES': [
         'wind.throttles.AnonBurstThrottle',
@@ -412,6 +416,13 @@ if _FULL_SYNC_ENABLED:
             "time_limit": _FULL_SYNC_TIME_LIMIT,
         },
         "kwargs": {"limit": _SYNC_LIMIT},
+    }
+
+if CeleryConfig.CLOSURE_RETRY_ENABLED:
+    CELERY_BEAT_SCHEDULE["retry-partial-closures"] = {
+        "task": "wind.tasks.retry_partial_closures_task",
+        "schedule": timedelta(minutes=CeleryConfig.CLOSURE_RETRY_MINUTES),
+        "options": {"queue": _PIPELINE_QUEUE},
     }
 
 

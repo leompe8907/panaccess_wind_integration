@@ -84,6 +84,30 @@ def close_subscriber_account(
             "message": "La cuenta ya estaba cerrada.",
         }
 
+    if not dry_run:
+        # Tombstone de entrada, ANTES de llamar a PanAccess: protege la fila
+        # local durante todo el tiempo que tarde la desaprovisión (que puede
+        # ser varios pasos/segundos), incluso si el suscriptor nunca se
+        # habia sincronizado localmente antes. Sin esto, un
+        # periodic_sync_pipeline_task/full_sync_task que corriera justo en
+        # esa ventana podia insertar/refrescar la fila como "active" con
+        # datos de PanAccess mientras el cierre real todavia estaba en
+        # curso (_is_closure_tombstone solo protege status
+        # CLOSED/PENDING_CLOSURE, y antes de este cambio esa marca no
+        # existia hasta el final del proceso cuando no habia fila previa).
+        if subscriber:
+            if subscriber.status != ListOfSubscriber.STATUS_PENDING_CLOSURE:
+                subscriber.status = ListOfSubscriber.STATUS_PENDING_CLOSURE
+                subscriber.save(update_fields=["status"])
+        else:
+            subscriber, _ = ListOfSubscriber.objects.update_or_create(
+                code=subscriber_code,
+                defaults={
+                    "id": subscriber_code,
+                    "status": ListOfSubscriber.STATUS_PENDING_CLOSURE,
+                },
+            )
+
     panaccess_result: dict[str, Any] = {"skipped": skip_panaccess}
     if not skip_panaccess:
         panaccess_result = deprovision_subscriber_in_panaccess(
@@ -107,14 +131,9 @@ def close_subscriber_account(
     closed_at = timezone.now()
     local_result: dict[str, Any] = {}
 
-    if subscriber:
-        subscriber.status = ListOfSubscriber.STATUS_PENDING_CLOSURE
-        subscriber.save(update_fields=["status"])
-
     if not skip_panaccess and not panaccess_result.get("success"):
-        if subscriber:
-            subscriber.status = ListOfSubscriber.STATUS_PENDING_CLOSURE
-            subscriber.save(update_fields=["status"])
+        # Ya quedó en PENDING_CLOSURE arriba (antes de la llamada a
+        # PanAccess); no hace falta volver a marcarlo aquí.
         log = SubscriberClosureLog.objects.create(
             subscriber_code=subscriber_code,
             requested_by=requested_by,
@@ -137,32 +156,13 @@ def close_subscriber_account(
         preserve_registry=True,
     )
 
-    if subscriber:
-        subscriber.smartcards = []
-        subscriber.status = ListOfSubscriber.STATUS_CLOSED
-        subscriber.closed_at = closed_at
-        subscriber.closed_reason = reason or ""
-        subscriber.save(update_fields=["smartcards", "status", "closed_at", "closed_reason"])
-    else:
-        # No habia fila local para este suscriptor (nunca se habia
-        # sincronizado desde PanAccess). Un .filter(...).update(...) sobre
-        # cero filas no crea nada y no avisa -- eso dejaba el cierre sin
-        # tombstone local, y el siguiente sync (periodic_sync_pipeline_task /
-        # full_sync_task) volvia a insertar al suscriptor como "active" con
-        # los datos que todavia tuviera PanAccess, deshaciendo el cierre en
-        # la cache local. Con update_or_create siempre queda una fila
-        # cerrada, exista o no de antes (y es seguro ante condiciones de
-        # carrera con un sync concurrente).
-        ListOfSubscriber.objects.update_or_create(
-            code=subscriber_code,
-            defaults={
-                "id": subscriber_code,
-                "smartcards": [],
-                "status": ListOfSubscriber.STATUS_CLOSED,
-                "closed_at": closed_at,
-                "closed_reason": reason or "",
-            },
-        )
+    # A esta altura "subscriber" siempre existe: si no habia fila previa, el
+    # tombstone de entrada (arriba) ya la creo con update_or_create.
+    subscriber.smartcards = []
+    subscriber.status = ListOfSubscriber.STATUS_CLOSED
+    subscriber.closed_at = closed_at
+    subscriber.closed_reason = reason or ""
+    subscriber.save(update_fields=["smartcards", "status", "closed_at", "closed_reason"])
 
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)
     local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)

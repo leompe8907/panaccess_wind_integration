@@ -412,7 +412,56 @@ def create_subscriber_view(request):
             subscriber_code = returned_code
         
         logger.info(f"Suscriptor {subscriber_code} creado exitosamente")
-        
+
+        if FeatureConfig.CREATE_SUBSCRIBER_ASYNC_ENRICHMENT:
+            # Modo async (opt-in, ver appConfig.FeatureConfig): el resto del
+            # registro encadenaba 6-9 llamadas síncronas más a PanAccess
+            # (búsqueda en catálogo, contactos, license block, producto de
+            # prueba) dentro del mismo request público -- eso retenía un
+            # worker todo ese tiempo. Con el flag activado, solo se hace
+            # addSubscriber sync (ya ocurrió arriba) y se responde de una
+            # vez; finish_subscriber_provisioning_task hace el resto en
+            # background. OJO: en este modo la respuesta ya NO incluye
+            # "token"/"credentials_url"/"license_block_added"/
+            # "contacts_added"/"assigned_smartcards" de forma síncrona.
+            from wind.tasks import finish_subscriber_provisioning_task
+
+            finish_subscriber_provisioning_task.delay(
+                subscriber_code=subscriber_code,
+                data={
+                    "firstName": data.get("firstName"),
+                    "lastName": data.get("lastName"),
+                    "comment": data.get("comment"),
+                },
+                email_normalized=email_normalized,
+                phone_normalized=phone_normalized,
+                user_provided_code=user_provided_code,
+                grant_registration_trial=grant_registration_trial,
+                request_extra={
+                    "regionId": request.data.get("regionId"),
+                    "technicalNotes": request.data.get("technicalNotes"),
+                    "caf": request.data.get("caf"),
+                    "countryCode": request.data.get("countryCode", "DO"),
+                },
+                is_social_account=bool(getattr(request, "wind_is_social_account", False)),
+            )
+            logger.info(
+                "[Async] Aprovisionamiento adicional de %s encolado en background "
+                "(CREATE_SUBSCRIBER_ASYNC_ENRICHMENT=true)",
+                subscriber_code,
+            )
+            return Response({
+                "success": True,
+                "message": (
+                    "Suscriptor creado. El resto del aprovisionamiento "
+                    "(contactos, license block, producto de prueba) "
+                    "continúa en segundo plano."
+                ),
+                "subscriber_code": subscriber_code,
+                "alternative_login": email_normalized,
+                "provisioning": "async",
+            }, status=status.HTTP_201_CREATED)
+
         subscriber_data_for_db = None
         smartcards_list = None
         

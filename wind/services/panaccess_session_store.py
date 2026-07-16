@@ -7,6 +7,8 @@ import logging
 
 from django.conf import settings
 
+from wind.utils.encryption import decrypt_value, encrypt_value
+
 logger = logging.getLogger(__name__)
 
 SESSION_KEY = "panaccess:session_id"
@@ -30,9 +32,19 @@ def get_session_id() -> str | None:
         raw = _redis_client().get(SESSION_KEY)
         if not raw:
             return None
-        return raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+        stored = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
     except Exception as exc:
         logger.warning("No se pudo leer sesión PanAccess desde Redis: %s", exc)
+        return None
+
+    try:
+        return decrypt_value(stored)
+    except Exception as exc:
+        # Cubre tambien el caso de upgrade: un valor viejo guardado en claro
+        # (antes de este cambio) no va a desencriptar -- se trata como
+        # cache-miss para forzar un login nuevo, en vez de propagar el
+        # sessionId en texto plano.
+        logger.warning("SessionId de PanAccess en Redis no se pudo desencriptar, se ignora: %s", exc)
         return None
 
 
@@ -43,7 +55,7 @@ def set_session_id(session_id: str, *, ttl_seconds: int | None = None) -> None:
         getattr(settings, "PANACCESS_SESSION_TTL_SECONDS", 1500)
     )
     try:
-        _redis_client().set(SESSION_KEY, session_id, ex=ttl)
+        _redis_client().set(SESSION_KEY, encrypt_value(session_id), ex=ttl)
     except Exception as exc:
         logger.warning("No se pudo guardar sesión PanAccess en Redis: %s", exc)
 
