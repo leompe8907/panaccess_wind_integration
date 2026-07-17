@@ -46,6 +46,7 @@ Servicios `systemd` de aplicación (4):
 | `panaccess-wind.service` | Daphne (API + `/ws/`) |
 | `panaccess-celery-worker-pipeline.service` | Cola `sync_pipeline` |
 | `panaccess-celery-worker-full.service` | Cola `full_sync` |
+| `panaccess-celery-worker-compare.service` | Cola `compare_reconcile` |
 | `panaccess-celery-beat.service` | Agenda de tareas periódicas |
 
 > **Importante:** Este proyecto requiere **Daphne (ASGI)**, no Gunicorn solo. Gunicorn no sirve WebSockets de Django Channels.
@@ -473,18 +474,28 @@ WantedBy=multi-user.target
 
 ### 2. Workers de Celery (pipeline + full sync)
 
-Se usan **dos workers** con colas separadas:
+Se usan **tres workers** con colas separadas:
 
 | Worker | Cola | Rol |
 |--------|------|-----|
-| `panaccess-celery-worker-pipeline` | `sync_pipeline` | Pipeline periódico: suscriptores → smartcards (serie, `-c 1`) |
+| `panaccess-celery-worker-pipeline` | `sync_pipeline` | Pipeline periódico: suscriptores → smartcards (serie, `-c 1`). También recibe emails y tareas sueltas (`finish_subscriber_provisioning_task`, correos de bienvenida/reset/verificación) -- ver nota más abajo. |
 | `panaccess-celery-worker-full` | `full_sync` | Full sync nocturno exclusivo (`-c 1`) |
+| `panaccess-celery-worker-compare` | `compare_reconcile` | Reconciliación frecuente de subscribers/smartcards (cada `CELERY_COMPARE_SUBSCRIBERS_MINUTES`, default 5 min, `-c 1`) |
+
+**Importante (corregido en auditoría, sección 20):** hasta esta revisión, `compare_and_update_subscribers_task`/`compare_and_update_smartcards_task` estaban programadas cada 5 minutos en Beat con cola propia `compare_reconcile`, pero **no existía ningún worker consumiendo esa cola** en este deploy -- los mensajes se acumulaban sin procesarse nunca. Si tu entorno ya estaba desplegado antes de esta fecha, **hace falta instalar y arrancar `panaccess-celery-worker-compare.service` manualmente** (no pasa solo con actualizar el código):
+
+```bash
+sudo cp deploy/systemd/panaccess-celery-worker-compare.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now panaccess-celery-worker-compare.service
+```
 
 Variables en `.env`:
 
 ```env
 CELERY_SYNC_PIPELINE_QUEUE=sync_pipeline
 CELERY_FULL_SYNC_QUEUE=full_sync
+CELERY_COMPARE_SUBSCRIBERS_QUEUE=compare_reconcile
 CELERY_PIPELINE_LOCK_TIMEOUT=1800
 CELERY_TASK_ALWAYS_EAGER=false
 ```
@@ -529,7 +540,27 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-Opcional: worker general para emails y tareas sueltas (`-Q celery`).
+**Compare/reconcile** (`/etc/systemd/system/panaccess-celery-worker-compare.service`):
+
+```ini
+[Unit]
+Description=Celery Worker compare_reconcile (reconciliacion frecuente subscribers/smartcards)
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=wind
+WorkingDirectory=/opt/panaccess-wind
+EnvironmentFile=/opt/panaccess-wind/.env
+ExecStart=/opt/panaccess-wind/env/bin/celery -A panaccess_wind_integration worker -Q compare_reconcile -c 1 --loglevel=info -n compare@%h
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Ya no hace falta un worker aparte para la cola default `celery`: `finish_subscriber_provisioning_task` y los correos (bienvenida, reset de contraseña, verificación) están ruteados explícitamente a `sync_pipeline` en `CELERY_TASK_ROUTES` (antes caían en la cola default `celery`, que tampoco tenía worker en este deploy -- mismo problema que `compare_reconcile`, corregido en la misma revisión).
 
 > Mientras `full_sync` corre, el flag Redis `celery:flag:full_sync_in_progress` hace que el pipeline **se omita** automáticamente.
 
@@ -587,7 +618,7 @@ Recarga systemd e inicia **primero** Daphne y workers (Beat al final, tras el fu
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service
+sudo systemctl enable --now panaccess-wind.service panaccess-celery-worker-pipeline.service panaccess-celery-worker-full.service panaccess-celery-worker-compare.service
 # Tras confirmar run_full_sync OK:
 sudo systemctl enable --now panaccess-celery-beat.service
 ```
@@ -596,6 +627,7 @@ Verifica que estén activos sin errores:
 sudo systemctl status panaccess-wind.service
 sudo systemctl status panaccess-celery-worker-pipeline.service
 sudo systemctl status panaccess-celery-worker-full.service
+sudo systemctl status panaccess-celery-worker-compare.service
 sudo systemctl status panaccess-celery-beat.service
 ```
 
@@ -819,7 +851,7 @@ sudo cp deploy/systemd/panaccess-wind@.service deploy/systemd/panaccess-wind.tar
 sudo systemctl daemon-reload
 sudo systemctl enable postgresql redis-server nginx
 DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh enable
-sudo systemctl enable panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+sudo systemctl enable panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat
 ```
 
 ### Verificar que quedará activo al boot
@@ -827,7 +859,7 @@ sudo systemctl enable panaccess-celery-worker-pipeline panaccess-celery-worker-f
 ```bash
 systemctl is-enabled postgresql redis-server nginx panaccess-wind.target
 systemctl is-enabled panaccess-wind@{8000..8007}.service
-systemctl is-enabled panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+systemctl is-enabled panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat
 ```
 
 Todos deben responder **`enabled`**.
@@ -837,7 +869,7 @@ Todos deben responder **`enabled`**.
 ```bash
 sudo systemctl start postgresql redis-server
 DAPHNE_INSTANCES=8 sudo /opt/panaccess-wind/deploy/manage_daphne.sh start
-sudo systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+sudo systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat
 curl -s http://127.0.0.1:8000/health/
 ```
 
@@ -1005,6 +1037,7 @@ SKIP_DJANGO=1 DAPHNE_INSTANCES=8 ./deploy/reset_stack.sh
 sudo journalctl -u panaccess-wind@8000.service -f
 sudo journalctl -u panaccess-celery-worker-pipeline.service -f
 sudo journalctl -u panaccess-celery-worker-full.service -f
+sudo journalctl -u panaccess-celery-worker-compare.service -f
 sudo journalctl -u panaccess-celery-beat.service -f
 sudo tail -f /var/log/nginx/error.log
 ```
@@ -1103,7 +1136,7 @@ python manage.py showmigrations --plan | tail -20
 
 ```bash
 echo "=== Servicios ==="
-for svc in postgresql redis-server nginx panaccess-wind panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat; do
+for svc in postgresql redis-server nginx panaccess-wind panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat; do
     echo "--- $svc ---"
     sudo systemctl is-active "$svc" 2>/dev/null || sudo systemctl is-active "${svc}.service"
 done
@@ -1200,6 +1233,7 @@ Beat encola pero el worker no consume (cola incorrecta o servicio caído):
 ```bash
 sudo systemctl status panaccess-celery-worker-pipeline.service
 sudo systemctl status panaccess-celery-worker-full.service
+sudo systemctl status panaccess-celery-worker-compare.service
 redis-cli ping
 sudo journalctl -u panaccess-celery-worker-pipeline.service -n 30
 ```

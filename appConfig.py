@@ -486,6 +486,26 @@ class CeleryConfig:
     PIPELINE_LOCK_TIMEOUT = max(
         600, _env_int("CELERY_PIPELINE_LOCK_TIMEOUT", 1800)
     )
+    # TTLs de lock para las tareas de sync individuales (sync_subscribers_task,
+    # sync_products_task, sync_smartcards_task, compare_and_update_smartcards_task
+    # -- estas son manuales/on-demand, no todas tienen Beat schedule propio).
+    # Antes 600s hardcodeado en tasks.py; se mueven acá para poder ajustarlos
+    # por entorno sin tocar código. Con auto_extend=True en
+    # RedisConfig.task_lock, este valor es solo el TTL inicial -- el lock se
+    # renueva solo mientras la tarea sigue viva, así que no hace falta
+    # sobrestimarlo "por si acaso" para cubrir el peor caso completo.
+    SYNC_SUBSCRIBERS_LOCK_TIMEOUT = max(
+        300, _env_int("CELERY_SYNC_SUBSCRIBERS_LOCK_TIMEOUT", 600)
+    )
+    SYNC_PRODUCTS_LOCK_TIMEOUT = max(
+        300, _env_int("CELERY_SYNC_PRODUCTS_LOCK_TIMEOUT", 600)
+    )
+    SYNC_SMARTCARDS_LOCK_TIMEOUT = max(
+        300, _env_int("CELERY_SYNC_SMARTCARDS_LOCK_TIMEOUT", 600)
+    )
+    COMPARE_SMARTCARDS_LOCK_TIMEOUT = max(
+        300, _env_int("CELERY_COMPARE_SMARTCARDS_LOCK_TIMEOUT", 600)
+    )
     USE_CRONTAB = _env_bool("CELERY_USE_CRONTAB", False)
 
     FULL_SYNC_ENABLED = _env_bool("CELERY_FULL_SYNC_ENABLED", True)
@@ -560,6 +580,18 @@ class PanaccessConfig:
     DELETE_SUBSCRIBER_API = _strip_env(os.getenv("PANACCESS_DELETE_SUBSCRIBER_API")) or "deleteSubscriber"
     DISABLE_ORDER_API = _strip_env(os.getenv("PANACCESS_DISABLE_ORDER_API")) or "disableOrderOfSubscriber"
     REGISTRATION_TRIAL_DAYS = _env_int("REGISTRATION_TRIAL_DAYS", 30)
+
+    # Sync incremental de suscriptores (download_subscribers_since_last):
+    # tope de páginas de seguridad antes de rendirse y dejar que la
+    # reconciliación periódica (compare_and_update_subscribers_task) recoja
+    # lo que falte, en vez de degradar a un recorrido completo del catálogo
+    # en cada corrida si el corte por 'created' nunca se alcanza.
+    INCREMENTAL_SYNC_MAX_PAGES = max(1, _env_int("PANACCESS_INCREMENTAL_SYNC_MAX_PAGES", 50))
+    # Margen de solapamiento (segundos) al comparar 'created' contra el
+    # cursor local, para no perder registros con timestamp igual o con
+    # reloj levemente desalineado respecto a PanAccess. Reprocesarlos de más
+    # es inofensivo porque el guardado es upsert.
+    INCREMENTAL_SYNC_OVERLAP_SECONDS = max(0, _env_int("PANACCESS_INCREMENTAL_SYNC_OVERLAP_SECONDS", 5))
 
     # Alias usados por wind.utils / panaccess_client (retrocompatibilidad)
     PANACCESS = URL

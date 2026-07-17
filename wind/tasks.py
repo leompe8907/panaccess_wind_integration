@@ -72,7 +72,11 @@ def periodic_sync_pipeline_task(self, limit=None):
     lock_key = "celery:lock:periodic_sync_pipeline_task"
     lock_timeout = CeleryConfig.PIPELINE_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    # auto_extend=True: el lock se renueva solo (heartbeat) mientras la tarea
+    # sigue corriendo, así una corrida lenta (PanAccess lento, catálogo
+    # grande) no deja que el TTL expire a mitad de camino y Beat/un reintento
+    # arranque una segunda corrida en paralelo sobre el mismo pipeline.
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             return _skipped_already_running("periodic_sync_pipeline_task")
 
@@ -134,9 +138,12 @@ def sync_subscribers_task(self, limit=None):
         return _skipped_during_full_sync("sync_subscribers_task")
 
     lock_key = "celery:lock:sync_subscribers_task"
-    lock_timeout = 600
+    lock_timeout = CeleryConfig.SYNC_SUBSCRIBERS_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    # auto_extend=True: el lock se renueva solo mientras la tarea corre, para
+    # que una corrida lenta no deje el lock expirar y permita una segunda
+    # instancia en paralelo (ver auditoría).
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             logger.warning(
                 "⚠️ [Celery] sync_subscribers_task ya está ejecutándose, saltando esta ejecución"
@@ -186,9 +193,9 @@ def sync_products_task(self, limit=None):
         return _skipped_during_full_sync("sync_products_task")
 
     lock_key = "celery:lock:sync_products_task"
-    lock_timeout = 600
+    lock_timeout = CeleryConfig.SYNC_PRODUCTS_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             logger.warning("[Celery] sync_products_task ya está ejecutándose, se omite")
             return {
@@ -238,7 +245,7 @@ def compare_and_update_subscribers_task(self, limit=None):
     # arrancar una segunda corrida en paralelo sobre el mismo catálogo.
     lock_timeout = CeleryConfig.COMPARE_SUBSCRIBERS_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             logger.warning(
                 "[Celery] compare_and_update_subscribers_task ya está ejecutándose, se omite"
@@ -288,9 +295,9 @@ def compare_and_update_smartcards_task(self, limit=None):
         return _skipped_during_full_sync("compare_and_update_smartcards_task")
 
     lock_key = "celery:lock:compare_and_update_smartcards_task"
-    lock_timeout = 600
+    lock_timeout = CeleryConfig.COMPARE_SMARTCARDS_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             logger.warning(
                 "[Celery] compare_and_update_smartcards_task ya está ejecutándose, se omite"
@@ -340,9 +347,9 @@ def sync_smartcards_task(self, limit=None):
         return _skipped_during_full_sync("sync_smartcards_task")
 
     lock_key = "celery:lock:sync_smartcards_task"
-    lock_timeout = 600
+    lock_timeout = CeleryConfig.SYNC_SMARTCARDS_LOCK_TIMEOUT
 
-    with RedisConfig.task_lock(lock_key, timeout=lock_timeout) as acquired:
+    with RedisConfig.task_lock(lock_key, timeout=lock_timeout, auto_extend=True) as acquired:
         if not acquired:
             logger.warning(
                 "[Celery] sync_smartcards_task ya está ejecutándose, se omite"
@@ -457,7 +464,13 @@ def full_sync_task(self, limit=None):
             RedisConfig.clear_full_sync_in_progress()
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+@shared_task(
+    bind=True,
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=4,
+)
 def finish_subscriber_provisioning_task(
     self,
     *,
@@ -482,6 +495,25 @@ def finish_subscriber_provisioning_task(
     devolver sync porque dependen de estas mismas llamadas. El correo de
     bienvenida (ya async por su cuenta) sigue siendo el mecanismo para que
     el usuario reciba sus credenciales.
+
+    Reintentos (auditoría, sección 20): antes cada paso atrapaba
+    `PanAccessException` en general y se rendía en silencio para siempre,
+    sin importar si la falla era un error de negocio (no reintentable) o un
+    problema de conectividad transitorio (sí reintentable). Ahora los pasos
+    de contactos/license-block/producto de prueba dejan escapar las
+    excepciones de conectividad (`PanAccessConnectionError`/
+    `PanAccessTimeoutError`/`PanAccessSessionError`/`PanAccessRateLimitError`)
+    hacia un bloque que llama a `self.retry()` con backoff -- solo los
+    errores de negocio (`PanAccessException` genérico) se siguen
+    absorbiendo localmente por paso, igual que antes. El reintento es
+    manual (no `autoretry_for`) a propósito: así, si se agotan los
+    `max_retries`, se puede revertir la reserva del trial
+    (`eligible_for_trial=False`) antes de dejar que la tarea falle
+    definitivamente, en vez de dejarla reservada para siempre esperando un
+    otorgamiento que ya no va a llegar. Volver a ejecutar pasos que ya
+    habían tenido éxito en un intento previo (ej. `addContactToSubscriber`)
+    es seguro -- PanAccess los trata como "ya existe"/no-op, no duplica
+    nada.
     """
     from datetime import timedelta
 
@@ -561,94 +593,140 @@ def finish_subscriber_provisioning_task(
         logger.warning("[Async] No se encontró %s en el catálogo de PanAccess tras crearlo", subscriber_code)
     result["found_in_catalog"] = bool(found)
 
-    # 3) Contactos: email (+ validación) y teléfono si vino.
-    contacts_added = []
+    # Pasos 3 y 4 envueltos en un try/except propio: si algún paso deja
+    # escapar un error de conectividad (ver los except específicos más
+    # abajo), se decide acá si reintentar la tarea completa (con backoff) o,
+    # si ya se agotaron los reintentos, revertir la reserva de trial antes
+    # de rendirse -- así nunca queda "reservado para siempre" esperando un
+    # otorgamiento que ya no va a llegar (auditoría, sección 20).
     try:
-        add_resp = panaccess.call(
-            "addContactToSubscriber",
-            {"code": subscriber_code, "type": "email", "isBusiness": False, "contact": email_normalized},
-        )
-        if add_resp.get("success"):
-            contacts_added.append("email")
-            contact_id = _resolve_email_contact_id(panaccess, subscriber_code, add_resp, email_normalized)
-            if contact_id is not None:
-                _validate_email_contact_of_subscriber(panaccess, subscriber_code, contact_id, email_normalized)
-        else:
-            logger.error("[Async] addContactToSubscriber (email) falló para %s: %s", subscriber_code, add_resp.get("errorMessage"))
-    except PanAccessException:
-        logger.exception("[Async] Error PanAccess agregando contacto email para %s", subscriber_code)
-
-    if phone_normalized:
+        # 3) Contactos: email (+ validación) y teléfono si vino.
+        contacts_added = []
         try:
-            phone_resp = panaccess.call(
+            add_resp = panaccess.call(
                 "addContactToSubscriber",
-                {"code": subscriber_code, "type": "phone", "isBusiness": False, "contact": phone_normalized},
+                {"code": subscriber_code, "type": "email", "isBusiness": False, "contact": email_normalized},
             )
-            if phone_resp.get("success"):
-                contacts_added.append("phone")
+            if add_resp.get("success"):
+                contacts_added.append("email")
+                contact_id = _resolve_email_contact_id(panaccess, subscriber_code, add_resp, email_normalized)
+                if contact_id is not None:
+                    _validate_email_contact_of_subscriber(panaccess, subscriber_code, contact_id, email_normalized)
             else:
-                logger.error("[Async] addContactToSubscriber (phone) falló para %s: %s", subscriber_code, phone_resp.get("errorMessage"))
+                logger.error("[Async] addContactToSubscriber (email) falló para %s: %s", subscriber_code, add_resp.get("errorMessage"))
+        except (PanAccessConnectionError, PanAccessTimeoutError, PanAccessSessionError, PanAccessRateLimitError):
+            # Conectividad -- se deja escapar hacia el except de más abajo
+            # en vez de dar por perdido este contacto.
+            raise
         except PanAccessException:
-            logger.exception("[Async] Error PanAccess agregando contacto phone para %s", subscriber_code)
+            logger.exception("[Async] Error PanAccess agregando contacto email para %s", subscriber_code)
 
-    _persist_subscriber_contacts_to_db(subscriber_code, email=email_normalized, phone=phone_normalized)
-    result["contacts_added"] = contacts_added
-
-    # 4) License block + producto de prueba (solo si quedaron smartcards).
-    license_block_success = False
-    try:
-        license_resp = panaccess.call("addLicenseBlockToSubscriber", {"code": subscriber_code})
-        license_block_success = bool(license_resp.get("success"))
-        if not license_block_success:
-            logger.warning("[Async] addLicenseBlockToSubscriber falló para %s: %s", subscriber_code, license_resp.get("errorMessage"))
-    except PanAccessException:
-        logger.exception("[Async] Error PanAccess en license block para %s", subscriber_code)
-    result["license_block_added"] = license_block_success
-
-    if license_block_success:
-        found_after = _find_in_catalog()
-        updated_smartcards = found_after.get("smartcards") if found_after else None
-        if updated_smartcards and subscriber_obj is not None:
+        if phone_normalized:
             try:
-                subscriber_obj.smartcards = updated_smartcards
-                subscriber_obj.save(update_fields=["smartcards"])
-            except Exception:
-                logger.exception("[Async] Error actualizando smartcards de %s tras license block", subscriber_code)
+                phone_resp = panaccess.call(
+                    "addContactToSubscriber",
+                    {"code": subscriber_code, "type": "phone", "isBusiness": False, "contact": phone_normalized},
+                )
+                if phone_resp.get("success"):
+                    contacts_added.append("phone")
+                else:
+                    logger.error("[Async] addContactToSubscriber (phone) falló para %s: %s", subscriber_code, phone_resp.get("errorMessage"))
+            except (PanAccessConnectionError, PanAccessTimeoutError, PanAccessSessionError, PanAccessRateLimitError):
+                raise
+            except PanAccessException:
+                logger.exception("[Async] Error PanAccess agregando contacto phone para %s", subscriber_code)
 
-            if grant_registration_trial:
+        _persist_subscriber_contacts_to_db(subscriber_code, email=email_normalized, phone=phone_normalized)
+        result["contacts_added"] = contacts_added
+
+        # 4) License block + producto de prueba (solo si quedaron smartcards).
+        license_block_success = False
+        try:
+            license_resp = panaccess.call("addLicenseBlockToSubscriber", {"code": subscriber_code})
+            license_block_success = bool(license_resp.get("success"))
+            if not license_block_success:
+                logger.warning("[Async] addLicenseBlockToSubscriber falló para %s: %s", subscriber_code, license_resp.get("errorMessage"))
+        except (PanAccessConnectionError, PanAccessTimeoutError, PanAccessSessionError, PanAccessRateLimitError):
+            raise
+        except PanAccessException:
+            logger.exception("[Async] Error PanAccess en license block para %s", subscriber_code)
+        result["license_block_added"] = license_block_success
+
+        if license_block_success:
+            found_after = _find_in_catalog()
+            updated_smartcards = found_after.get("smartcards") if found_after else None
+            if updated_smartcards and subscriber_obj is not None:
                 try:
-                    trial_days = registration_trial_days()
-                    expiry_time = timezone.now() + timedelta(days=trial_days)
-                    product_params = {
-                        "productId": PanaccessConfig.REGISTRATION_PRODUCT_ID,
-                        "hcId": PanaccessConfig.HCID,
-                        "expiryTime": expiry_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    }
-                    for idx, sn in enumerate(updated_smartcards):
-                        if sn:
-                            product_params[f"smartcards[{idx}]"] = str(sn)
-                    product_resp = panaccess.call("addProductToSmartcards", product_params)
-                    if product_resp.get("success"):
-                        mark_trial_granted(
-                            email=email_normalized,
-                            document=user_provided_code or None,
-                            subscriber_code=subscriber_code,
-                            granted_at=timezone.now(),
-                        )
-                        result["trial_granted"] = True
-                    else:
-                        logger.warning("[Async] addProductToSmartcards falló para %s: %s", subscriber_code, product_resp.get("errorMessage"))
-                except PanAccessException:
-                    logger.exception("[Async] Error PanAccess asignando producto de prueba a %s", subscriber_code)
-            else:
-                logger.info("[Async] Trial omitido para %s (no elegible)", subscriber_code)
+                    subscriber_obj.smartcards = updated_smartcards
+                    subscriber_obj.save(update_fields=["smartcards"])
+                except Exception:
+                    logger.exception("[Async] Error actualizando smartcards de %s tras license block", subscriber_code)
+
+                if grant_registration_trial:
+                    try:
+                        trial_days = registration_trial_days()
+                        expiry_time = timezone.now() + timedelta(days=trial_days)
+                        product_params = {
+                            "productId": PanaccessConfig.REGISTRATION_PRODUCT_ID,
+                            "hcId": PanaccessConfig.HCID,
+                            "expiryTime": expiry_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                        for idx, sn in enumerate(updated_smartcards):
+                            if sn:
+                                product_params[f"smartcards[{idx}]"] = str(sn)
+                        product_resp = panaccess.call("addProductToSmartcards", product_params)
+                        if product_resp.get("success"):
+                            mark_trial_granted(
+                                email=email_normalized,
+                                document=user_provided_code or None,
+                                subscriber_code=subscriber_code,
+                                granted_at=timezone.now(),
+                            )
+                            result["trial_granted"] = True
+                        else:
+                            logger.warning("[Async] addProductToSmartcards falló para %s: %s", subscriber_code, product_resp.get("errorMessage"))
+                    except (PanAccessConnectionError, PanAccessTimeoutError, PanAccessSessionError, PanAccessRateLimitError):
+                        raise
+                    except PanAccessException:
+                        logger.exception("[Async] Error PanAccess asignando producto de prueba a %s", subscriber_code)
+                else:
+                    logger.info("[Async] Trial omitido para %s (no elegible)", subscriber_code)
+    except (PanAccessConnectionError, PanAccessTimeoutError, PanAccessSessionError, PanAccessRateLimitError, ConnectionError) as exc:
+        retries_exhausted = self.request.retries >= self.max_retries
+        if retries_exhausted:
+            # Sin más reintentos -- si había un trial reservado
+            # (eligible_for_trial=False) esperando a que este paso lo
+            # otorgara, se revierte ahora para no bloquear una futura
+            # elegibilidad legítima por culpa de una falla de conectividad
+            # que nunca se resolvió.
+            if grant_registration_trial and not result.get("trial_granted"):
+                from wind.functions.create_subscriber import revert_trial_reservation
+
+                revert_trial_reservation(email_normalized, user_provided_code or None)
+            logger.error(
+                "[Async] finish_subscriber_provisioning_task agotó reintentos para %s "
+                "(reserva de trial revertida si aplicaba)",
+                subscriber_code,
+                exc_info=True,
+            )
+        else:
+            logger.warning(
+                "[Async] Error de conectividad en finish_subscriber_provisioning_task "
+                "para %s, se reintentará (intento %s/%s)",
+                subscriber_code,
+                self.request.retries + 1,
+                self.max_retries,
+                exc_info=True,
+            )
+        raise self.retry(exc=exc)
 
     if grant_registration_trial and not result.get("trial_granted"):
         # Se había reservado el trial (eligible_for_trial=False) al
         # escribir los registries en create_subscriber_view, pero acá no
         # se llegó a otorgar de verdad (sin licencia, sin smartcards, o
-        # falló addProductToSmartcards) -- se revierte para no bloquear un
-        # reintento legítimo.
+        # falló addProductToSmartcards por un error de negocio, no de
+        # conectividad) -- se revierte para no bloquear un reintento
+        # legítimo.
         from wind.functions.create_subscriber import revert_trial_reservation
 
         revert_trial_reservation(email_normalized, user_provided_code or None)
@@ -785,9 +863,16 @@ def send_welcome_credentials_email_task(self, email, subject, text_body, html_bo
             return {"success": False, "error": str(exc), "email": email}
 
 
-@shared_task
-def send_password_reset_email_task(email: str, reset_link: str):
-    """Envía el correo con enlace de recuperación de contraseña."""
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_password_reset_email_task(self, email: str, reset_link: str):
+    """
+    Envía el correo con enlace de recuperación de contraseña.
+
+    Reintenta ante fallas transitorias de SMTP (antes no reintentaba nunca
+    -- un hiccup momentáneo del servidor de correo perdía el email de
+    reset para siempre, sin que el usuario tuviera forma de saberlo salvo
+    "pedirlo de nuevo"; auditoría, sección 20).
+    """
     from django.conf import settings
     from django.core.mail import send_mail
 
@@ -817,9 +902,12 @@ def send_password_reset_email_task(email: str, reset_link: str):
         )
         logger.info("Email de recuperación enviado a %s", email)
         return {"success": True, "email": email}
-    except Exception as e:
+    except Exception as exc:
         logger.exception("Error al enviar email de recuperación a %s", email)
-        return {"success": False, "error": str(e), "email": email}
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=15)
@@ -878,10 +966,15 @@ def refresh_subscriber_profile_task(self, subscriber_code, target_sns=None):
                 return {"success": False, "subscriber_code": subscriber_code, "error": str(exc)}
 
 
-@shared_task
-def send_verification_email_task(email, subject, body, html_body=None):
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_verification_email_task(self, email, subject, body, html_body=None):
     """
     Envía un email de verificación o notificación de forma asíncrona.
+
+    Reintenta ante fallas transitorias de SMTP (antes no reintentaba nunca
+    -- auditoría, sección 20). Este task también manda las alertas de
+    cierre parcial agotado (`_alert_closure_exhausted`), así que perder una
+    de estas notificaciones en silencio es particularmente indeseable.
     """
     from django.core.mail import send_mail
     from django.conf import settings
@@ -897,6 +990,9 @@ def send_verification_email_task(email, subject, body, html_body=None):
         )
         logger.info("Email enviado exitosamente a %s", email)
         return {"success": True, "email": email}
-    except Exception as e:
+    except Exception as exc:
         logger.exception("Error al enviar email a %s", email)
-        return {"success": False, "error": str(e), "email": email}
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}

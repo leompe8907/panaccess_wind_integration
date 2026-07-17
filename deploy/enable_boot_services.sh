@@ -25,6 +25,7 @@ systemctl enable panaccess-wind.target
 echo "=== Celery ==="
 systemctl enable panaccess-celery-worker-pipeline.service
 systemctl enable panaccess-celery-worker-full.service
+systemctl enable panaccess-celery-worker-compare.service
 systemctl enable panaccess-celery-beat.service
 
 echo ""
@@ -33,7 +34,7 @@ systemctl is-enabled postgresql redis-server nginx panaccess-wind.target || true
 for p in $(seq 8000 $((8000 + DAPHNE_INSTANCES - 1))); do
     systemctl is-enabled "panaccess-wind@${p}.service" || true
 done
-systemctl is-enabled panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat
+systemctl is-enabled panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat
 
 echo ""
-echo "Listo. Tras reboot: sudo systemctl start postgresql redis-server && DAPHNE_INSTANCES=$DAPHNE_INSTANCES $BASE/deploy/manage_daphne.sh start && systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-beat nginx"
+echo "Listo. Tras reboot: sudo systemctl start postgresql redis-server && DAPHNE_INSTANCES=$DAPHNE_INSTANCES $BASE/deploy/manage_daphne.sh start && systemctl start panaccess-celery-worker-pipeline panaccess-celery-worker-full panaccess-celery-worker-compare panaccess-celery-beat nginx"

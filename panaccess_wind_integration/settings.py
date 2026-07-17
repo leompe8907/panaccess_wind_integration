@@ -380,6 +380,15 @@ CELERY_TASK_ROUTES = {
     # subscriber_catalog.py) -- va a la misma cola liviana del pipeline
     # incremental, no necesita cola dedicada.
     'wind.tasks.refresh_subscriber_profile_task': {'queue': _PIPELINE_QUEUE},
+    # Sin ruta explícita, estas caían en la cola default de Celery ("celery")
+    # -- que en este deploy NO tiene ningún worker escuchándola (ver
+    # docs/DEPLOYMENT_UBUNTU_NATIVE.md y auditoría, sección 20). Se rutean a
+    # sync_pipeline (worker liviano que ya existe) para que efectivamente se
+    # ejecuten en vez de acumularse sin procesar.
+    'wind.tasks.finish_subscriber_provisioning_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.send_welcome_credentials_email_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.send_password_reset_email_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.send_verification_email_task': {'queue': _PIPELINE_QUEUE},
 }
 
 _SYNC_MINUTES = CeleryConfig.SYNC_MINUTES

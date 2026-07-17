@@ -475,30 +475,81 @@ def fetch_all_subscribers(session_id=None, limit=100):
 
 
 def download_subscribers_since_last(session_id=None, limit=100):
-    last = LastSubscriber()
-    if not last:
-        return (0, 0)
-    highest_code = last.code
+    """
+    Sync incremental: trae de PanAccess solo lo creado desde la última corrida.
+
+    Antes el corte se decidía comparando cada fila contra el CÓDIGO local más
+    alto (`LastSubscriber()`, orden alfabético/numérico de `code`), pero
+    `CallListExtendedSubscribers` pagina con `orderBy=created, DESC` (más
+    reciente primero) -- son dos criterios de orden distintos que no tienen
+    por qué coincidir (los códigos pueden venir de un documento de usuario,
+    no son secuenciales por fecha de alta). Si el suscriptor con el código
+    más alto no era el más recientemente creado, había que paginar casi todo
+    el catálogo para encontrarlo por orden de creación; y si ese suscriptor
+    ya no existe en PanAccess (p. ej. cuenta cerrada y borrada), el corte
+    nunca se encontraba y el loop degradaba a un recorrido completo del
+    catálogo en CADA corrida de 10 minutos, sin avisar (auditoría).
+
+    Ahora el corte usa la MISMA clave que la query: el `created` más reciente
+    que ya tenemos en caché local, con un pequeño margen de solapamiento
+    (`INCREMENTAL_SYNC_OVERLAP_SECONDS`) para no perder registros con
+    timestamp igual o reloj levemente desalineado -- reprocesarlos de más es
+    inofensivo porque el guardado es upsert. Si se supera un tope de páginas
+    de seguridad (`INCREMENTAL_SYNC_MAX_PAGES`) sin cruzar el corte, se
+    detiene la corrida en vez de seguir paginando el catálogo entero; lo que
+    falte lo recoge la reconciliación periódica
+    (`compare_and_update_subscribers_task`, cada pocos minutos).
+    """
+    from datetime import timedelta
+
+    from django.db.models import Max
+
+    last_created = ListOfSubscriber.objects.exclude(created__isnull=True).aggregate(
+        latest=Max("created")
+    )["latest"]
+
+    if last_created is None:
+        # No hay ningún 'created' local confiable para anclar el corte --
+        # se trata como base sin historial utilizable en vez de arriesgar
+        # un corte mal calculado (y, con el código viejo, esto silenciosamente
+        # no traía nada nuevo).
+        logger.warning(
+            "download_subscribers_since_last: no hay 'created' local para anclar "
+            "el corte, se hace un fetch_all_subscribers completo"
+        )
+        return fetch_all_subscribers(session_id, limit)
+
+    cursor = last_created - timedelta(seconds=PanaccessConfig.INCREMENTAL_SYNC_OVERLAP_SECONDS)
+    max_pages = PanaccessConfig.INCREMENTAL_SYNC_MAX_PAGES
+
     offset = 0
     new_data = []
-    found = False
     parser = _get_dateutil_parser()
-    
+    pages_scanned = 0
+    reached_cursor = False
+
     while True:
         result = CallListExtendedSubscribers(session_id, offset, limit)
         rows = result.get("extendedSubscriberEntries") or result.get("subscriberEntries") or result.get("rows", [])
         if not rows:
             break
-        
+
+        pages_scanned += 1
+        stop_page = False
+
         for row in rows:
             code = row.get("subscriberCode")
             if not code or not str(code).strip():
                 continue
-            
-            if code == highest_code:
-                found = True
+
+            row_created = _parse_subscriber_datetime(row.get("created"), parser)
+            if row_created is not None and row_created <= cursor:
+                # orderBy=created DESC: de aquí en adelante todo es igual o
+                # más viejo que lo que ya tenemos -- ya alcanzamos lo nuevo.
+                reached_cursor = True
+                stop_page = True
                 break
-            
+
             subscriber_data = {
                 "id": code,
                 "code": code,
@@ -524,20 +575,42 @@ def download_subscribers_since_last(session_id=None, limit=100):
                 "newsletterAccepted": row.get("newsletterAccepted", False),
                 "tags": row.get("tags"),
                 "uniqueLogin": row.get("uniqueLogin"),
+                "created": row_created,
+                "firstOrderTime": _parse_subscriber_datetime(row.get("firstOrderTime"), parser),
+                "lastExpiryTime": _parse_subscriber_datetime(row.get("lastExpiryTime"), parser),
             }
-            
-            subscriber_data["created"] = _parse_subscriber_datetime(row.get("created"), parser)
-            subscriber_data["firstOrderTime"] = _parse_subscriber_datetime(row.get("firstOrderTime"), parser)
-            subscriber_data["lastExpiryTime"] = _parse_subscriber_datetime(row.get("lastExpiryTime"), parser)
-            
+
             new_data.append(subscriber_data)
-        
-        if found:
+
+        if stop_page:
             break
+
         offset += limit
-    
+
+        if pages_scanned >= max_pages:
+            logger.error(
+                "download_subscribers_since_last: se alcanzó el tope de seguridad "
+                "de %s páginas (limit=%s) sin encontrar el corte por 'created' -- "
+                "se detiene esta corrida para no degradar a un recorrido completo "
+                "del catálogo cada vez. La reconciliación periódica "
+                "(compare_and_update_subscribers_task) recogerá lo que falte.",
+                max_pages,
+                limit,
+            )
+            break
+
+    if not reached_cursor and pages_scanned < max_pages:
+        # PanAccess se quedó sin filas (fin real del catálogo) sin nunca
+        # cruzar el cursor -- no debería pasar en un catálogo estable, pero
+        # no es un error en sí (ya se trajo todo lo que había).
+        logger.info(
+            "download_subscribers_since_last: se llegó al final del catálogo "
+            "remoto sin cruzar el cursor local (created=%s); asumido normal.",
+            cursor,
+        )
+
     result_store = store_all_subscribers_in_chunks(new_data)
-    
+
     if fetch_login_info_for_subscriber and new_data:
         from wind.functions.getSubscriberLoginInfo import fetch_login_info_for_codes
         codes = [item.get("code") for item in new_data if item.get("code")]
