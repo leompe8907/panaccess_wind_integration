@@ -54,18 +54,37 @@ def _deactivate_portal_users(subscriber_code: str) -> int:
     `invalidate_active_sessions` necesita el objeto `User` real por cada
     uno.
     """
-    emails = list(
-        SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).values_list(
-            "email", flat=True
-        )
-    )
-    if not emails:
-        return 0
+    from wind.models import SubscriberLoginInfo
+    from django.db.models import Q
+    from django.db.models.functions import Lower
+
+    emails = set()
+    for email in SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).values_list(
+        "email", flat=True
+    ):
+        if email:
+            emails.add(email.strip().lower())
+
+    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    if sub and sub.emails:
+        emails.add(sub.emails.strip().lower())
+
+    usernames = {subscriber_code}
+    login_info = SubscriberLoginInfo.objects.filter(subscriberCode=subscriber_code).first()
+    if login_info:
+        if login_info.login1:
+            usernames.add(str(login_info.login1))
+        if login_info.login2:
+            usernames.add(login_info.login2)
 
     from wind.services.jwt_invalidation import invalidate_active_sessions
 
+    user_qs = User.objects.annotate(email_lower=Lower("email")).filter(
+        Q(email_lower__in=list(emails)) | Q(username__in=list(usernames))
+    )
+
     updated = 0
-    for user in User.objects.filter(email__in=emails):
+    for user in user_qs:
         invalidate_active_sessions(user)
         if user.is_active:
             user.is_active = False

@@ -575,11 +575,16 @@
                 throw new Error("Sesión expirada");
               }
               return res.json().then(function (data) {
-                return { ok: res.ok, data: data };
+                return { ok: res.ok, status: res.status, data: data };
               });
             })
             .then(function (out) {
               if (!out.ok || !out.data.success) {
+                if (out.status === 404 && out.data.message === "No hay suscriptor vinculado a este usuario.") {
+                  WindAuth.logout();
+                  window.location.href = "/wind/login/?session=expired";
+                  throw new Error("Cuenta cerrada");
+                }
                 throw new Error(out.data.message || "No se pudo cargar la cuenta");
               }
               var sub = getSubscriber(out.data);
