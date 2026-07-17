@@ -42,6 +42,18 @@ def _mark_registry_closed(subscriber_code: str, closed_at) -> dict[str, int]:
 
 
 def _deactivate_portal_users(subscriber_code: str) -> int:
+    """
+    Desactiva el/los `User` de Django vinculados a este abonado y corta
+    cualquier sesión JWT que ya tuvieran activa (auditoría, sección
+    17/21/22): `is_active=False` ya hace que `JWTAuthentication` rechace el
+    access token en la siguiente request, pero sin invalidar también el
+    token en sí (blacklist de refresh + corte de `iat`), un access token
+    todavía vigente emitido *antes* de este cierre seguiría sirviendo hasta
+    que expire por su cuenta si en algún momento el usuario se reactivara
+    por error. Se itera (en vez de un `.update()` en bloque) porque
+    `invalidate_active_sessions` necesita el objeto `User` real por cada
+    uno.
+    """
     emails = list(
         SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).values_list(
             "email", flat=True
@@ -49,7 +61,17 @@ def _deactivate_portal_users(subscriber_code: str) -> int:
     )
     if not emails:
         return 0
-    return User.objects.filter(email__in=emails, is_active=True).update(is_active=False)
+
+    from wind.services.jwt_invalidation import invalidate_active_sessions
+
+    updated = 0
+    for user in User.objects.filter(email__in=emails):
+        invalidate_active_sessions(user)
+        if user.is_active:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+            updated += 1
+    return updated
 
 
 def _revoke_udid_requests(subscriber_code: str) -> int:
@@ -107,6 +129,19 @@ def close_subscriber_account(
                     "status": ListOfSubscriber.STATUS_PENDING_CLOSURE,
                 },
             )
+
+        # Igual que el tombstone de arriba: se corta el acceso al portal
+        # DE UNA VEZ, antes de llamar a PanAccess -- no solo si la
+        # desaprovisión termina en éxito completo más abajo. Antes,
+        # `_deactivate_portal_users` solo corría tras un cierre 100%
+        # exitoso; si PanAccess fallaba o quedaba parcial, el `User` seguía
+        # activo y CUALQUIER sesión ya logueada (JWT emitido antes de este
+        # cierre) seguía entrando al dashboard con normalidad, aunque el
+        # abonado ya estuviera en PENDING_CLOSURE localmente (auditoría,
+        # sección 17/21/22 -- confirmado en la práctica por el cliente: el
+        # perfil devolvía 404 "sin suscriptor vinculado" pero el dashboard
+        # seguía cargando, señal de que la sesión seguía autenticando bien).
+        _deactivate_portal_users(subscriber_code)
 
     panaccess_result: dict[str, Any] = {"skipped": skip_panaccess}
     if not skip_panaccess:

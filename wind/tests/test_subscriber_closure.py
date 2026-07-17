@@ -10,10 +10,13 @@ nada -- este test confirma que ahora si se crea la fila cerrada.
 """
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from wind.models import ListOfSubscriber
+from wind.models import ListOfSubscriber, SubscriberEmailRegistry
 from wind.services.subscriber_closure import close_subscriber_account
+
+User = get_user_model()
 
 
 class CloseSubscriberAccountNoLocalRowTestCase(TestCase):
@@ -78,3 +81,58 @@ class CloseSubscriberAccountNoLocalRowTestCase(TestCase):
         self.assertEqual(subscriber.status, ListOfSubscriber.STATUS_CLOSED)
         self.assertEqual(subscriber.smartcards, [])
         self.assertEqual(ListOfSubscriber.objects.filter(code=code).count(), 1)
+
+
+class CloseSubscriberAccountDeactivatesPortalUserTestCase(TestCase):
+    """
+    Auditoría, sección 17/21/22: confirmado en producción que, tras cerrar
+    una cuenta, una sesión ya logueada seguía entrando al dashboard con
+    normalidad. La causa: `_deactivate_portal_users` solo corría después de
+    un cierre 100% exitoso en PanAccess -- si la desaprovisión fallaba o
+    quedaba parcial, el `User` de Django nunca se desactivaba. Estos tests
+    confirman que ahora el usuario se desactiva de una vez al iniciar el
+    cierre, sin importar el resultado final en PanAccess.
+    """
+
+    def _make_user_and_registry(self, code, email):
+        user = User.objects.create_user(username=email, email=email, password="Whatever123!")
+        SubscriberEmailRegistry.objects.create(email=email, subscriber_code=code)
+        return user
+
+    @patch("wind.services.subscriber_closure.deprovision_subscriber_in_panaccess")
+    def test_deactivates_user_even_when_panaccess_fails(self, mock_deprovision):
+        code = "40219990001"
+        email = "cliente.cerrado@example.com"
+        user = self._make_user_and_registry(code, email)
+        self.assertTrue(user.is_active)
+
+        mock_deprovision.return_value = {"success": False, "errors": ["timeout"], "steps": []}
+
+        result = close_subscriber_account(code, reason="prueba")
+
+        self.assertFalse(result["success"])
+        user.refresh_from_db()
+        self.assertFalse(
+            user.is_active,
+            "El usuario debe quedar desactivado aunque PanAccess haya fallado/quedado parcial",
+        )
+
+    @patch("wind.services.subscriber_closure.deprovision_subscriber_in_panaccess")
+    def test_deactivates_user_on_full_success(self, mock_deprovision):
+        code = "40219990002"
+        email = "cliente.cerrado2@example.com"
+        user = self._make_user_and_registry(code, email)
+
+        mock_deprovision.return_value = {
+            "success": True,
+            "subscriber_deleted": True,
+            "steps": [],
+            "warnings": [],
+            "errors": [],
+        }
+
+        result = close_subscriber_account(code, reason="prueba")
+
+        self.assertTrue(result["success"], result)
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)

@@ -29,8 +29,23 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 logger = logging.getLogger(__name__)
 
 
-def mark_password_changed(user) -> None:
-    """Registra el momento del cambio y blacklistea refresh tokens vigentes."""
+def invalidate_active_sessions(user) -> None:
+    """
+    Corta cualquier sesión JWT activa de este usuario: blacklistea sus
+    refresh tokens vigentes y adelanta el "corte" que
+    `PasswordAwareJWTAuthentication` usa para rechazar access tokens ya
+    emitidos (aunque el nombre del campo sea `password_changed_at`, el
+    mecanismo es genérico -- "cualquier token emitido antes de este
+    timestamp deja de servir").
+
+    Se usa tanto al cambiar contraseña (`mark_password_changed`) como al
+    cerrar una cuenta (`subscriber_closure.close_subscriber_account`,
+    auditoría sección 17/21/22): cerrar la cuenta desactiva el `User`
+    (`is_active=False`, que `JWTAuthentication` ya rechaza en cada request),
+    pero sin esto un access token todavía vigente emitido *antes* del cierre
+    seguiría pasando el chequeo de `iat` -- este corte cierra también esa
+    ventana.
+    """
     if not user:
         return
 
@@ -41,6 +56,11 @@ def mark_password_changed(user) -> None:
         defaults={"password_changed_at": timezone.now()},
     )
     _blacklist_outstanding_refresh_tokens(user)
+
+
+def mark_password_changed(user) -> None:
+    """Registra el momento del cambio y blacklistea refresh tokens vigentes."""
+    invalidate_active_sessions(user)
 
 
 def _blacklist_outstanding_refresh_tokens(user) -> None:

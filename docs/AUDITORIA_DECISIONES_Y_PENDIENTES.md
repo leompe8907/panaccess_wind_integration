@@ -278,6 +278,18 @@ Al revisar el flujo de login a raíz de una pregunta sobre cuentas cerradas: `au
 
 Los productos de prueba no se ven afectados por este hallazgo (solo se otorgan en el registro, nunca en el login).
 
+### 22. Confirmado en producción tras el fix anterior — una sesión ya logueada seguía entrando al dashboard después de cerrar la cuenta
+
+El cliente cerró una cuenta y, aunque el fix de la sección 17 ya bloquea logins NUEVOS, seguía pudiendo entrar al dashboard con la sesión que ya tenía abierta -- el perfil devolvía 404 ("No hay suscriptor vinculado a este usuario") pero el resto de la app seguía cargando, señal de que la autenticación en sí seguía pasando.
+
+**Causa raíz:** `_deactivate_portal_users` (que pone `is_active=False` en el `User` de Django) solo se ejecutaba en `close_subscriber_account` **después** de que la desaprovisión en PanAccess terminara con éxito completo. Si PanAccess fallaba o el cierre quedaba `PARTIAL` (ver sección 11), la función retornaba antes de llegar a esa línea -- el `User` nunca se desactivaba, así que cualquier sesión JWT ya abierta (access token emitido antes del cierre) seguía autenticando con total normalidad hasta que expirara por su cuenta. Además, aunque el `User` sí llegara a desactivarse, nada invalidaba de forma proactiva los tokens ya emitidos -- solo `is_active=False`, que corta accesos *nuevos* pero no imita el mecanismo que ya existía para cambio de contraseña (`jwt_invalidation.py`).
+
+**Resuelto:**
+- `_deactivate_portal_users` ahora corre en el mismo punto donde se marca el tombstone `PENDING_CLOSURE`, **antes** de llamar a PanAccess -- no solo tras un éxito completo. Así, apenas se pide el cierre (sin importar si PanAccess termina bien, mal, o parcial), el acceso al portal queda cortado.
+- Se generalizó el mecanismo de invalidación de JWT que ya existía para cambio de contraseña (`wind/services/jwt_invalidation.py`, antes `mark_password_changed`): nueva función `invalidate_active_sessions(user)` -- blacklistea los refresh tokens vigentes y adelanta el corte de `iat` que `PasswordAwareJWTAuthentication` usa para rechazar access tokens ya emitidos. `mark_password_changed` ahora es un alias de esta función; `_deactivate_portal_users` la llama por cada usuario que desactiva, así un access token vigente emitido antes del cierre deja de servir de inmediato, no solo al expirar.
+
+Tests nuevos en `wind/tests/test_subscriber_closure.py` confirman que el usuario queda desactivado tanto si la desaprovisión en PanAccess falla como si termina en éxito completo.
+
 ### 18. Implementado — resto de los temas de la sección 16
 
 - **`getSubscriber.py` — borrado de credenciales por paginación incompleta (resuelto).** `compare_and_update_all_subscribers` ahora distingue "página vacía = fin real del catálogo" de "página vacía por glitch transitorio": si una página intermedia llega vacía, reintenta hasta `max_empty_page_retries` (2) antes de darla por buena. Se agregó una bandera `pagination_complete` que solo queda en `True` si el recorrido llegó al final sin cortes sospechosos; `_delete_local_subscribers_not_in_remote` y `cleanup_login_info_not_in_remote` (los pasos destructivos) ahora se saltan por completo si `pagination_complete=False`, en vez de borrar con datos incompletos.
