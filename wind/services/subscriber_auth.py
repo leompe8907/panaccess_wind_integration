@@ -231,6 +231,25 @@ def ensure_subscriber_portal_email_verified(user: User, login: str = "") -> None
         mark_portal_email_verified(user, email)
 
 
+def is_subscriber_closed_locally(subscriber_code: str | None) -> bool:
+    """
+    True si el abonado está CLOSED o PENDING_CLOSURE en la tabla local.
+
+    Usado para no dejar entrar (ni reactivar el usuario del portal) a una
+    cuenta que ya cerramos localmente, sin importar si PanAccess todavía
+    acepta esas credenciales (auditoría, sección 17/21: el login nunca
+    revisaba este estado, así que cerrar la cuenta no impedía volver a
+    entrar si las credenciales seguían siendo válidas del lado de
+    PanAccess -- confirmado en la práctica por el cliente).
+    """
+    if not subscriber_code:
+        return False
+    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    if not sub:
+        return False
+    return sub.status in (ListOfSubscriber.STATUS_CLOSED, ListOfSubscriber.STATUS_PENDING_CLOSURE)
+
+
 def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
     """Crea o actualiza un User de Django vinculado al abonado PanAccess."""
     code = login_record.subscriberCode or ""
@@ -253,7 +272,12 @@ def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
     raw_password = login_record.get_password()
     if raw_password:
         user.set_password(raw_password)
-    user.is_active = True
+    # No reactivar una cuenta que cerramos localmente -- ver
+    # is_subscriber_closed_locally(). El caller (authenticate_portal_user)
+    # ya debería haber bloqueado el login antes de llegar acá; esto es una
+    # segunda capa para cualquier otro caller presente o futuro.
+    if not is_subscriber_closed_locally(code):
+        user.is_active = True
     user.save()
     mark_portal_email_verified(user, email)
     return user
@@ -263,6 +287,14 @@ def authenticate_portal_user(login: str, password: str):
     """
     Autentica por usuario Django (email/username) o credenciales PanAccess (texto libre).
     Retorna User o None.
+
+    Nota (auditoría, sección 17/21): el camino por credenciales PanAccess
+    (`verify_panaccess_credentials`) puede encontrar la contraseña cacheada
+    localmente, o volver a pedirla en vivo a PanAccess si no está en caché
+    (`fetch_and_find_login_record`) -- en cualquiera de los dos casos, si
+    esa cuenta ya la cerramos localmente (`ListOfSubscriber.status`), no se
+    debe conceder acceso ni reactivar el usuario del portal, sin importar
+    si PanAccess todavía acepta esas credenciales.
     """
     login = (login or "").strip()
     if not login or not password:
@@ -270,6 +302,13 @@ def authenticate_portal_user(login: str, password: str):
 
     user = authenticate(username=login, password=password)
     if user:
+        # authenticate() de Django ya respeta is_active, pero si el usuario
+        # sigue activo y el abonado vinculado resulta estar cerrado (ej. se
+        # cerró la cuenta por otro medio sin desactivar este User todavía),
+        # se bloquea igual acá.
+        if is_subscriber_closed_locally(resolve_subscriber_code(login)):
+            logger.warning("Login rechazado para %s: abonado cerrado localmente", login)
+            return None
         user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
         ensure_subscriber_portal_email_verified(user, login)
         return user
@@ -279,12 +318,23 @@ def authenticate_portal_user(login: str, password: str):
         if by_email:
             user = authenticate(username=by_email.get_username(), password=password)
             if user:
+                if is_subscriber_closed_locally(resolve_subscriber_code(login)):
+                    logger.warning("Login rechazado para %s: abonado cerrado localmente", login)
+                    return None
                 user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
                 ensure_subscriber_portal_email_verified(user, login)
                 return user
 
     login_record = verify_panaccess_credentials(login, password)
     if login_record:
+        if is_subscriber_closed_locally(login_record.subscriberCode):
+            logger.warning(
+                "Login rechazado para %s: abonado %s cerrado localmente "
+                "(PanAccess todavía aceptó las credenciales)",
+                login,
+                login_record.subscriberCode,
+            )
+            return None
         user = get_or_create_portal_user(login_record)
         user.backend = "django.contrib.auth.backends.ModelBackend"
         ensure_subscriber_portal_email_verified(user, login)

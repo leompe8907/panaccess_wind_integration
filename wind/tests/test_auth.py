@@ -183,3 +183,59 @@ class SubscriberAuthTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
+
+
+class ClosedSubscriberLoginTestCase(APITestCase):
+    """
+    Auditoría, sección 17/21: cerrar la cuenta no debe dejar seguir
+    logueando por credenciales de PanAccess (cacheadas o re-consultadas en
+    vivo), ni reactivar el User que el cierre desactivó.
+    """
+
+    def _make_login_record(self, code, password='secret'):
+        return SubscriberLoginInfo.objects.create(
+            subscriberCode=code,
+            login1=99001,
+            login2=f'wtl@{code}',
+            password_hash=encrypt_value(password),
+        )
+
+    def test_authenticate_portal_user_rejects_closed_subscriber(self):
+        from wind.services.subscriber_auth import authenticate_portal_user
+
+        ListOfSubscriber.objects.create(id='CLOSEDCODE', code='CLOSEDCODE', status=ListOfSubscriber.STATUS_CLOSED)
+        self._make_login_record('CLOSEDCODE')
+
+        user = authenticate_portal_user('99001', 'secret')
+
+        self.assertIsNone(user)
+
+    def test_authenticate_portal_user_rejects_pending_closure_subscriber(self):
+        from wind.services.subscriber_auth import authenticate_portal_user
+
+        ListOfSubscriber.objects.create(
+            id='PENDCODE', code='PENDCODE', status=ListOfSubscriber.STATUS_PENDING_CLOSURE
+        )
+        self._make_login_record('PENDCODE', password='otrasecreta')
+
+        user = authenticate_portal_user('99001', 'otrasecreta')
+
+        self.assertIsNone(user)
+
+    def test_authenticate_portal_user_allows_active_subscriber(self):
+        from wind.services.subscriber_auth import authenticate_portal_user
+
+        ListOfSubscriber.objects.create(id='ACTIVECODE', code='ACTIVECODE', status=ListOfSubscriber.STATUS_ACTIVE)
+        self._make_login_record('ACTIVECODE', password='activa123')
+
+        user = authenticate_portal_user('99001', 'activa123')
+
+        self.assertIsNotNone(user)
+
+    def test_get_or_create_portal_user_does_not_reactivate_closed_subscriber(self):
+        ListOfSubscriber.objects.create(id='CLOSEDCODE2', code='CLOSEDCODE2', status=ListOfSubscriber.STATUS_CLOSED)
+        login_record = self._make_login_record('CLOSEDCODE2', password='cualquiera')
+
+        user = get_or_create_portal_user(login_record)
+
+        self.assertFalse(user.is_active)
