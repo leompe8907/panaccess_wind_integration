@@ -7,139 +7,110 @@
     <title>Registro | Wind</title>
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f3f5f9;
-        --bg-2: #e9eef7;
-        --card: rgba(255,255,255,0.92);
-        --text: rgba(17, 24, 39, 0.94);
-        --muted: rgba(17, 24, 39, 0.62);
-        --line: rgba(15, 23, 42, 0.14);
-        --line-2: rgba(15, 23, 42, 0.10);
-        --focus: rgba(59, 130, 246, 0.22);
-        --ok: #16a34a;
-        --warn: #d97706;
-        --bad: #dc2626;
-        --btn: #1d4ed8;
-        --btn-hover: #1e40af;
-        --shadow: 0 22px 60px rgba(2, 6, 23, 0.18);
+        color-scheme: dark;
+        --bg: #001222;
+        --card: #012b4f;
+        --text: #ffffff;
+        --muted: #b3e3ff;
+        --line: rgba(74, 199, 215, 0.3);
+        --line-2: rgba(74, 199, 215, 0.15);
+        --focus: rgba(74, 199, 215, 0.35);
+        --ok: #10b981;
+        --warn: #f59e0b;
+        --bad: #ef4444;
+        --btn: #4ac7d7;
+        --btn-hover: #b3e3ff;
+        --shadow: 0 22px 60px rgba(0, 0, 0, 0.6);
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-        background-color: var(--bg);
-        background-image:
-          /* Overlay sutil para mantener legibilidad sin “tapar” la imagen */
-          linear-gradient(180deg, rgba(243,245,249,0.38), rgba(233,238,247,0.46)),
-          url("{% static 'wind/images/backgroundalt.webp' %}");
-        background-position: center, center;
-        background-size: cover, cover;
-        background-repeat: no-repeat, no-repeat;
+        background: var(--bg);
         color: var(--text);
-        overflow: hidden; /* sin scroll de página */
-      }
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(900px 520px at 18% 0%, rgba(29,78,216,0.12), transparent 60%),
-          radial-gradient(900px 520px at 92% 15%, rgba(16,185,129,0.08), transparent 62%),
-          radial-gradient(700px 520px at 55% 100%, rgba(245,158,11,0.08), transparent 60%);
-        opacity: 0.9;
-        z-index: -1;
-      }
-      a { color: inherit; }
-      .wrap {
         min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 22px 16px 70px;
+        overflow-x: hidden;
       }
-      .card {
-        width: 100%;
-        max-width: 560px;
-        max-height: calc(100vh - 100px);
-        max-height: calc(100dvh - 100px);
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        /* Un poco más sólido para legibilidad sobre foto */
-        background: rgba(255,255,255,0.94);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-      }
-      .header {
-        padding: 18px 18px 14px;
-        border-bottom: 1px solid var(--line-2);
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 14px;
-        align-items: center;
-      }
-      .brand {
+      a { color: #4ac7d7; }
+
+      /* Layout "split cinematográfico": la foto ocupa una parte real de la
+         pantalla (no wallpaper detrás de una tarjeta) y el formulario vive
+         en un panel sólido al lado. Mismo lenguaje visual que login/olvidé
+         contraseña (wind/static/wind/css/app.css), pero con un panel más
+         ancho porque este formulario tiene grillas de 2 columnas. */
+      .split-shell {
+        min-height: 100vh;
         display: flex;
-        align-items: center;
-        gap: 10px;
       }
-      .logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: radial-gradient(16px 16px at 30% 30%, rgba(255,255,255,0.75), transparent 60%),
-                    linear-gradient(135deg, rgba(29,78,216,0.85), rgba(16,185,129,0.45));
-        box-shadow: 0 10px 26px rgba(2, 6, 23, 0.12);
+      .split-photo {
+        flex: 1.4;
+        position: relative;
+        background-image: url("{% static 'wind/images/backgroundalt.webp' %}");
+        background-size: cover;
+        background-position: center;
       }
-      .title {
-        display: grid;
-        gap: 6px;
+      .split-photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 55%, var(--bg) 100%);
       }
-      .title h1 {
-        font-size: 18px;
-        margin: 0;
-        letter-spacing: 0.2px;
+      .split-panel {
+        flex: 1;
+        min-width: 340px;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 48px clamp(24px, 5vw, 64px) 90px;
       }
-      .title p {
-        margin: 0;
+      .split-panel-inner {
+        max-width: 460px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      .split-brand {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #4ac7d7;
+        margin-bottom: 22px;
+      }
+      .split-panel h1 {
+        font-size: 22px;
+        margin: 0 0 8px;
+      }
+      .split-sub {
+        margin: 0 0 4px;
         color: var(--muted);
         font-size: 13px;
         line-height: 1.4;
       }
-      .pill {
-        font-size: 12px;
-        color: var(--muted);
-        border: 1px solid var(--line);
-        background: rgba(255,255,255,0.05);
-        padding: 6px 10px;
-        border-radius: 999px;
-        white-space: nowrap;
-      }
-      .content {
-        display: block;
-        padding: 14px;
-      }
-      .panel {
-        border: 1px solid var(--line-2);
-        border-radius: 16px;
-        background: rgba(255,255,255,0.76);
-        padding: 14px;
-      }
-      .panel h2 {
-        margin: 0 0 12px;
+      .split-login-link {
+        margin: 10px 0 24px;
         font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: rgba(15, 23, 42, 0.78);
       }
+      .split-login-link a {
+        font-weight: 600;
+        text-decoration: none;
+      }
+      @media (max-width: 860px) {
+        .split-shell { flex-direction: column; }
+        .split-photo { flex: none; height: 180px; }
+        .split-photo::after { background: linear-gradient(180deg, transparent 40%, var(--bg) 100%); }
+        .split-panel { padding: 28px 22px 90px; }
+      }
+
       form {
         display: grid;
-        gap: 10px;
+        gap: 14px;
+        align-items: start;
       }
       .grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 16px;
+        align-items: start;
       }
       @media (max-width: 560px) {
         .grid { grid-template-columns: 1fr; }
@@ -147,6 +118,8 @@
       .field {
         display: grid;
         gap: 6px;
+        width: 100%;
+        align-items: start;
       }
       label {
         display: grid;
@@ -162,40 +135,38 @@
       }
       .req {
         font-size: 11px;
-        color: rgba(17, 24, 39, 0.55);
+        color: var(--muted);
+        opacity: 0.8;
       }
+      /* Inputs de línea (sin caja), como en login/olvidé contraseña. */
       input, select, textarea {
         width: 100%;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        background: rgba(255,255,255,0.92);
+        border: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+        background: transparent;
+        padding: 10px 2px;
         color: var(--text);
         outline: none;
+        border-radius: 0;
+        transition: border-color 0.2s ease;
       }
-      input::placeholder, textarea::placeholder { color: rgba(17, 24, 39, 0.38); }
+      input::placeholder, textarea::placeholder { color: rgba(179, 227, 255, 0.45); }
       textarea { min-height: 92px; resize: vertical; }
       input:focus, select:focus, textarea:focus {
-        border-color: rgba(29, 78, 216, 0.45);
-        box-shadow: 0 0 0 4px var(--focus);
-      }
-      input:invalid:focus, textarea:invalid:focus {
-        border-color: rgba(220,38,38,0.45);
-        box-shadow: 0 0 0 4px rgba(239,68,68,0.20);
+        border-bottom-color: #4ac7d7;
       }
       .errorText {
         display: none;
         font-size: 12px;
         line-height: 1.35;
-        color: rgba(127, 29, 29, 0.95);
-        background: rgba(239,68,68,0.10);
-        border: 1px solid rgba(220,38,38,0.20);
+        color: #ff9999;
+        background: rgba(239,68,68,0.15);
+        border: 1px solid rgba(220,38,30,0.30);
         padding: 8px 10px;
         border-radius: 12px;
       }
       .field[data-invalid="true"] input {
-        border-color: rgba(220,38,38,0.35);
-        box-shadow: 0 0 0 4px rgba(239,68,68,0.16);
+        border-bottom-color: var(--bad);
       }
       .field[data-invalid="true"] .errorText { display: block; }
       .row {
@@ -212,6 +183,7 @@
         justify-content: flex-end;
         flex-wrap: wrap;
         margin-top: 2px;
+        width: 100%;
       }
       .actions .left {
         margin-right: auto;
@@ -220,13 +192,6 @@
         align-items: center;
       }
       @media (max-width: 420px) {
-        .wrap { padding: 16px 12px 68px; }
-        .header { padding: 16px 14px 12px; }
-        .content { padding: 12px; }
-        .panel { padding: 12px; }
-        .title h1 { font-size: 17px; }
-        .logo { width: 34px; height: 34px; border-radius: 11px; }
-
         .actions { gap: 8px; }
         .actions .left { width: 100%; margin-right: 0; }
         .actions button { width: 100%; }
@@ -236,11 +201,12 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         padding: 8px 10px;
         border: 1px solid var(--line-2);
         border-radius: 14px;
-        background: rgba(255,255,255,0.70);
+        background: rgba(1, 43, 79, 0.40);
+        width: 100%;
       }
       .stepper .dots {
         display: flex;
@@ -251,12 +217,13 @@
         width: 8px;
         height: 8px;
         border-radius: 999px;
-        border: 1px solid rgba(15, 23, 42, 0.18);
-        background: rgba(15, 23, 42, 0.06);
+        border: 1px solid rgba(179, 227, 255, 0.3);
+        background: rgba(179, 227, 255, 0.1);
       }
       .dot[aria-current="step"] {
-        background: rgba(29,78,216,0.85);
-        border-color: rgba(29,78,216,0.45);
+        background: #4ac7d7;
+        border-color: #4ac7d7;
+        box-shadow: 0 0 8px rgba(74, 199, 215, 0.5);
       }
       .step {
         display: none;
@@ -265,19 +232,29 @@
       .step[data-active="true"] { display: grid; }
       button {
         appearance: none;
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        background: rgba(255,255,255,0.82);
+        border: 1px solid rgba(74, 199, 215, 0.35);
+        background: transparent;
         color: var(--text);
-        padding: 10px 12px;
-        border-radius: 12px;
+        padding: 10px 20px;
+        border-radius: 999px;
         cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+      }
+      button:hover {
+        background: rgba(0, 24, 45, 0.75);
+        border-color: rgba(74, 199, 215, 0.5);
       }
       button.primary {
-        border-color: rgba(29,78,216,0.50);
-        background: var(--btn);
-        color: rgba(255,255,255,0.96);
+        border-color: #4ac7d7;
+        background: #4ac7d7;
+        color: #00182d;
       }
-      button.primary:hover { background: var(--btn-hover); }
+      button.primary:hover {
+        background: #b3e3ff;
+        border-color: #b3e3ff;
+        box-shadow: 0 0 12px rgba(74, 199, 215, 0.4);
+      }
       button:disabled {
         opacity: 0.55;
         cursor: not-allowed;
@@ -292,17 +269,19 @@
       .status {
         margin-top: 12px;
         border: 1px solid var(--line-2);
-        background: rgba(255,255,255,0.78);
+        background: rgba(0, 24, 45, 0.90);
         border-radius: 14px;
         padding: 12px;
         display: none;
+        width: 100%;
       }
-      .status[data-kind="ok"] { border-color: rgba(34,197,94,0.35); }
-      .status[data-kind="warn"] { border-color: rgba(245,158,11,0.35); }
-      .status[data-kind="bad"] { border-color: rgba(239,68,68,0.35); }
+      .status[data-kind="ok"] { border-color: #10b981; }
+      .status[data-kind="warn"] { border-color: #f59e0b; }
+      .status[data-kind="bad"] { border-color: #ef4444; }
       .status h3 {
         margin: 0 0 6px;
         font-size: 13px;
+        color: #ffffff;
       }
       .status pre,
       .status .statusBody {
@@ -310,7 +289,7 @@
         white-space: pre-wrap;
         word-break: break-word;
         font-size: 13px;
-        color: rgba(15, 23, 42, 0.80);
+        color: var(--muted);
         line-height: 1.5;
         font-family: inherit;
       }
@@ -320,7 +299,7 @@
         padding: 2px 6px;
         border-radius: 8px;
         border: 1px solid var(--line);
-        background: rgba(255,255,255,0.82);
+        background: rgba(1, 43, 79, 0.82);
       }
       .hint {
         border-top: 1px dashed rgba(255,255,255,0.16);
@@ -337,13 +316,13 @@
         justify-content: center;
         gap: 12px;
         flex-wrap: wrap;
-        color: rgba(15, 23, 42, 0.55);
+        color: rgba(179, 227, 255, 0.5);
         font-size: 12px;
         position: fixed;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(243,245,249,0.88);
+        background: rgba(0, 24, 45, 0.80);
         backdrop-filter: blur(10px);
         padding-bottom: calc(10px + env(safe-area-inset-bottom));
       }
@@ -361,26 +340,19 @@
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <div class="card">
-        <div class="header">
-          <div class="brand">
-            <div class="logo" aria-hidden="true"></div>
-            <div class="title">
-              <h1>Crear tu cuenta</h1>
-              <p>
-                Completa tus datos para registrarte. Los campos marcados son obligatorios.
-              </p>
-              <p style="margin-top: 8px">
-                <a href="{% url 'login' %}" style="color: #1d4ed8; font-weight: 600; text-decoration: none">¿Ya tienes cuenta? Inicia sesión</a>
-              </p>
-            </div>
-          </div>
-        </div>
+    <div class="split-shell">
+      <div class="split-photo" aria-hidden="true"></div>
+      <div class="split-panel">
+        <div class="split-panel-inner">
+          <div class="split-brand">WIND</div>
+          <h1>Crear tu cuenta</h1>
+          <p class="split-sub">
+            Completa tus datos para registrarte. Los campos marcados son obligatorios.
+          </p>
+          <p class="split-login-link">
+            <a href="{% url 'login' %}">¿Ya tienes cuenta? Inicia sesión</a>
+          </p>
 
-        <div class="content">
-          <div class="panel">
-            <h2>Registro</h2>
             <form id="registerForm" autocomplete="on" novalidate aria-describedby="formHelp">
               {% csrf_token %}
               <div class="stepper" aria-label="Progreso del registro">
@@ -509,7 +481,6 @@
                 <div class="statusBody" id="statusBody"></div>
               </div>
             </form>
-          </div>
         </div>
       </div>
     </div>

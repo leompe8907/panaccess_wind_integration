@@ -5,31 +5,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Iniciar sesión | Wind</title>
-    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}" />
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=6" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
-  <body class="app-body">
-    <div class="app-wrap">
-      <div class="app-card">
-        <header class="app-header">
-          <div class="app-brand">
-            <div class="app-logo" aria-hidden="true"></div>
-            <div>
-              <h1>Bienvenido</h1>
-              <p>Accede a tu cuenta Wind</p>
-            </div>
-          </div>
-        </header>
+  <body class="split-body">
+    <div class="split-shell">
+      <div class="split-photo" aria-hidden="true"></div>
+      <div class="split-panel">
+        <div class="split-panel-inner">
+          <div class="split-brand">WIND</div>
+          <h1>Bienvenido</h1>
+          <p class="split-sub">Accede a tu cuenta Wind</p>
 
-        <div class="app-content">
           <div id="alert" class="app-alert" role="alert"></div>
 
-          <form id="login-form" class="app-form app-panel">
-            <div class="app-field">
+          <form id="login-form">
+            <div class="split-field">
               <label for="username">Usuario</label>
               <input
                 id="username"
                 name="username"
+                class="line-input"
                 type="text"
                 inputmode="text"
                 autocomplete="username"
@@ -37,25 +33,25 @@
                 required
               />
             </div>
-            <div class="app-field">
+            <div class="split-field">
               <label for="password">Contraseña</label>
-              <input id="password" name="password" type="password" autocomplete="current-password" required />
+              <input id="password" name="password" class="line-input" type="password" autocomplete="current-password" required />
             </div>
-            <button type="submit" class="app-btn primary" id="btn-login">Iniciar sesión</button>
-            <p style="text-align: center; margin: 8px 0 0">
+            <button type="submit" class="btn-flat btn-block" id="btn-login">Iniciar sesión</button>
+            <p class="split-links">
               <a class="app-link" href="{% url 'forgot_password' %}">¿Olvidaste tu contraseña?</a>
             </p>
-            <p style="text-align: center; margin: 12px 0 0">
+            <p class="split-links">
               ¿No tienes cuenta?
               <a class="app-link" href="{% url 'register_web' %}">Regístrate</a>
             </p>
           </form>
 
-          <div class="app-divider" style="margin: 16px 0">o continúa con</div>
+          <div class="split-divider">o continúa con</div>
 
-          <div class="social-row app-panel">
+          <div class="split-social">
             <div id="google-btn-container"></div>
-            <button type="button" class="app-btn" id="btn-facebook" style="background: #1877f2; color: #fff; border-color: #1877f2">
+            <button type="button" class="btn-flat btn-block btn-facebook" id="btn-facebook">
               Iniciar sesión con Facebook
             </button>
           </div>

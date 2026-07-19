@@ -1,19 +1,24 @@
 /* Estilos compartidos: login, registro, dashboard */
 :root {
-  color-scheme: light;
-  --bg: #f3f5f9;
-  --bg-2: #e9eef7;
-  --card: rgba(255, 255, 255, 0.94);
-  --text: rgba(17, 24, 39, 0.94);
-  --muted: rgba(17, 24, 39, 0.62);
-  --line: rgba(15, 23, 42, 0.14);
-  --line-2: rgba(15, 23, 42, 0.1);
-  --focus: rgba(59, 130, 246, 0.22);
-  --ok: #16a34a;
-  --bad: #dc2626;
-  --btn: #1d4ed8;
-  --btn-hover: #1e40af;
-  --shadow: 0 22px 60px rgba(2, 6, 23, 0.18);
+  color-scheme: dark;
+  --bg: #001222;
+  --bg-2: #00182d;
+  --card: #012b4f;
+  --text: #ffffff;
+  --muted: #b3e3ff;
+  --line: rgba(74, 199, 215, 0.3);
+  --line-2: rgba(74, 199, 215, 0.15);
+  --focus: rgba(74, 199, 215, 0.35);
+  --ok: #10b981;
+  --bad: #ef4444;
+  --btn: #4ac7d7;
+  --btn-hover: #b3e3ff;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.6);
+  /* Acento cálido (idea 2): exclusivo para insignias de estado/promoción
+     (trial, producto activo, etc.) -- nunca para texto de cuerpo ni para
+     botones de acción, para no competir con --btn (cian) ni con --ok/--bad. */
+  --amber: #f2b84b;
+  --amber-ink: #402a05;
 }
 
 * {
@@ -24,12 +29,16 @@ body.app-body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg);
-  background-image: linear-gradient(180deg, rgba(243, 245, 249, 0.38), rgba(233, 238, 247, 0.46)),
+  /* Idea 2: panel sólido, así que el contraste extra recae en el fondo --
+     degradado diagonal más marcado que el original, pensado para pantallas
+     con más densidad de información (dashboard, perfil). */
+  background-image: linear-gradient(160deg, rgba(0, 24, 45, 0.55) 10%, rgba(0, 12, 22, 0.85) 75%),
     url("../images/backgroundalt.webp");
   background-position: center, center;
   background-size: cover, cover;
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 body.app-body::before {
@@ -37,9 +46,10 @@ body.app-body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(900px 520px at 18% 0%, rgba(29, 78, 216, 0.12), transparent 60%),
-    radial-gradient(900px 520px at 92% 15%, rgba(16, 185, 129, 0.08), transparent 62%);
+  background: radial-gradient(900px 520px at 18% 0%, rgba(74, 199, 215, 0.15), transparent 60%),
+    radial-gradient(900px 520px at 92% 15%, rgba(1, 43, 79, 0.25), transparent 62%);
   z-index: -1;
+  opacity: 0.9;
 }
 
 .app-wrap {
@@ -65,7 +75,8 @@ body.app-body::before {
 
 .app-header {
   padding: 18px;
-  border-bottom: 1px solid var(--line-2);
+  background: #00182d;
+  border-bottom: 2px solid #4ac7d7;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -83,7 +94,9 @@ body.app-body::before {
   height: 36px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.85), rgba(16, 185, 129, 0.45));
+  background: radial-gradient(16px 16px at 30% 30%, rgba(255,255,255,0.75), transparent 60%),
+              linear-gradient(135deg, rgba(74,199,215,0.85), rgba(1,43,79,0.7));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
 }
 
 .app-header h1 {
@@ -99,18 +112,33 @@ body.app-body::before {
 
 .app-content {
   padding: 18px;
+  background: #012b4f;
 }
 
 .app-panel {
   border: 1px solid var(--line-2);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(0, 24, 45, 0.4);
   padding: 16px;
 }
 
 .app-form {
   display: grid;
   gap: 12px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.app-field {
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  display: grid;
+  gap: 6px;
+  align-items: start;
 }
 
 .app-field label {
@@ -124,23 +152,29 @@ body.app-body::before {
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  background: rgba(0, 24, 45, 0.5);
+  color: var(--text);
   font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-field input::placeholder {
+  color: rgba(179, 227, 255, 0.5);
 }
 
 .app-field input:focus {
   outline: none;
-  border-color: rgba(29, 78, 216, 0.45);
-  box-shadow: 0 0 0 4px var(--focus);
+  border-color: #4ac7d7;
+  box-shadow: 0 0 0 4px rgba(74, 199, 215, 0.25);
 }
 
 .app-btn {
   appearance: none;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(74, 199, 215, 0.3);
+  background: rgba(0, 24, 45, 0.5);
   color: var(--text);
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
@@ -151,16 +185,24 @@ body.app-body::before {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.app-btn:hover {
+  background: rgba(0, 24, 45, 0.75);
+  border-color: rgba(74, 199, 215, 0.5);
 }
 
 .app-btn.primary {
-  border-color: rgba(29, 78, 216, 0.5);
+  border-color: #4ac7d7;
   background: var(--btn);
-  color: #fff;
+  color: #00182d;
 }
 
 .app-btn.primary:hover {
   background: var(--btn-hover);
+  border-color: var(--btn-hover);
+  box-shadow: 0 0 12px rgba(74, 199, 215, 0.4);
 }
 
 .app-btn.ghost {
@@ -178,6 +220,9 @@ body.app-body::before {
   gap: 10px;
   color: var(--muted);
   font-size: 12px;
+  max-width: 420px;
+  margin: 16px auto;
+  width: 100%;
 }
 
 .app-divider::before,
@@ -191,6 +236,9 @@ body.app-body::before {
 .social-row {
   display: grid;
   gap: 10px;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .app-alert {
@@ -206,26 +254,40 @@ body.app-body::before {
 }
 
 .app-alert.error {
-  color: #7f1d1d;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(220, 38, 38, 0.2);
+  color: #ff9999;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .app-alert.success {
-  color: #14532d;
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(22, 163, 74, 0.25);
+  color: #a7f3d0;
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(22, 163, 74, 0.3);
 }
 
 .app-link {
-  color: var(--btn);
+  color: #4ac7d7;
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;
 }
 
 .app-link:hover {
+  color: #b3e3ff;
   text-decoration: underline;
+}
+
+/* Insignia de estado/promoción (idea 2) -- trial, producto activo, etc.
+   No usar para botones ni texto de cuerpo: es el único lugar del sitio que
+   usa --amber, para que mantenga su significado de "atención puntual". */
+.pill-amber {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: var(--amber-ink);
 }
 
 /* Dashboard */
@@ -806,4 +868,200 @@ body.app-body::before {
 .app-btn.danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ============================================================================
+   LAYOUT "SPLIT CINEMATOGRÁFICO" -- opción elegida para las pantallas simples
+   de un solo formulario (login, registro, olvidé/resetear contraseña, borrar
+   cuenta). La foto ya no es wallpaper detrás de una tarjeta flotante: ocupa
+   la mitad de la pantalla sin difuminar, y el formulario vive en un panel
+   sólido al lado, con inputs de línea (sin caja) y botón en píldora.
+   ============================================================================ */
+
+body.split-body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-2);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.split-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.split-photo {
+  flex: 1.4;
+  position: relative;
+  background-image: url("../images/backgroundalt.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* La foto se funde con el color del panel en el borde de unión, en vez de
+   cortar en seco -- así se lee como una sola composición, no dos mitades
+   pegadas. */
+.split-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, var(--bg-2) 100%);
+}
+
+.split-panel {
+  flex: 1;
+  min-width: 340px;
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px clamp(28px, 6vw, 72px);
+}
+
+.split-panel-inner {
+  max-width: 380px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.split-brand {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #4ac7d7;
+  margin-bottom: 28px;
+}
+
+.split-panel h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.split-sub {
+  color: var(--muted);
+  font-size: 13.5px;
+  margin: 0 0 28px;
+}
+
+.split-field {
+  margin-bottom: 18px;
+}
+
+.split-field label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.line-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  padding: 10px 2px;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.2s ease;
+}
+
+.line-input::placeholder {
+  color: rgba(179, 227, 255, 0.45);
+}
+
+.line-input:focus {
+  outline: none;
+  border-bottom-color: #4ac7d7;
+}
+
+.btn-flat {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--btn);
+  color: #00182d;
+  border: none;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.btn-flat:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.btn-flat:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-flat.btn-block {
+  width: 100%;
+}
+
+.btn-flat.btn-facebook {
+  background: #1877f2;
+  color: #fff;
+}
+
+.btn-flat.btn-facebook:hover:not(:disabled) {
+  background: #3b8bfa;
+}
+
+.split-links {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 13px;
+}
+
+.split-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 26px 0 18px;
+}
+
+.split-divider::before,
+.split-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.split-social {
+  display: grid;
+  gap: 10px;
+}
+
+/* Por debajo de este ancho, un split 60/40 aprieta demasiado el formulario --
+   la foto pasa a ser una franja superior corta y el panel ocupa todo el
+   ancho, en vez de forzar dos columnas angostas en un teléfono. */
+@media (max-width: 860px) {
+  .split-shell {
+    flex-direction: column;
+  }
+
+  .split-photo {
+    flex: none;
+    height: 200px;
+  }
+
+  .split-photo::after {
+    background: linear-gradient(180deg, transparent 40%, var(--bg-2) 100%);
+  }
+
+  .split-panel {
+    padding: 32px 24px 48px;
+  }
 }
