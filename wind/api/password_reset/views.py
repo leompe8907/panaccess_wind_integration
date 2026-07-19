@@ -19,6 +19,22 @@ def password_forgot_view(request):
     Solicita recuperación de contraseña por email.
     Respuesta genérica siempre (no revela si el correo existe).
     """
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     ser = ForgotPasswordSerializer(data=request.data)
     if not ser.is_valid():
         return Response(
@@ -36,6 +52,22 @@ def password_forgot_view(request):
 @throttle_classes([PasswordResetThrottle])
 def password_reset_confirm_view(request):
     """Confirma nueva contraseña con token del enlace de recuperación."""
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     ser = ResetPasswordConfirmSerializer(data=request.data)
     if not ser.is_valid():
         return Response(

@@ -1065,3 +1065,266 @@ body.split-body {
     padding: 32px 24px 48px;
   }
 }
+
+/* ============================================================================
+   DASHBOARD v2 -- panel lateral. A diferencia del resto del sitio (login,
+   registro, olvidé contraseña -- pantallas de un solo formulario, cinematográficas
+   con foto de fondo), "Mi cuenta" es una vista densa de datos que se consulta
+   seguido, no una pantalla de marketing. Por eso NO usa la foto de fondo ni
+   tarjetas flotantes: navegación lateral fija + contenido resuelto con
+   tipografía y espaciado, al estilo Stripe/Linear. Esto también corrige el bug
+   de contraste que tenía la versión anterior (tarjeta casi blanca con texto
+   --muted/--text pensado para fondo oscuro, quedaba casi ilegible).
+   ============================================================================ */
+body.dash-body-v2 {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-2);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.dash-shell-v2 {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.dash-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border-right: 1px solid var(--line-2);
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-sidebar-brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--btn);
+  margin: 0 0 30px;
+  padding-left: 6px;
+}
+
+.dash-sidebar .dash-tablist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+}
+
+.dash-sidebar .dash-tab {
+  flex: none;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #6f93ab;
+  font-size: 13.5px;
+}
+
+.dash-sidebar .dash-tab:hover {
+  color: var(--text);
+  background: rgba(74, 199, 215, 0.07);
+}
+
+.dash-sidebar .dash-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.dash-sidebar .dash-tab.is-active {
+  color: var(--text);
+  background: rgba(74, 199, 215, 0.1);
+  border-left-color: var(--btn);
+  box-shadow: none;
+}
+
+.dash-sidebar-spacer {
+  flex: 1;
+}
+
+.dash-sidebar .dash-tab-danger {
+  margin-top: 10px;
+  padding: 16px 12px 0;
+  border-top: 1px solid var(--line-2);
+  border-left: none;
+  border-radius: 0;
+  color: #d97a7a;
+  font-size: 13px;
+}
+
+.dash-sidebar .dash-tab-danger:hover {
+  background: none;
+  color: #ef8f8f;
+}
+
+.dash-sidebar .dash-tab-danger.is-active {
+  background: none;
+  border-left: none;
+  color: #ef8f8f;
+}
+
+.dash-main {
+  flex: 1;
+  min-width: 0;
+  padding: 34px 40px 48px;
+}
+
+.dash-main-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.dash-main-top h1 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.dash-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--btn), var(--card));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-2);
+  flex-shrink: 0;
+}
+
+.dash-logout-link {
+  appearance: none;
+  background: none;
+  border: none;
+  color: #7fa8c2;
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.dash-logout-link:hover {
+  color: var(--text);
+}
+
+/* Sin tarjeta: tipografía directamente sobre el fondo oscuro */
+.dash-body-v2 .account-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 40px;
+}
+
+.dash-body-v2 .account-line {
+  display: block;
+  border-bottom: 1px solid var(--line-2);
+  padding-bottom: 14px;
+}
+
+.dash-body-v2 .account-line-label {
+  display: block;
+  margin-right: 0;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6f93ab;
+}
+
+.dash-body-v2 .account-line-value {
+  font-size: 15.5px;
+}
+
+/* El resto de los módulos (contraseña, productos, eliminar cuenta) también
+   pierden la tarjeta clara -- mismo criterio de "tipografía sobre fondo
+   oscuro", y de paso corrige el contraste que tenían las smartcards/productos
+   con fondos pensados para tema claro. */
+.dash-body-v2 .module-card {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.dash-body-v2 .dash-section-title {
+  color: var(--text);
+}
+
+.dash-body-v2 .smartcard-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-2);
+}
+
+.dash-body-v2 .product-items li {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-2);
+}
+
+.dash-body-v2 .dash-danger-zone {
+  max-width: 520px;
+}
+
+@media (max-width: 760px) {
+  .dash-shell-v2 {
+    flex-direction: column;
+  }
+
+  .dash-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+
+  .dash-sidebar-brand {
+    margin: 0 14px 0 0;
+  }
+
+  .dash-sidebar .dash-tablist {
+    flex-direction: row;
+  }
+
+  .dash-sidebar-spacer {
+    display: none;
+  }
+
+  .dash-sidebar .dash-tab-danger {
+    margin: 0 0 0 10px;
+    padding: 8px 10px;
+    border-top: none;
+    border-left: 1px solid var(--line-2);
+  }
+
+  .dash-main {
+    padding: 24px 20px 40px;
+  }
+
+  .dash-body-v2 .account-fields {
+    grid-template-columns: 1fr;
+  }
+}

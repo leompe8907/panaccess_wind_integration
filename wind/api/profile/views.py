@@ -160,6 +160,22 @@ def profile_close_account_view(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     ser = ProfileCloseAccountSerializer(data=request.data)
     if not ser.is_valid():
         return Response(

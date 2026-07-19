@@ -5,207 +5,201 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mi cuenta | Wind</title>
-    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=5" />
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=7" />
   </head>
-  <body class="app-body">
-    <div class="app-wrap dash-page">
-      <div class="app-card wide dash-shell">
-        <header class="app-header dash-header">
-          <div class="app-brand">
-            <div class="app-logo" aria-hidden="true"></div>
-            <div>
-              <h1 id="dash-page-title">Mi cuenta</h1>
-              <p id="user-greeting" class="dash-greeting">Cargando…</p>
-            </div>
+  <body class="dash-body-v2">
+    <div class="dash-shell-v2">
+      <aside class="dash-sidebar">
+        <div class="dash-sidebar-brand">WIND</div>
+        <nav class="dash-tablist" id="dash-tablist" role="tablist" aria-label="Secciones de mi cuenta" hidden>
+          <button
+            type="button"
+            class="dash-tab is-active"
+            role="tab"
+            id="tab-btn-account"
+            aria-selected="true"
+            aria-controls="tab-panel-account"
+            data-tab="account"
+          >
+            Mi cuenta
+          </button>
+          <button
+            type="button"
+            class="dash-tab"
+            role="tab"
+            id="tab-btn-password"
+            aria-selected="false"
+            aria-controls="tab-panel-password"
+            data-tab="password"
+            hidden
+          >
+            Contraseña
+          </button>
+          <button
+            type="button"
+            class="dash-tab"
+            role="tab"
+            id="tab-btn-products"
+            aria-selected="false"
+            aria-controls="tab-panel-products"
+            data-tab="products"
+            hidden
+          >
+            Productos
+          </button>
+        </nav>
+        <div class="dash-sidebar-spacer"></div>
+        <button
+          type="button"
+          class="dash-tab dash-tab-danger"
+          role="tab"
+          id="tab-btn-close-account"
+          aria-selected="false"
+          aria-controls="tab-panel-close-account"
+          data-tab="close-account"
+          hidden
+        >
+          Eliminar cuenta
+        </button>
+      </aside>
+
+      <main class="dash-main">
+        <div class="dash-main-top">
+          <div>
+            <h1 id="dash-page-title">Mi cuenta</h1>
+            <p id="user-greeting" class="dash-greeting">Cargando…</p>
           </div>
-          <button type="button" class="app-btn ghost" id="btn-logout">Cerrar sesión</button>
-        </header>
+          <div class="dash-user-chip">
+            <div class="dash-avatar" id="dash-avatar" aria-hidden="true">—</div>
+            <button type="button" class="dash-logout-link" id="btn-logout">Cerrar sesión</button>
+          </div>
+        </div>
 
-        <div class="app-content dash-content">
-          <nav class="dash-tablist" id="dash-tablist" role="tablist" aria-label="Secciones de mi cuenta" hidden>
-            <button
-              type="button"
-              class="dash-tab is-active"
-              role="tab"
-              id="tab-btn-account"
-              aria-selected="true"
-              aria-controls="tab-panel-account"
-              data-tab="account"
-            >
-              Mi cuenta
-            </button>
-            <button
-              type="button"
-              class="dash-tab"
-              role="tab"
-              id="tab-btn-password"
-              aria-selected="false"
-              aria-controls="tab-panel-password"
-              data-tab="password"
-              hidden
-            >
-              Contraseña
-            </button>
-            <button
-              type="button"
-              class="dash-tab"
-              role="tab"
-              id="tab-btn-products"
-              aria-selected="false"
-              aria-controls="tab-panel-products"
-              data-tab="products"
-              hidden
-            >
-              Productos
-            </button>
-            <button
-              type="button"
-              class="dash-tab dash-tab-danger"
-              role="tab"
-              id="tab-btn-close-account"
-              aria-selected="false"
-              aria-controls="tab-panel-close-account"
-              data-tab="close-account"
-              hidden
-            >
-              Eliminar cuenta
-            </button>
-          </nav>
+        <div class="dash-tabpanels">
+          <div
+            role="tabpanel"
+            id="tab-panel-account"
+            class="dash-tabpanel is-active"
+            aria-labelledby="tab-btn-account"
+          >
+            <section class="dash-account module-card" id="account-panel">
+              <p id="account-status" class="account-status" hidden></p>
 
-          <div class="dash-tabpanels">
-            <div
-              role="tabpanel"
-              id="tab-panel-account"
-              class="dash-tabpanel is-active"
-              aria-labelledby="tab-btn-account"
-            >
-              <section class="dash-account module-card" id="account-panel">
-                <p id="account-status" class="account-status" hidden></p>
-
-                <div class="account-fields">
-                  <p class="account-line">
-                    <span class="account-line-label">Código de suscriptor:</span>
-                    <span id="field-code" class="account-line-value">—</span>
-                  </p>
-                  <p class="account-line">
-                    <span class="account-line-label">Nombre:</span>
-                    <span id="field-name" class="account-line-value">—</span>
-                  </p>
-                  <p class="account-line">
-                    <span class="account-line-label">Correo:</span>
-                    <span id="field-email" class="account-line-value">—</span>
-                  </p>
-                  <p class="account-line">
-                    <span class="account-line-label">Usuario de acceso:</span>
-                    <span id="field-login1" class="account-line-value">—</span>
-                  </p>
-                  <p class="account-line">
-                    <span class="account-line-label">Usuario de acceso alternativo:</span>
-                    <span id="field-login2" class="account-line-value">—</span>
-                  </p>
-                  <p class="account-line">
-                    <span class="account-line-label">Número de pantallas:</span>
-                    <span id="field-screens" class="account-line-value">—</span>
-                  </p>
-                </div>
-              </section>
-            </div>
-
-            <div
-              role="tabpanel"
-              id="tab-panel-password"
-              class="dash-tabpanel"
-              aria-labelledby="tab-btn-password"
-              hidden
-            >
-              <section class="dash-module module-card" id="password-module">
-                <form id="password-form" class="app-form password-form" novalidate>
-                  <div class="app-field">
-                    <label for="new-password">Nueva contraseña</label>
-                    <input
-                      id="new-password"
-                      name="newPass"
-                      type="password"
-                      autocomplete="new-password"
-                      minlength="4"
-                      required
-                    />
-                  </div>
-                  <div class="app-field">
-                    <label for="confirm-password">Confirmar contraseña</label>
-                    <input
-                      id="confirm-password"
-                      type="password"
-                      autocomplete="new-password"
-                      minlength="4"
-                      required
-                    />
-                  </div>
-                  <p id="password-msg" class="app-alert" role="status"></p>
-                  <button type="submit" class="app-btn primary" id="btn-password-submit">
-                    Actualizar contraseña
-                  </button>
-                </form>
-              </section>
-            </div>
-
-            <div
-              role="tabpanel"
-              id="tab-panel-products"
-              class="dash-tabpanel"
-              aria-labelledby="tab-btn-products"
-              hidden
-            >
-              <section class="dash-module module-card" id="products-module">
-                <p id="products-status" class="app-alert" role="status"></p>
-                <div id="products-list" class="products-list">
-                  <p class="products-placeholder">Selecciona esta pestaña para ver tus productos.</p>
-                </div>
-              </section>
-            </div>
-
-            <div
-              role="tabpanel"
-              id="tab-panel-close-account"
-              class="dash-tabpanel"
-              aria-labelledby="tab-btn-close-account"
-              hidden
-            >
-              <section class="dash-module module-card dash-danger-zone" id="close-account-module">
-                <h2 class="dash-section-title">Eliminar cuenta</h2>
-                <p class="dash-danger-text">
-                  Esta acción desactiva tu acceso al portal, quita productos y smartcards en PanAccess
-                  y marca tu cuenta como cerrada. Podrás volver a registrarte con el mismo correo,
-                  pero <strong>no</strong> recibirás un segundo período de prueba.
+              <div class="account-fields">
+                <p class="account-line">
+                  <span class="account-line-label">Código de suscriptor:</span>
+                  <span id="field-code" class="account-line-value">—</span>
                 </p>
+                <p class="account-line">
+                  <span class="account-line-label">Nombre:</span>
+                  <span id="field-name" class="account-line-value">—</span>
+                </p>
+                <p class="account-line">
+                  <span class="account-line-label">Usuario de acceso (correo):</span>
+                  <span id="field-email" class="account-line-value">—</span>
+                </p>
+                <p class="account-line">
+                  <span class="account-line-label">Número de pantallas:</span>
+                  <span id="field-screens" class="account-line-value">—</span>
+                </p>
+              </div>
+            </section>
+          </div>
+
+          <div
+            role="tabpanel"
+            id="tab-panel-password"
+            class="dash-tabpanel"
+            aria-labelledby="tab-btn-password"
+            hidden
+          >
+            <section class="dash-module module-card" id="password-module">
+              <form id="password-form" class="app-form password-form" novalidate>
                 <div class="app-field">
-                  <label for="close-confirm-code">Confirma escribiendo tu código de suscriptor</label>
+                  <label for="new-password">Nueva contraseña</label>
                   <input
-                    id="close-confirm-code"
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    placeholder="Ej. 1120743001"
+                    id="new-password"
+                    name="newPass"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="4"
+                    required
                   />
                 </div>
                 <div class="app-field">
-                  <label for="close-reason">Motivo (opcional)</label>
-                  <textarea id="close-reason" rows="2" maxlength="500" placeholder="Ej. Ya no uso el servicio"></textarea>
+                  <label for="confirm-password">Confirmar contraseña</label>
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="4"
+                    required
+                  />
                 </div>
-                <label class="dash-checkbox-row">
-                  <input type="checkbox" id="close-dry-run" />
-                  <span>Solo simular (dry-run) — muestra el resultado sin aplicar cambios</span>
-                </label>
-                <p id="close-account-msg" class="app-alert" role="status"></p>
-                <pre id="close-account-result" class="dash-json-result" hidden></pre>
-                <button type="button" class="app-btn danger" id="btn-close-account">
-                  Eliminar mi cuenta
+                <p id="password-msg" class="app-alert" role="status"></p>
+                <button type="submit" class="app-btn primary" id="btn-password-submit">
+                  Actualizar contraseña
                 </button>
-              </section>
-            </div>
+              </form>
+            </section>
+          </div>
+
+          <div
+            role="tabpanel"
+            id="tab-panel-products"
+            class="dash-tabpanel"
+            aria-labelledby="tab-btn-products"
+            hidden
+          >
+            <section class="dash-module module-card" id="products-module">
+              <p id="products-status" class="app-alert" role="status"></p>
+              <div id="products-list" class="products-list">
+                <p class="products-placeholder">Selecciona esta pestaña para ver tus productos.</p>
+              </div>
+            </section>
+          </div>
+
+          <div
+            role="tabpanel"
+            id="tab-panel-close-account"
+            class="dash-tabpanel"
+            aria-labelledby="tab-btn-close-account"
+            hidden
+          >
+            <section class="dash-module module-card dash-danger-zone" id="close-account-module">
+              <h2 class="dash-section-title">Eliminar cuenta</h2>
+              <p class="dash-danger-text">
+                Esta acción desactiva tu acceso al portal, quita productos y smartcards en PanAccess
+                y marca tu cuenta como cerrada. Podrás volver a registrarte con el mismo correo,
+                pero <strong>no</strong> recibirás un segundo período de prueba.
+              </p>
+              <div class="app-field">
+                <label for="close-confirm-code">Confirma escribiendo tu código de suscriptor</label>
+                <input
+                  id="close-confirm-code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="Ej. 1120743001"
+                />
+              </div>
+              <div class="app-field">
+                <label for="close-reason">Motivo (opcional)</label>
+                <textarea id="close-reason" rows="2" maxlength="500" placeholder="Ej. Ya no uso el servicio"></textarea>
+              </div>
+              <label class="dash-checkbox-row">
+                <input type="checkbox" id="close-dry-run" />
+                <span>Solo simular (dry-run) — muestra el resultado sin aplicar cambios</span>
+              </label>
+              <p id="close-account-msg" class="app-alert" role="status"></p>
+              <pre id="close-account-result" class="dash-json-result" hidden></pre>
+              <button type="button" class="app-btn danger" id="btn-close-account">
+                Eliminar mi cuenta
+              </button>
+            </section>
           </div>
         </div>
-      </div>
+      </main>
     </div>
 
     <div id="password-confirm-modal" class="dash-modal" hidden aria-hidden="true">
@@ -247,10 +241,9 @@
           code: document.getElementById("field-code"),
           name: document.getElementById("field-name"),
           email: document.getElementById("field-email"),
-          login1: document.getElementById("field-login1"),
-          login2: document.getElementById("field-login2"),
           screens: document.getElementById("field-screens"),
         };
+        var avatarEl = document.getElementById("dash-avatar");
         var passwordForm = document.getElementById("password-form");
         var newPasswordInput = document.getElementById("new-password");
         var confirmPasswordInput = document.getElementById("confirm-password");
@@ -377,6 +370,17 @@
           return null;
         }
 
+        function initials(name, fallback) {
+          var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+          if (!parts.length) {
+            return (fallback || "?").slice(0, 2).toUpperCase();
+          }
+          if (parts.length === 1) {
+            return parts[0].slice(0, 2).toUpperCase();
+          }
+          return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
         function renderAccount(sub) {
           var name = displayName(sub);
 
@@ -385,9 +389,8 @@
           setField(fieldEls.code, sub.code);
           setField(fieldEls.name, name);
           setField(fieldEls.email, sub.emails);
-          setField(fieldEls.login1, sub.login1);
-          setField(fieldEls.login2, sub.login2);
           setField(fieldEls.screens, sub.smartcards_count);
+          if (avatarEl) avatarEl.textContent = initials(name, sub.code);
 
           updateSubscriberTabs(!!subscriberCode);
         }
