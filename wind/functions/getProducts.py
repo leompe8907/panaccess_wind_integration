@@ -138,6 +138,17 @@ def download_products_since_last(session_id=None, limit=100):
     return store_all_products_in_chunks(new_data)
 
 
+# Campos que compare_and_update_all_products puede modificar. Se pasan todos
+# juntos a bulk_update() -- reescribe columnas sin cambios en el mismo objeto,
+# pero eso es preferible a un UPDATE por fila cuando el catálogo es grande.
+_PRODUCT_UPDATABLE_FIELDS = [
+    "name", "ordered", "activeOrders", "flexiblyOrdered", "activeFlexibleOrders",
+    "deleted", "description", "minRunTime", "minRunTimeType",
+    "allowFlexibleRuntime", "hasOptionalPackages", "packages",
+    "optionalPackages", "catchupGroups", "streams", "vodLibraries",
+]
+
+
 def compare_and_update_all_products(session_id=None, limit=100):
     logger.info("Actualizando productos existentes")
     local_data = {
@@ -145,7 +156,13 @@ def compare_and_update_all_products(session_id=None, limit=100):
     }
     offset = 0
     total_updated = 0
-    
+    # Antes: un ListOfProducts.save(update_fields=...) por producto cambiado
+    # dentro del loop (1 UPDATE por fila). Ahora se acumulan los objetos
+    # modificados y se escriben en bloque al final con bulk_update(), que
+    # agrupa las escrituras en lotes de PANACCESS_DB_WRITE_CHUNK_SIZE en vez
+    # de una consulta individual por producto.
+    pending_updates = []
+
     while True:
         response = CallListOfProducts(session_id, offset, limit)
         product_entries = response.get("productEntries", [])
@@ -192,14 +209,25 @@ def compare_and_update_all_products(session_id=None, limit=100):
                         changed_fields.append(key)
             
             if changed_fields:
-                try:
-                    local_obj.save(update_fields=changed_fields)
-                    total_updated += 1
-                except Exception as e:
-                    logger.error(f"Error actualizando producto {product_id}: {str(e)}")
-        
+                pending_updates.append(local_obj)
+                total_updated += 1
+
         offset += limit
-    
+
+    if pending_updates:
+        chunk_size = PanaccessConfig.DB_WRITE_CHUNK_SIZE
+        try:
+            with transaction.atomic():
+                ListOfProducts.objects.bulk_update(
+                    pending_updates,
+                    _PRODUCT_UPDATABLE_FIELDS,
+                    batch_size=chunk_size,
+                )
+        except Exception as e:
+            logger.error(
+                f"Error en bulk_update de {len(pending_updates)} productos: {str(e)}"
+            )
+
     logger.info(f"Actualizados {total_updated} productos")
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta, timezone as dt_timezone
 
-from django.db import transaction
+from django.db import close_old_connections, transaction
 from django.utils import timezone
 
 from appConfig import PanaccessConfig, RedisConfig
@@ -668,10 +668,21 @@ def _process_subscriber_smartcard_sync(
     session_id=None,
     limit: int = 100,
 ) -> dict:
-    remote_list, truncated = _fetch_smartcards_for_subscriber(session_id, subscriber_code, limit)
-    stats = _reconcile_subscriber_smartcards(subscriber_code, remote_list, truncated=truncated)
-    stats["subscriber_code"] = subscriber_code
-    return stats
+    # Corre dentro de un ThreadPoolExecutor (ver compare_and_update_smartcards_
+    # by_subscribers). Django abre una conexión de BD nueva por hilo la primera
+    # vez que se usa el ORM ahí, pero como esos hilos no son el hilo principal
+    # de un request/tarea Celery, Django nunca la cierra sola al terminar --
+    # bajo sync sostenido con muchos abonados eso puede ir acumulando
+    # conexiones abiertas/inactivas en Postgres. close_old_connections() al
+    # terminar cada tarea del hilo libera la conexión si ya expiró
+    # (CONN_MAX_AGE) o quedó inutilizable, en vez de dejarla abierta indefinidamente.
+    try:
+        remote_list, truncated = _fetch_smartcards_for_subscriber(session_id, subscriber_code, limit)
+        stats = _reconcile_subscriber_smartcards(subscriber_code, remote_list, truncated=truncated)
+        stats["subscriber_code"] = subscriber_code
+        return stats
+    finally:
+        close_old_connections()
 
 
 def compare_and_update_smartcards_by_subscribers(session_id=None, limit=100):

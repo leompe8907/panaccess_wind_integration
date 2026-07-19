@@ -57,40 +57,47 @@ def _deactivate_portal_users(subscriber_code: str) -> int:
     from wind.models import SubscriberLoginInfo
     from django.db.models import Q
     from django.db.models.functions import Lower
+    from wind.db_router import use_primary_for_reads
 
-    emails = set()
-    for email in SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).values_list(
-        "email", flat=True
-    ):
-        if email:
-            emails.add(email.strip().lower())
+    # Estas lecturas ocurren justo después de escribir el tombstone de
+    # cierre (mismo request, milisegundos de diferencia) -- forzar primaria
+    # evita que un lag de réplica haga que esta función no encuentre el
+    # email/subscriber recién escrito y deje sin desactivar/invalidar una
+    # sesión que debía cortarse de inmediato (ver wind/db_router.py).
+    with use_primary_for_reads():
+        emails = set()
+        for email in SubscriberEmailRegistry.objects.filter(subscriber_code=subscriber_code).values_list(
+            "email", flat=True
+        ):
+            if email:
+                emails.add(email.strip().lower())
 
-    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
-    if sub and sub.emails:
-        emails.add(sub.emails.strip().lower())
+        sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+        if sub and sub.emails:
+            emails.add(sub.emails.strip().lower())
 
-    usernames = {subscriber_code}
-    login_info = SubscriberLoginInfo.objects.filter(subscriberCode=subscriber_code).first()
-    if login_info:
-        if login_info.login1:
-            usernames.add(str(login_info.login1))
-        if login_info.login2:
-            usernames.add(login_info.login2)
+        usernames = {subscriber_code}
+        login_info = SubscriberLoginInfo.objects.filter(subscriberCode=subscriber_code).first()
+        if login_info:
+            if login_info.login1:
+                usernames.add(str(login_info.login1))
+            if login_info.login2:
+                usernames.add(login_info.login2)
 
-    from wind.services.jwt_invalidation import invalidate_active_sessions
+        from wind.services.jwt_invalidation import invalidate_active_sessions
 
-    user_qs = User.objects.annotate(email_lower=Lower("email")).filter(
-        Q(email_lower__in=list(emails)) | Q(username__in=list(usernames))
-    )
+        user_qs = User.objects.annotate(email_lower=Lower("email")).filter(
+            Q(email_lower__in=list(emails)) | Q(username__in=list(usernames))
+        )
 
-    updated = 0
-    for user in user_qs:
-        invalidate_active_sessions(user)
-        if user.is_active:
-            user.is_active = False
-            user.save(update_fields=["is_active"])
-            updated += 1
-    return updated
+        updated = 0
+        for user in user_qs:
+            invalidate_active_sessions(user)
+            if user.is_active:
+                user.is_active = False
+                user.save(update_fields=["is_active"])
+                updated += 1
+        return updated
 
 
 def _revoke_udid_requests(subscriber_code: str) -> int:

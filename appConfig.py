@@ -66,6 +66,16 @@ def _normalize_origin(value: str) -> str:
     return value.strip().rstrip("/")
 
 
+def _normalize_csrf_origin(value: str) -> str:
+    """CSRF_TRUSTED_ORIGINS: Django exige esquema explícito (https://dominio)."""
+    v = value.strip().rstrip("/")
+    if not v:
+        return v
+    if not (v.startswith("http://") or v.startswith("https://")):
+        v = f"https://{v}"
+    return v
+
+
 # ---------------------------------------------------------------------------
 # Django / seguridad HTTP
 # ---------------------------------------------------------------------------
@@ -79,6 +89,11 @@ class DjangoConfig:
     # poder avisar cuando alguien la desactiva a propósito en producción.
     PRODUCTION_HTTPS_RAW = os.getenv("PRODUCTION_HTTPS")
     SYNC_ADMIN_IP_ALLOWLIST = _csv("SYNC_ADMIN_IP_ALLOWLIST")
+    # Dominios reales del frontend en producción (con esquema, ej.
+    # "https://app.wind.do"). Sin esto, Django 4+ rechaza con 403 CSRF
+    # cualquier request con cookie+CSRF (admin, /accounts/ de allauth) que
+    # llegue con Origin/Referer distinto al host de Django mismo.
+    CSRF_TRUSTED_ORIGINS = [_normalize_csrf_origin(o) for o in _csv("CSRF_TRUSTED_ORIGINS")]
 
     @classmethod
     def production_https(cls, *, debug: bool) -> bool:
@@ -159,7 +174,16 @@ class DatabaseConfig:
     PASSWORD = _strip_env(os.getenv("DB_PASSWORD"))
     HOST = _strip_env(os.getenv("DB_HOST"))
     PORT = _strip_env(os.getenv("DB_PORT"))
-    CONN_MAX_AGE = _env_int("DB_CONN_MAX_AGE", 0)
+    # Antes por defecto era 0 (sin conexiones persistentes): cada request y
+    # cada tarea Celery abría y cerraba una conexión nueva a Postgres. Con
+    # PgBouncer/pooler externo puede seguir siendo 0 a propósito; si no hay
+    # pooler externo, mantener conexiones vivas ~60s reduce notablemente el
+    # overhead de TCP/TLS+auth por request. Sigue siendo configurable por env.
+    CONN_MAX_AGE = _env_int("DB_CONN_MAX_AGE", 60)
+    # Solo tiene efecto si CONN_MAX_AGE > 0: valida (SELECT 1 barato) que la
+    # conexión reutilizada siga viva antes de usarla, en vez de fallar el
+    # request si Postgres la cerró por su cuenta (idle timeout, reinicio, etc).
+    CONN_HEALTH_CHECKS = _env_bool("DB_CONN_HEALTH_CHECKS", True)
 
     REPLICA_HOST = _strip_env(os.getenv("DB_REPLICA_HOST"))
     REPLICA_PORT = _strip_env(os.getenv("DB_REPLICA_PORT"))
@@ -203,6 +227,7 @@ class DatabaseConfig:
         }
         if cls.CONN_MAX_AGE:
             db["CONN_MAX_AGE"] = cls.CONN_MAX_AGE
+            db["CONN_HEALTH_CHECKS"] = cls.CONN_HEALTH_CHECKS
         return db
 
     @classmethod
@@ -233,6 +258,14 @@ class RedisConfig:
     PASSWORD = _strip_env(os.getenv("REDIS_PASSWORD"))
     CACHE_DB = max(0, min(15, _env_int("REDIS_CACHE_DB", 1)))
 
+    # TLS opcional (Redis 6+ con soporte TLS nativo, o stunnel delante).
+    # Desactivado por defecto para no romper despliegues existentes contra
+    # Redis en red privada/localhost sin TLS configurado del otro lado.
+    SSL = _env_bool("REDIS_SSL", False)
+    # required (default, verifica el certificado del servidor) | optional |
+    # none (sin verificar -- solo para diagnósticos, no usar en producción).
+    SSL_CERT_REQS = (_strip_env(os.getenv("REDIS_SSL_CERT_REQS")) or "required").lower()
+
     REDIS_URL = _strip_env(os.getenv("REDIS_URL"))
     CELERY_BROKER_URL = _strip_env(os.getenv("CELERY_BROKER_URL"))
     CELERY_RESULT_BACKEND = _strip_env(os.getenv("CELERY_RESULT_BACKEND"))
@@ -241,7 +274,11 @@ class RedisConfig:
     def build_url(cls, db: int | None = None) -> str:
         database = cls.DB if db is None else db
         auth = f":{quote(cls.PASSWORD, safe='')}@" if cls.PASSWORD else ""
-        return f"redis://{auth}{cls.HOST}:{cls.PORT}/{database}"
+        scheme = "rediss" if cls.SSL else "redis"
+        url = f"{scheme}://{auth}{cls.HOST}:{cls.PORT}/{database}"
+        if cls.SSL and cls.SSL_CERT_REQS != "required":
+            url += f"?ssl_cert_reqs={cls.SSL_CERT_REQS}"
+        return url
 
     @classmethod
     def broker_url(cls) -> str:
@@ -274,6 +311,16 @@ class RedisConfig:
         }
         if cls.PASSWORD:
             kwargs["password"] = cls.PASSWORD
+        if cls.SSL:
+            import ssl as _ssl
+
+            cert_reqs_map = {
+                "required": _ssl.CERT_REQUIRED,
+                "optional": _ssl.CERT_OPTIONAL,
+                "none": _ssl.CERT_NONE,
+            }
+            kwargs["ssl"] = True
+            kwargs["ssl_cert_reqs"] = cert_reqs_map.get(cls.SSL_CERT_REQS, _ssl.CERT_REQUIRED)
         return Redis(**kwargs)
 
     FULL_SYNC_FLAG_KEY = "celery:flag:full_sync_in_progress"
@@ -451,6 +498,11 @@ class RedisConfig:
             raise EnvironmentError(f"❌ REDIS_PORT inválido: {cls.PORT}")
         if cls.DB < 0 or cls.DB > 15:
             raise EnvironmentError(f"❌ REDIS_DB inválido (use 0-15): {cls.DB}")
+        if cls.SSL_CERT_REQS not in ("required", "optional", "none"):
+            raise EnvironmentError(
+                f"❌ REDIS_SSL_CERT_REQS inválido: {cls.SSL_CERT_REQS} "
+                "(use required|optional|none)"
+            )
 
 
 class CeleryConfig:
@@ -670,7 +722,19 @@ class PanaccessConfig:
         return not debug
 
     @classmethod
-    def validate(cls):
+    def validate(cls, *, debug: bool | None = None):
+        # `debug` es opcional a propósito: casi todos los call sites de este
+        # método (wind/utils/panaccess_auth.py, encryption.py,
+        # panaccess_client.py, create_subscriber.py) lo llaman sin
+        # argumentos. Si por eso "debug" cayera siempre en False, un
+        # entorno de desarrollo real con DEBUG=true en el .env seguiría
+        # bloqueado por el check de HTTPS de más abajo en cualquier llamada
+        # que no sea la de settings.py -- así que si no se pasa
+        # explícitamente, se resuelve del mismo DEBUG del entorno
+        # (DjangoConfig no depende de Django estar inicializado, solo lee
+        # la variable de entorno).
+        effective_debug = DjangoConfig.DEBUG if debug is None else debug
+
         missing = []
         if not cls.URL:
             missing.append("url_panaccess")
@@ -688,6 +752,29 @@ class PanaccessConfig:
             missing.append("ENCRYPTION_KEY")
         if missing:
             raise EnvironmentError(f"❌ Faltan variables de entorno: {', '.join(missing)}")
+
+        # url_panaccess sin HTTPS significa que el password de la cuenta de
+        # servicio (hasheado con MD5+salt fijo, ver wind/utils/panaccess_auth.py)
+        # y el sessionId viajan en texto plano, interceptables por cualquiera
+        # en la red intermedia. Falla el arranque en vez de permitirlo
+        # silenciosamente -- salvo que se declare explícitamente un entorno
+        # de desarrollo/pruebas (DEBUG=true) o se fuerce con
+        # PANACCESS_ALLOW_INSECURE_HTTP=true.
+        if cls.URL and not cls.URL.lower().startswith("https://"):
+            allow_insecure = _env_bool("PANACCESS_ALLOW_INSECURE_HTTP", False)
+            if effective_debug or allow_insecure:
+                logger.warning(
+                    "url_panaccess no usa HTTPS (%s). Permitido solo por DEBUG=true "
+                    "o PANACCESS_ALLOW_INSECURE_HTTP=true -- nunca dejar así en "
+                    "producción real.",
+                    cls.URL,
+                )
+            else:
+                raise EnvironmentError(
+                    "❌ url_panaccess debe usar HTTPS en producción (valor actual: "
+                    f"{cls.URL}). Si es un entorno de desarrollo/pruebas, active "
+                    "DEBUG=true o PANACCESS_ALLOW_INSECURE_HTTP=true explícitamente."
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -855,6 +942,37 @@ class FeatureConfig:
 
 class StaticConfig:
     CDN_URL = _strip_env(os.getenv("CDN_STATIC_URL"))
+
+
+class RecaptchaConfig:
+    """
+    reCAPTCHA v3 en /wind/create-subscriber/ (registro público) -- mitigación
+    contra bots/scripts/IA creando abonados masivamente (ver auditoría).
+
+    Opt-in a propósito: si RECAPTCHA_SECRET_KEY no está configurado, la
+    verificación se omite (no rompe clientes web/móvil existentes que
+    todavía no integran el widget/token). Configurar la variable de entorno
+    una vez el frontend envíe `recaptcha_token` en el body del registro para
+    empezar a exigirlo.
+    """
+
+    SECRET_KEY = _strip_env(os.getenv("RECAPTCHA_SECRET_KEY"))
+    MIN_SCORE = float(os.getenv("RECAPTCHA_MIN_SCORE", "0.5"))
+
+
+class HealthCheckConfig:
+    """
+    Token opcional para habilitar el check profundo (PanAccess) en /health/.
+
+    Sin este token configurado, /health/ solo reporta DB + caché (liveness
+    liviano) -- no fuerza un login real contra PanAccess (que cuenta contra
+    su límite de intentos) ni expone el texto de sus errores públicamente.
+    Configurar HEALTH_CHECK_TOKEN acá y en el monitoreo interno (enviado en
+    el header 'X-Health-Token') para habilitar el check completo solo para
+    quien tenga el secreto.
+    """
+
+    TOKEN = _strip_env(os.getenv("HEALTH_CHECK_TOKEN"))
 
 
 class SentryConfig:

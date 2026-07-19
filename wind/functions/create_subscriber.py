@@ -292,32 +292,25 @@ def _persist_subscriber_contacts_to_db(
         )
 
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-@throttle_classes([RegisterThrottle])
-def create_subscriber_view(request):
-    if not getattr(request, "wind_internal_create", False) and not _create_subscriber_public_enabled():
-        return Response(
-            {
-                "success": False,
-                "message": (
-                    "Registro HTTP deshabilitado. Use login social o "
-                    "CREATE_SUBSCRIBER_PUBLIC_ENABLED=true en entornos controlados."
-                ),
-            },
-            status=status.HTTP_403_FORBIDDEN,
-        )
+def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_social_account: bool = False):
+    """
+    Lógica de creación de suscriptor en PanAccess + BD local.
 
-    serializer = CreateSubscriberSerializer(data=request.data)
-    
-    if not serializer.is_valid():
-        return Response({
-            'success': False,
-            'message': 'Datos inválidos',
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    data = serializer.validated_data
+    No depende de un HttpRequest de DRF: la usan tanto `create_subscriber_view`
+    (registro público, detrás de AllowAny+RegisterThrottle) como el
+    aprovisionamiento de login social (`wind.services.social_login_provisioning
+    .create_subscriber_in_panaccess`), que ahora la invoca directamente en vez
+    de simular un HttpRequest y despachar la vista completa -- así la llamada
+    interna nunca pasa por (ni tiene que "saltarse") el throttle público, en
+    vez de depender de un atributo de request (`wind_internal_create`) para
+    distinguirla.
+
+    `raw_extra` reemplaza a `request.data` para los campos opcionales que no
+    cubre `CreateSubscriberSerializer` (countryCode, regionId, technicalNotes,
+    caf) -- viene de `request.data` cuando la llama la vista pública, o vacío
+    cuando la llama el aprovisionamiento social (no aplica esos campos).
+    """
+    raw_extra = raw_extra or {}
     logger.info(f"Datos recibidos y validados: {list(data.keys())}")
     
     email = data.get('email')
@@ -334,7 +327,7 @@ def create_subscriber_view(request):
     phone_normalized = ""
     if data.get("phone"):
         try:
-            default_region = (request.data.get("countryCode") or "DO").upper()
+            default_region = (raw_extra.get("countryCode") or "DO").upper()
             phone_normalized = normalize_phone(data.get("phone"), default_region=default_region)
         except ValueError:
             return Response({
@@ -431,19 +424,19 @@ def create_subscriber_view(request):
             'subscriber[supervisor]': 'AUTOMATICO',
             'subscriber[lastName]': data['lastName'],
             'subscriber[firstName]': data['firstName'],
-            'subscriber[countryCode]': request.data.get('countryCode', 'DO'),
+            'subscriber[countryCode]': raw_extra.get('countryCode', 'DO'),
         }
-        
-        if request.data.get('regionId'):
-            subscriber_params['subscriber[regionId]'] = request.data.get('regionId')
-        
+
+        if raw_extra.get('regionId'):
+            subscriber_params['subscriber[regionId]'] = raw_extra.get('regionId')
+
         if data.get('comment'):
             subscriber_params['subscriber[comment]'] = data.get('comment')
-        
+
         optional_fields = ['technicalNotes', 'caf']
         for field in optional_fields:
-            if request.data.get(field):
-                subscriber_params[f'subscriber[{field}]'] = request.data.get(field)
+            if raw_extra.get(field):
+                subscriber_params[f'subscriber[{field}]'] = raw_extra.get(field)
         
         logger.info(f"Parámetros a enviar a PanAccess: {subscriber_params}")
         
@@ -530,12 +523,12 @@ def create_subscriber_view(request):
                 user_provided_code=user_provided_code,
                 grant_registration_trial=grant_registration_trial,
                 request_extra={
-                    "regionId": request.data.get("regionId"),
-                    "technicalNotes": request.data.get("technicalNotes"),
-                    "caf": request.data.get("caf"),
-                    "countryCode": request.data.get("countryCode", "DO"),
+                    "regionId": raw_extra.get("regionId"),
+                    "technicalNotes": raw_extra.get("technicalNotes"),
+                    "caf": raw_extra.get("caf"),
+                    "countryCode": raw_extra.get("countryCode", "DO"),
                 },
-                is_social_account=bool(getattr(request, "wind_is_social_account", False)),
+                is_social_account=is_social_account,
             )
             logger.info(
                 "[Async] Aprovisionamiento adicional de %s encolado en background "
@@ -987,7 +980,6 @@ def create_subscriber_view(request):
         try:
             from wind.services.welcome_email import enqueue_welcome_credentials_email
 
-            is_social_account = bool(getattr(request, "wind_is_social_account", False))
             enqueue_welcome_credentials_email(
                 first_name=data.get("firstName", ""),
                 last_name=data.get("lastName", ""),
@@ -1018,3 +1010,57 @@ def create_subscriber_view(request):
             'error_type': 'Exception',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([RegisterThrottle])
+def create_subscriber_view(request):
+    """
+    Registro público de suscriptores. Gating de superficie pública
+    (feature flag + reCAPTCHA + throttle) vive acá; la lógica de creación
+    en sí está en `_create_subscriber_core`, que también usa el
+    aprovisionamiento de login social sin pasar por esta vista.
+    """
+    if not _create_subscriber_public_enabled():
+        return Response(
+            {
+                "success": False,
+                "message": (
+                    "Registro HTTP deshabilitado. Use login social o "
+                    "CREATE_SUBSCRIBER_PUBLIC_ENABLED=true en entornos controlados."
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = CreateSubscriberSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response({
+            'success': False,
+            'message': 'Datos inválidos',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    return _create_subscriber_core(
+        serializer.validated_data,
+        raw_extra=request.data,
+        is_social_account=False,
+    )

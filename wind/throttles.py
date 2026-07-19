@@ -21,14 +21,19 @@ class SyncAdminThrottle(UserRateThrottle):
 
 
 class RegisterThrottle(AnonRateThrottle):
-    """Registro público /wind/create-subscriber/ — límite bajo por IP."""
+    """
+    Registro público /wind/create-subscriber/ — límite bajo por IP.
+
+    Antes tenía un bypass vía `request.wind_internal_create` para que el
+    aprovisionamiento de login social pudiera saltárselo sin pasar por el
+    límite de tasa pensado para registro anónimo. Ese caso ahora invoca la
+    lógica de creación directamente (`_create_subscriber_core`) sin pasar
+    por esta vista/throttle en absoluto (ver
+    wind.services.social_login_provisioning.create_subscriber_in_panaccess),
+    así que ya no hace falta ningún atributo mágico para distinguirlo acá.
+    """
 
     scope = "register"
-
-    def allow_request(self, request, view):
-        if getattr(request, "wind_internal_create", False):
-            return True
-        return super().allow_request(request, view)
 
 
 class PasswordResetThrottle(AnonRateThrottle):

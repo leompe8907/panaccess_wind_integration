@@ -244,7 +244,16 @@ def is_subscriber_closed_locally(subscriber_code: str | None) -> bool:
     """
     if not subscriber_code:
         return False
-    sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    # Fuerza lectura a primaria (no réplica): esta es la puerta que decide
+    # si un login se rechaza por cierre de cuenta. Si leyera de una réplica
+    # con lag, un cierre recién escrito en primaria podría no verse todavía
+    # acá, dejando una ventana real para loguearse en una cuenta ya cerrada
+    # -- justo el bypass que este chequeo existe para evitar (ver
+    # wind/db_router.py).
+    from wind.db_router import use_primary_for_reads
+
+    with use_primary_for_reads():
+        sub = ListOfSubscriber.objects.filter(code=subscriber_code).first()
     if not sub:
         return False
     return sub.status in (ListOfSubscriber.STATUS_CLOSED, ListOfSubscriber.STATUS_PENDING_CLOSURE)

@@ -1,0 +1,25 @@
+import os
+import sys
+import django
+sys.path.append(r"f:\Back-Wind-V2")
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'panaccess_wind_integration.settings')
+django.setup()
+from django.db import connection
+def drop_column_if_exists(table, column):
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(f"ALTER TABLE {table} DROP COLUMN IF EXISTS {column} CASCADE;")
+            print(f"Dropped {table}.{column} if it existed.")
+        except Exception as e:
+            print(f"Error dropping {table}.{column}: {e}")
+# List of tables and columns to drop
+columns_to_drop = {
+    'wind_listofsubscriber': ['closed_at', 'closed_reason', 'status'],
+    'wind_subscriberdocumentregistry': ['account_closed_at', 'closed_subscriber_code', 'eligible_for_trial', 'trial_expires_at', 'trial_granted_at', 'trial_used'],
+    'wind_subscriberemailregistry': ['account_closed_at', 'closed_subscriber_code', 'eligible_for_trial', 'trial_expires_at', 'trial_granted_at', 'trial_used'],
+}
+print("Iniciando la limpieza de columnas conflictivas...")
+for table, cols in columns_to_drop.items():
+    for col in cols:
+        drop_column_if_exists(table, col)
+print("Limpieza finalizada.")

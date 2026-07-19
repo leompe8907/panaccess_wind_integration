@@ -4,6 +4,7 @@ import uuid
 import hashlib
 
 from django.db import models
+from django.db.models.functions import Upper
 from django.utils import timezone
 from django.dispatch import receiver
 from django.contrib.auth.models import User
@@ -18,10 +19,10 @@ from wind.utils.encryption import encrypt_value, decrypt_value
 
 class ListOfSubscriber(models.Model):
     id = models.CharField(primary_key=True, blank=True, unique=True, max_length=100)
-    code = models.CharField(max_length=100, blank=True, null=True, unique=True, db_index=True)
+    code = models.CharField(max_length=100, blank=True, null=True, unique=True)
     lastName = models.CharField(max_length=100, null=True, blank=True)
     firstName = models.CharField(max_length=100, null=True, blank=True)
-    smartcards = models.JSONField(null=True, blank=True, db_index=True)
+    smartcards = models.JSONField(null=True, blank=True)
     created = models.DateTimeField(null=True, blank=True)
     
     # Información extendida
@@ -77,9 +78,13 @@ class ListOfSubscriber(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['code']),
-            models.Index(fields=['emails']),
-            models.Index(fields=['smartcards']),
+            # 'code' ya tiene índice único por unique=True; 'smartcards' no se
+            # consulta nunca por igualdad (era un índice btree inútil sobre un
+            # JSON). Este índice funcional sí importa: todo el login/registro
+            # filtra con emails__iexact, que en Postgres compila a
+            # UPPER(emails) = UPPER(...) y NO puede usar el índice plano de
+            # 'emails' -- sin esto, cada login hacía un scan completo.
+            models.Index(Upper('emails'), name='wind_lof_sub_emails_upper'),
         ]
 
     def __str__(self):
@@ -91,7 +96,7 @@ class ListOfSubscriber(models.Model):
 
 
 class ListOfSmartcards(models.Model):
-    sn = models.CharField(max_length=100, unique=True, null=True, blank=True, db_index=True)
+    sn = models.CharField(max_length=100, unique=True, null=True, blank=True)
     subscriberCode = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     lastName = models.CharField(max_length=100, blank=True, null=True)
     firstName = models.CharField(max_length=100, blank=True, null=True)
@@ -127,11 +132,10 @@ class ListOfSmartcards(models.Model):
     fingerprint = models.CharField(max_length=100, null=True, blank=True)
     hardware = models.CharField(max_length=100, null=True, blank=True)
 
-    class Meta:
-        indexes = [
-            models.Index(fields=['subscriberCode']),
-            models.Index(fields=['sn']),
-        ]
+    # 'sn' ya tiene índice único por unique=True y 'subscriberCode' ya tiene
+    # su propio índice por db_index=True -- no hace falta un Meta.indexes
+    # que duplique esos mismos índices (mantenerlo doblaba el costo de
+    # escritura de cada sync sin aportar nada a las lecturas).
 
     def __str__(self):
         name_parts = [self.firstName, self.lastName]

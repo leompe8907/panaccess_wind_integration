@@ -3,13 +3,11 @@ Aprovisionamiento PanAccess para login social (Google/Facebook).
 """
 from __future__ import annotations
 
-import json
 import logging
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory
 
-from wind.functions.create_subscriber import create_subscriber_view
+from wind.functions.create_subscriber import _create_subscriber_core
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 from wind.models import ListOfSubscriber, SubscriberEmailRegistry
 from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
@@ -27,23 +25,24 @@ def create_subscriber_in_panaccess(
     comment="",
     is_social_account=False,
 ):
-    """Llama a create-subscriber simulando un request interno."""
-    factory = RequestFactory()
+    """
+    Crea el suscriptor invocando directamente la lógica de negocio
+    (`_create_subscriber_core`), sin pasar por la vista HTTP pública ni por
+    su throttle -- esta es una llamada interna server-to-server (login
+    social ya autenticado contra Google/Facebook), no un registro anónimo,
+    así que no debe competir por ni depender de saltarse el límite de tasa
+    pensado para ese caso. Antes se simulaba un HttpRequest con
+    RequestFactory y se marcaba con `wind_internal_create=True` para que
+    `RegisterThrottle` lo dejara pasar; con la llamada directa ese atributo
+    ya no existe ni hace falta.
+    """
     data = {
         "lastName": last_name,
         "firstName": first_name,
         "email": email,
         "comment": comment,
     }
-    request = factory.post(
-        "/dummy/",
-        data=json.dumps(data),
-        content_type="application/json",
-    )
-    request.wind_internal_create = True
-    if is_social_account:
-        request.wind_is_social_account = True
-    response = create_subscriber_view(request)
+    response = _create_subscriber_core(data, is_social_account=is_social_account)
     return response.data
 
 

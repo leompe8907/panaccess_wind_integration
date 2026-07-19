@@ -37,7 +37,7 @@ if sys.platform == 'win32':
 # Validar las configuraciones
 DjangoConfig.validate()
 SocialConfig.validate()
-PanaccessConfig.validate()
+PanaccessConfig.validate(debug=DjangoConfig.DEBUG)
 if DatabaseConfig.use_postgresql():
     DatabaseConfig.configure()
 RedisConfig.validate()
@@ -72,6 +72,11 @@ elif DjangoConfig.production_https_explicitly_disabled(debug=DEBUG):
     )
 
 SYNC_ADMIN_IP_ALLOWLIST = DjangoConfig.SYNC_ADMIN_IP_ALLOWLIST
+
+# Requerido por Django 4+ para aceptar requests con cookie+CSRF (admin,
+# /accounts/ de allauth) cuyo Origin/Referer no coincide con el host que
+# sirve Django (típico detrás de un dominio/CDN de frontend distinto).
+CSRF_TRUSTED_ORIGINS = DjangoConfig.CSRF_TRUSTED_ORIGINS
 
 
 # ============================================================================

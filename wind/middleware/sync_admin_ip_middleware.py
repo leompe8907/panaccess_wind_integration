@@ -25,6 +25,13 @@ _PROTECTED_PREFIXES = (
     "/wind/test-call-list-",
     "/wind/products-stats",
     "/wind/smartcards-stats",
+    # /admin/ (Django admin) no tenía ninguna restricción de red -- quedaba
+    # accesible desde cualquier IP para quien adivinara/probara credenciales
+    # (ver auditoría). OJO: este middleware solo se instala en MIDDLEWARE si
+    # SYNC_ADMIN_IP_ALLOWLIST está definido en el entorno (ver settings.py);
+    # si esa variable no está configurada en el despliegue actual, agregar
+    # este prefijo acá no tiene efecto hasta que se defina.
+    "/admin/",
 )
 
 
