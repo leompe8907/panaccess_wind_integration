@@ -574,8 +574,11 @@ class CeleryConfig:
     # de que termine, sin importar la duración real.
     FULL_SYNC_NO_TIME_LIMIT = _env_bool("CELERY_FULL_SYNC_NO_TIME_LIMIT", True)
     # compare_and_update_all_subscribers/smartcards escalan con el tamaño
-    # TOTAL del catálogo (pagina todo PanAccess + carga toda la tabla local),
-    # no con lo que cambió -- por eso corre nocturno, no cada pocos minutos.
+    # TOTAL del catálogo remoto (pagina todo PanAccess), no con lo que
+    # cambió -- por eso corre nocturno, no cada pocos minutos. (subscribers
+    # ya no precarga toda la tabla local en memoria -- solo el set de
+    # códigos y, por página remota, un filter(code__in=...) puntual; ver
+    # wind/functions/getSubscriber.py:compare_and_update_all_subscribers).
     # Si el worker/broker estuvo caído y el mensaje de Beat quedó encolado
     # más de FULL_SYNC_EXPIRES_SECONDS sin arrancar, Celery lo descarta en
     # vez de ejecutarlo tarde -- evita que se acumulen corridas completas
@@ -590,6 +593,23 @@ class CeleryConfig:
     CLOSURE_RETRY_ENABLED = _env_bool("CELERY_CLOSURE_RETRY_ENABLED", True)
     CLOSURE_RETRY_MINUTES = max(5, _env_int("CELERY_CLOSURE_RETRY_MINUTES", 30))
     CLOSURE_RETRY_MAX_ATTEMPTS = max(1, _env_int("CELERY_CLOSURE_RETRY_MAX_ATTEMPTS", 5))
+
+    # Recuperación de logs de auditoría que quedaron encolados en Redis
+    # (RPUSH durable, ver wind/utils/log_buffer.py) sin llegar a escribirse
+    # en AuthAuditLog -- por ejemplo si el proceso se cayó entre el RPUSH y
+    # el bulk_create. Corre de fondo cada pocos minutos como red de
+    # seguridad; el flush normal (batch_size/flush_interval en memoria) sigue
+    # siendo el camino rápido de todos los días.
+    LOG_BUFFER_RECOVERY_ENABLED = _env_bool("CELERY_LOG_BUFFER_RECOVERY_ENABLED", True)
+    LOG_BUFFER_RECOVERY_MINUTES = max(1, _env_int("CELERY_LOG_BUFFER_RECOVERY_MINUTES", 5))
+
+    # Reintento automático de aprovisionamiento parcial de suscriptores
+    # (contactos/license block/producto de prueba que quedaron pendientes --
+    # ver wind/services/subscriber_provisioning.py y
+    # wind/tasks.retry_partial_provisioning_task).
+    PROVISIONING_RETRY_ENABLED = _env_bool("CELERY_PROVISIONING_RETRY_ENABLED", True)
+    PROVISIONING_RETRY_MINUTES = max(5, _env_int("CELERY_PROVISIONING_RETRY_MINUTES", 15))
+    PROVISIONING_RETRY_MAX_ATTEMPTS = max(1, _env_int("CELERY_PROVISIONING_RETRY_MAX_ATTEMPTS", 8))
 
 
 # ---------------------------------------------------------------------------
@@ -847,6 +867,12 @@ class ThrottleConfig:
     SYNC_ADMIN = _strip_env(os.getenv("DRF_THROTTLE_SYNC_ADMIN")) or "30/minute"
     REGISTER = _strip_env(os.getenv("DRF_THROTTLE_REGISTER")) or "10/hour"
     PASSWORD_RESET = _strip_env(os.getenv("DRF_THROTTLE_PASSWORD_RESET")) or "5/hour"
+    # Login social (Google/Facebook): antes sin scope propio, caía en el
+    # límite genérico anónimo (60/minute) -- mucho más permisivo que el resto
+    # de las acciones sensibles de auth. No tan estricto como register/
+    # password_reset porque es una acción legítima de uso frecuente (ver
+    # auditoría).
+    SOCIAL_LOGIN = _strip_env(os.getenv("DRF_THROTTLE_SOCIAL_LOGIN")) or "20/minute"
 
 
 # ---------------------------------------------------------------------------

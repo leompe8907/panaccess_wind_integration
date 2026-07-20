@@ -1,4 +1,5 @@
 from datetime import timedelta
+import hmac
 import secrets
 import uuid
 import hashlib
@@ -75,6 +76,39 @@ class ListOfSubscriber(models.Model):
     # cierre termina en CLOSED. Al llegar a CeleryConfig.CLOSURE_RETRY_MAX_ATTEMPTS
     # se deja de reintentar automáticamente y se manda una alerta.
     closure_retry_count = models.PositiveIntegerField(default=0)
+
+    # Estado de aprovisionamiento tras addSubscriber (auditoría: "fallos
+    # parciales no abortan el registro" -- create_subscriber.py/
+    # finish_subscriber_provisioning_task pueden terminar sin agregar
+    # contactos, license block o el producto de prueba, y antes eso dejaba
+    # al suscriptor a medias para siempre sin ninguna señal). 'complete' es
+    # el default para no marcar como pendiente ninguna fila existente ni
+    # ninguna que no pase por este flujo; solo create_subscriber.py y
+    # finish_subscriber_provisioning_task escriben 'partial' cuando de
+    # verdad falta algo. Ver wind/services/subscriber_provisioning.py y
+    # wind/tasks.retry_partial_provisioning_task.
+    PROVISIONING_COMPLETE = "complete"
+    PROVISIONING_PARTIAL = "partial"
+    PROVISIONING_STATUS_CHOICES = [
+        (PROVISIONING_COMPLETE, "Complete"),
+        (PROVISIONING_PARTIAL, "Partial"),
+    ]
+    provisioning_status = models.CharField(
+        max_length=20,
+        choices=PROVISIONING_STATUS_CHOICES,
+        default=PROVISIONING_COMPLETE,
+        db_index=True,
+    )
+    # Pasos que quedaron pendientes la última vez que se intentó terminar el
+    # aprovisionamiento (subconjunto de "email_contact", "phone_contact",
+    # "license_block", "trial_product"). None/vacío cuando no falta nada.
+    provisioning_pending_steps = models.JSONField(null=True, blank=True)
+    # Cuántas veces retry_partial_provisioning_task reintentó terminar el
+    # aprovisionamiento sin lograrlo del todo. Al llegar a
+    # CeleryConfig.PROVISIONING_RETRY_MAX_ATTEMPTS se deja de reintentar
+    # automáticamente y se manda una alerta (mismo patrón que
+    # closure_retry_count / retry_partial_closures_task).
+    provisioning_retry_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         indexes = [
@@ -201,7 +235,13 @@ class SubscriberLoginInfo(models.Model):
     def check_password(self, raw_password):
         if not self.password_hash or not raw_password:
             return False
-        return self.get_password() == raw_password
+        # hmac.compare_digest en vez de == -- comparación de tiempo
+        # constante, en vez de cortar apenas encuentra la primera
+        # diferencia (ver auditoría).
+        stored = self.get_password()
+        if stored is None:
+            return False
+        return hmac.compare_digest(stored, raw_password)
 
 
 class SubscriberInfo(models.Model):
@@ -261,7 +301,13 @@ class SubscriberInfo(models.Model):
     def check_password(self, raw_password):
         if not self.password_hash or not raw_password:
             return False
-        return self.get_password() == raw_password
+        # hmac.compare_digest en vez de == -- comparación de tiempo
+        # constante, en vez de cortar apenas encuentra la primera
+        # diferencia (ver auditoría).
+        stored = self.get_password()
+        if stored is None:
+            return False
+        return hmac.compare_digest(stored, raw_password)
     
     def set_pin(self, raw_pin):
         if raw_pin:

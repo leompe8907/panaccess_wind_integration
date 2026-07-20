@@ -3,7 +3,9 @@ Funciones de autenticación con PanAccess.
 """
 import hashlib
 import logging
+import threading
 import requests
+from requests.adapters import HTTPAdapter
 from urllib.parse import urlencode
 
 from appConfig import PanaccessConfig
@@ -39,6 +41,34 @@ def _is_rate_limit_error(error_message: str) -> bool:
         return False
     text = error_message.lower()
     return any(keyword in text for keyword in _RATE_LIMIT_KEYWORDS)
+
+
+# Sesión HTTP compartida hacia PanAccess (login, verificación de sesión, y
+# todas las llamadas de PanAccessClient.call) -- antes cada request abría y
+# cerraba su propia conexión TCP+TLS con `requests.post(...)` suelto, sin
+# reutilizar nada. Con una única `requests.Session` con pool de conexiones
+# keep-alive, requests hacia el mismo host reutilizan el socket/TLS ya
+# establecido en vez de renegociar TLS en cada llamada -- reduce latencia y
+# carga en el servidor de PanAccess bajo tráfico sostenido. Un solo objeto
+# por proceso, creado perezosamente y protegido con lock (double-checked
+# locking) para que sea seguro entre threads (workers Gunicorn/Celery con
+# threads, ThreadPoolExecutor de sync de smartcards, etc.).
+_session: requests.Session | None = None
+_session_lock = threading.Lock()
+
+
+def get_panaccess_session() -> requests.Session:
+    """Sesión `requests` compartida y reutilizable para hablar con PanAccess."""
+    global _session
+    if _session is None:
+        with _session_lock:
+            if _session is None:
+                session = requests.Session()
+                adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=0)
+                session.mount("https://", adapter)
+                session.mount("http://", adapter)
+                _session = session
+    return _session
 
 
 def hash_password(password: str, salt: str = None) -> str:
@@ -84,7 +114,7 @@ def login() -> str:
     logger.info("Iniciando login")
     
     try:
-        response = requests.post(
+        response = get_panaccess_session().post(
             url,
             data=param_string,
             headers=headers,
@@ -190,7 +220,7 @@ def logged_in(session_id: str) -> bool:
     logger.debug("Verificando sesión")
     
     try:
-        response = requests.post(
+        response = get_panaccess_session().post(
             url,
             data=param_string,
             headers=headers,

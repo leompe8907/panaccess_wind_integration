@@ -164,6 +164,26 @@ class CreateSubscriberSerializer(serializers.Serializer):
     hcId = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
     comment = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
+    # Antes se tomaban directo de `request.data` sin pasar por este
+    # serializer (ver auditoría) -- se enviaban tal cual al payload de
+    # PanAccess, sin límite de longitud ni formato. Ahora quedan validados
+    # como el resto de los campos.
+    countryCode = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        max_length=10,
+        help_text="Código de país ISO (ej. DO). Por defecto DO si no se envía.",
+    )
+    regionId = serializers.IntegerField(required=False, allow_null=True)
+    technicalNotes = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=500)
+    caf = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
+
+    def validate_countryCode(self, value):
+        if value and not value.strip().isalpha():
+            raise serializers.ValidationError("countryCode debe ser un código de país (solo letras).")
+        return value.strip().upper() if value else value
+
 
 class ValidateSubscriberEmailSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, help_text="Email a validar contra registros existentes")

@@ -142,9 +142,15 @@ def _is_closure_tombstone(subscriber) -> bool:
 
 
 def _update_subscriber_from_row(local_obj, row, parser=None):
-    """Actualiza un suscriptor local si difiere de la fila remota. Retorna True si guardó cambios."""
+    """Aplica en memoria los cambios de la fila remota sobre local_obj si difiere.
+
+    NO guarda en base de datos -- solo muta el objeto y retorna la lista de
+    campos modificados (vacía si no hubo cambios) para que el caller acumule
+    los objetos y los escriba en bloque con bulk_update() en vez de un
+    UPDATE por fila (ver compare_and_update_all_subscribers).
+    """
     if _is_closure_tombstone(local_obj):
-        return False
+        return []
 
     if parser is None:
         parser = _get_dateutil_parser()
@@ -194,15 +200,41 @@ def _update_subscriber_from_row(local_obj, row, parser=None):
             setattr(local_obj, key, val)
             changed_fields.append(key)
 
-    if not changed_fields:
-        return False
+    return changed_fields
 
+
+# Campos que compare_and_update_all_subscribers puede modificar. Se pasan
+# todos juntos a bulk_update() -- mismo patrón que
+# getProducts.py:_PRODUCT_UPDATABLE_FIELDS -- reescribe columnas sin cambios
+# en el mismo objeto, pero es preferible a un UPDATE por fila cuando la tabla
+# de suscriptores es grande.
+_SUBSCRIBER_UPDATABLE_FIELDS = [
+    "lastName", "firstName", "smartcards", "regionId", "countryCode", "caf",
+    "supervisor", "comment", "ip", "emails", "phones", "faxes", "skypes",
+    "mobiles", "custodians", "address1", "address2", "address3",
+    "addressCount", "newsletterAccepted", "tags", "uniqueLogin", "created",
+    "firstOrderTime", "lastExpiryTime",
+]
+
+
+def _flush_pending_subscriber_updates(pending_updates, chunk_size=None):
+    """Escribe en bloque (bulk_update) los suscriptores acumulados con cambios."""
+    if not pending_updates:
+        return
+    chunk_size = chunk_size or PanaccessConfig.DB_WRITE_CHUNK_SIZE
     try:
-        local_obj.save(update_fields=changed_fields)
-        return True
+        with transaction.atomic():
+            ListOfSubscriber.objects.bulk_update(
+                pending_updates,
+                _SUBSCRIBER_UPDATABLE_FIELDS,
+                batch_size=chunk_size,
+            )
     except Exception as e:
-        logger.error("Error actualizando suscriptor %s: %s", local_obj.code, e)
-        return False
+        logger.error(
+            "Error en bulk_update de %s suscriptores: %s", len(pending_updates), e
+        )
+    finally:
+        pending_updates.clear()
 
 
 def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
@@ -337,23 +369,24 @@ def store_all_subscribers_in_chunks(data_batch, chunk_size=None):
     for i in range(0, total, chunk_size):
         chunk = data_batch[i:i + chunk_size]
         valid_objects = []
-        
+        pending_updates_chunk = []
+
         codes = {item.get('code') for item in chunk if item.get('code')}
         ids = {item.get('id') for item in chunk if item.get('id')}
-        
+
         existing_by_code = {
             obj.code: obj for obj in ListOfSubscriber.objects.filter(code__in=codes) if obj.code
         }
         existing_by_id = {
             obj.id: obj for obj in ListOfSubscriber.objects.filter(id__in=ids) if obj.id
         }
-        
+
         for item in chunk:
             serializer = ListOfSubscriberSerializer(data=item)
             if not serializer.is_valid():
                 total_errors += 1
                 continue
-            
+
             validated = serializer.validated_data
             code = validated.get('code')
             subscriber_id = validated.get('id')
@@ -361,18 +394,17 @@ def store_all_subscribers_in_chunks(data_batch, chunk_size=None):
             if not code or not str(code).strip() or not subscriber_id or not str(subscriber_id).strip():
                 total_errors += 1
                 continue
-            
+
             existing = None
             if code and code in existing_by_code:
                 existing = existing_by_code[code]
             elif subscriber_id and subscriber_id in existing_by_id:
                 existing = existing_by_id[subscriber_id]
-            
+
             if existing:
                 if _is_closure_tombstone(existing):
                     continue
                 changed = False
-                changed_fields = []
                 for key, val in validated.items():
                     if key == "status":
                         continue
@@ -381,27 +413,39 @@ def store_all_subscribers_in_chunks(data_batch, chunk_size=None):
                         if current_val != val:
                             setattr(existing, key, val)
                             changed = True
-                            changed_fields.append(key)
                     elif isinstance(current_val, dict) and isinstance(val, dict):
                         if current_val != val:
                             setattr(existing, key, val)
                             changed = True
-                            changed_fields.append(key)
                     elif str(current_val) != str(val):
                         setattr(existing, key, val)
                         changed = True
-                        changed_fields.append(key)
-                
+
                 if changed:
-                    try:
-                        existing.save(update_fields=changed_fields)
-                        total_updated += 1
-                    except Exception as e:
-                        logger.error("Error actualizando: %s", e)
-                        total_errors += 1
+                    pending_updates_chunk.append(existing)
             else:
                 valid_objects.append(ListOfSubscriber(**validated))
-        
+
+        # Escritura en bloque de las filas modificadas de este chunk (antes:
+        # un existing.save(update_fields=...) por fila -- ver
+        # _flush_pending_subscriber_updates / _SUBSCRIBER_UPDATABLE_FIELDS).
+        if pending_updates_chunk:
+            try:
+                with transaction.atomic():
+                    ListOfSubscriber.objects.bulk_update(
+                        pending_updates_chunk,
+                        _SUBSCRIBER_UPDATABLE_FIELDS,
+                        batch_size=chunk_size,
+                    )
+                total_updated += len(pending_updates_chunk)
+            except Exception as e:
+                logger.error(
+                    "Error en bulk_update de %s suscriptores: %s",
+                    len(pending_updates_chunk),
+                    e,
+                )
+                total_errors += len(pending_updates_chunk)
+
         if valid_objects:
             try:
                 created = ListOfSubscriber.objects.bulk_create(valid_objects, ignore_conflicts=True)
@@ -409,7 +453,7 @@ def store_all_subscribers_in_chunks(data_batch, chunk_size=None):
             except Exception as e:
                 logger.error("Error bulk create: %s", e)
                 total_errors += len(valid_objects)
-    
+
     return total_inserted, total_errors
 
 
@@ -620,15 +664,35 @@ def download_subscribers_since_last(session_id=None, limit=100):
 
 
 def compare_and_update_all_subscribers(session_id=None, limit=100):
+    """Reconcilia suscriptores desde PanAccess (full sync correctivo).
+
+    Antes cargaba TODA la tabla ListOfSubscriber en memoria como objetos
+    completos (`{obj.code: obj for obj in ListOfSubscriber.objects...}`) y
+    guardaba cada fila cambiada con un `.save()` individual. Ahora:
+      - solo se mantiene en memoria el SET de códigos locales (strings, no
+        objetos) para saber qué existe y para el borrado final por
+        diferencia de conjuntos;
+      - por cada página remota (~`limit` filas) se consulta a la base de
+        datos solo esos códigos (`filter(code__in=...)`) en vez de repasar
+        el diccionario completo;
+      - los objetos modificados se acumulan y se escriben en bloque con
+        bulk_update() (ver _flush_pending_subscriber_updates), igual que
+        getProducts.py:compare_and_update_all_products.
+    """
     logger.info("Reconciliando suscriptores desde PanAccess (full sync correctivo)")
 
     parser = _get_dateutil_parser()
-    local_valid_qs = ListOfSubscriber.objects.exclude(code__isnull=True).exclude(code="")
-    local_data = {obj.code: obj for obj in local_valid_qs if obj.code}
-    local_total_count = len(local_data)
+    chunk_size = PanaccessConfig.DB_WRITE_CHUNK_SIZE
+    local_codes_all = set(
+        ListOfSubscriber.objects.exclude(code__isnull=True)
+        .exclude(code="")
+        .values_list("code", flat=True)
+    )
+    local_total_count = len(local_codes_all)
 
     remote_codes = set()
     new_subscriber_rows = []
+    pending_updates = []
     offset = 0
     remote_total_count = None
     total_updated = 0
@@ -674,29 +738,50 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
             break
 
         empty_page_retries = 0
+
+        page_codes_in_local = []
+        rows_by_code = {}
         for row in remote_list:
             code = row.get("subscriberCode")
             if not code or not str(code).strip():
                 continue
 
             remote_codes.add(code)
+            rows_by_code[code] = row
 
-            if code in local_data:
-                local_obj = local_data[code]
-                if _is_closure_tombstone(local_obj):
-                    # No reactivar ni sobrescribir cuentas cerradas desde PanAccess.
-                    continue
-                if _update_subscriber_from_row(local_obj, row, parser):
-                    total_updated += 1
+            if code in local_codes_all:
+                page_codes_in_local.append(code)
             else:
                 subscriber_data = extended_subscriber_row_to_data(row, parser)
                 if subscriber_data:
                     new_subscriber_rows.append(subscriber_data)
 
+        if page_codes_in_local:
+            # Solo se trae de la base de datos el pedacito de la tabla que
+            # corresponde a esta página remota, en vez de tener toda la
+            # tabla de suscriptores cargada en memoria de antemano.
+            local_objs_page = ListOfSubscriber.objects.filter(code__in=page_codes_in_local)
+            for local_obj in local_objs_page:
+                if _is_closure_tombstone(local_obj):
+                    # No reactivar ni sobrescribir cuentas cerradas desde PanAccess.
+                    continue
+                row = rows_by_code.get(local_obj.code)
+                if row is None:
+                    continue
+                changed_fields = _update_subscriber_from_row(local_obj, row, parser)
+                if changed_fields:
+                    pending_updates.append(local_obj)
+                    total_updated += 1
+
+        if len(pending_updates) >= chunk_size:
+            _flush_pending_subscriber_updates(pending_updates, chunk_size)
+
         offset += limit
         if remote_total_count and len(remote_codes) >= remote_total_count:
             pagination_complete = True
             break
+
+    _flush_pending_subscriber_updates(pending_updates, chunk_size)
 
     total_created = 0
     create_errors = 0
@@ -704,7 +789,7 @@ def compare_and_update_all_subscribers(session_id=None, limit=100):
         total_created, create_errors = store_all_subscribers_in_chunks(new_subscriber_rows)
 
     if pagination_complete:
-        delete_result = _delete_local_subscribers_not_in_remote(set(local_data.keys()), remote_codes)
+        delete_result = _delete_local_subscribers_not_in_remote(local_codes_all, remote_codes)
     else:
         logger.error(
             "Paginacion de suscriptores incompleta (vistos %s de %s esperados tras "

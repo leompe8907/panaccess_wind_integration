@@ -81,10 +81,15 @@ def profile_password_view(request):
             {"success": False, "error_type": "PanAccessException", "message": str(e)},
             status=status.HTTP_502_BAD_GATEWAY,
         )
-    except Exception as e:
+    except Exception:
+        # No devolver str(e) al cliente -- puede filtrar detalles internos
+        # (ver auditoría). El detalle real ya queda en el log de arriba.
         logger.exception("Error en profile_password_view")
         return Response(
-            {"success": False, "message": str(e)},
+            {
+                "success": False,
+                "message": "Ocurrió un error inesperado al cambiar la contraseña. Intenta de nuevo.",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -209,9 +214,14 @@ def profile_close_account_view(request):
         )
         http_status = status.HTTP_200_OK if result.get("success") else status.HTTP_502_BAD_GATEWAY
         return Response(result, status=http_status)
-    except Exception as e:
+    except Exception:
+        # No devolver str(e) al cliente -- puede filtrar detalles internos
+        # (ver auditoría). El detalle real ya queda en el log de arriba.
         logger.exception("Error en profile_close_account_view para %s", code)
         return Response(
-            {"success": False, "message": str(e)},
+            {
+                "success": False,
+                "message": "Ocurrió un error inesperado al eliminar la cuenta. Intenta de nuevo.",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

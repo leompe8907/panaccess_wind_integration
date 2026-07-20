@@ -65,8 +65,16 @@ def change_password_view(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    except Exception as e:
+    except Exception:
+        # No devolver str(e) al cliente -- puede filtrar detalles internos
+        # (nombres de tabla, rutas, fragmentos de configuración). El detalle
+        # real queda en el log del servidor (ver auditoría).
+        logger.exception("Error inesperado en change_password_view para code=%s", code)
         return Response(
-            {"success": False, "error_type": "Exception", "message": f"Error inesperado: {str(e)}"},
+            {
+                "success": False,
+                "error_type": "Exception",
+                "message": "Ocurrió un error inesperado al cambiar la contraseña. Intenta de nuevo.",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

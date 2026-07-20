@@ -40,3 +40,15 @@ class PasswordResetThrottle(AnonRateThrottle):
     """Recuperación de contraseña — límite bajo por IP."""
 
     scope = "password_reset"
+
+
+class SocialLoginThrottle(AnonRateThrottle):
+    """
+    Login social (Google/Facebook) — antes sin throttle propio, caía en el
+    límite genérico anónimo global (60/minute), mucho más permisivo que el
+    resto de las acciones de auth. Este endpoint valida un token externo y
+    dispara aprovisionamiento en PanAccess, así que conviene un límite
+    dedicado (ver auditoría).
+    """
+
+    scope = "social_login"

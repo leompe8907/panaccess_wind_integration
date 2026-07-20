@@ -1,6 +1,7 @@
 """
 Autenticación de abonados: credenciales PanAccess (login1/login2/código) y usuarios Django.
 """
+import hmac
 import logging
 
 from django.contrib.auth import authenticate, get_user_model
@@ -24,7 +25,10 @@ def _check_password_hash(password_hash: str | None, raw_password: str) -> bool:
     if not password_hash or not raw_password:
         return False
     try:
-        return decrypt_value(password_hash) == raw_password
+        # hmac.compare_digest en vez de == -- comparación de tiempo
+        # constante, no corta apenas encuentra la primera diferencia (ver
+        # auditoría).
+        return hmac.compare_digest(decrypt_value(password_hash), raw_password)
     except Exception:
         return False
 

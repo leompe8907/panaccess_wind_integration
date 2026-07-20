@@ -10,6 +10,7 @@ from wind.auth_serializers import (
     PanAccessSocialLoginSerializer,
 )
 from wind.services.social_login_provisioning import resolve_panaccess_credentials_for_user
+from wind.throttles import SocialLoginThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class GoogleLoginView(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
     client_class = OAuth2Client
     serializer_class = GoogleIdTokenSocialLoginSerializer
+    throttle_classes = [SocialLoginThrottle]
 
     callback_url = 'http://localhost:8000/accounts/google/login/callback/'
 
@@ -71,6 +73,7 @@ class FacebookLoginView(SocialLoginView):
     adapter_class = FacebookOAuth2Adapter
     client_class = OAuth2Client
     serializer_class = PanAccessSocialLoginSerializer
+    throttle_classes = [SocialLoginThrottle]
 
     def get_response(self):
         response = super().get_response()

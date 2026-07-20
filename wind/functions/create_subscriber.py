@@ -305,10 +305,11 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
     vez de depender de un atributo de request (`wind_internal_create`) para
     distinguirla.
 
-    `raw_extra` reemplaza a `request.data` para los campos opcionales que no
-    cubre `CreateSubscriberSerializer` (countryCode, regionId, technicalNotes,
-    caf) -- viene de `request.data` cuando la llama la vista pública, o vacío
-    cuando la llama el aprovisionamiento social (no aplica esos campos).
+    `countryCode`/`regionId`/`technicalNotes`/`caf` ya están validados por
+    `CreateSubscriberSerializer` y llegan dentro de `data` (antes se leían de
+    `raw_extra` = `request.data` crudo, sin pasar por el serializer -- ver
+    auditoría). `raw_extra` se conserva por compatibilidad de firma pero ya
+    no se usa dentro de esta función.
     """
     raw_extra = raw_extra or {}
     logger.info(f"Datos recibidos y validados: {list(data.keys())}")
@@ -327,7 +328,7 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
     phone_normalized = ""
     if data.get("phone"):
         try:
-            default_region = (raw_extra.get("countryCode") or "DO").upper()
+            default_region = (data.get("countryCode") or "DO").upper()
             phone_normalized = normalize_phone(data.get("phone"), default_region=default_region)
         except ValueError:
             return Response({
@@ -424,19 +425,19 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
             'subscriber[supervisor]': 'AUTOMATICO',
             'subscriber[lastName]': data['lastName'],
             'subscriber[firstName]': data['firstName'],
-            'subscriber[countryCode]': raw_extra.get('countryCode', 'DO'),
+            'subscriber[countryCode]': data.get('countryCode') or 'DO',
         }
 
-        if raw_extra.get('regionId'):
-            subscriber_params['subscriber[regionId]'] = raw_extra.get('regionId')
+        if data.get('regionId'):
+            subscriber_params['subscriber[regionId]'] = data.get('regionId')
 
         if data.get('comment'):
             subscriber_params['subscriber[comment]'] = data.get('comment')
 
         optional_fields = ['technicalNotes', 'caf']
         for field in optional_fields:
-            if raw_extra.get(field):
-                subscriber_params[f'subscriber[{field}]'] = raw_extra.get(field)
+            if data.get(field):
+                subscriber_params[f'subscriber[{field}]'] = data.get(field)
         
         logger.info(f"Parámetros a enviar a PanAccess: {subscriber_params}")
         
@@ -523,10 +524,10 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
                 user_provided_code=user_provided_code,
                 grant_registration_trial=grant_registration_trial,
                 request_extra={
-                    "regionId": raw_extra.get("regionId"),
-                    "technicalNotes": raw_extra.get("technicalNotes"),
-                    "caf": raw_extra.get("caf"),
-                    "countryCode": raw_extra.get("countryCode", "DO"),
+                    "regionId": data.get("regionId"),
+                    "technicalNotes": data.get("technicalNotes"),
+                    "caf": data.get("caf"),
+                    "countryCode": data.get("countryCode") or "DO",
                 },
                 is_social_account=is_social_account,
             )
@@ -557,34 +558,32 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
         try:
             logger.info(f"[DB] Obteniendo información completa del suscriptor {subscriber_code} desde PanAccess")
             
-            from wind.functions.getSubscriber import CallListExtendedSubscribers, extract_first_email, extract_first_phone
-            
+            from wind.functions.getSubscriber import CallGetSubscriber, extract_first_email, extract_first_phone
+
             try:
                 from dateutil import parser
                 parser_instance = parser
             except ImportError:
                 logger.warning("[DB] python-dateutil no está instalado, las fechas pueden no parsearse correctamente")
                 parser_instance = None
-            
+
+            # Antes: paginaba getListOfExtendedSubscribers en bloques de 100
+            # (hasta 300 filas) buscando el código recién creado fila por
+            # fila -- lento, y si el suscriptor no caía en esas primeras 300
+            # filas (catálogo grande, orden no garantizado), la búsqueda
+            # fallaba en falso aunque el suscriptor sí existiera. Ahora se
+            # pide directo por código (getSubscriber/getExtendedSubscriber),
+            # una sola llamada sin importar el tamaño del catálogo.
             found_subscriber = None
-            offset = 0
-            limit = 100
-            max_search = 3
-            
-            for i in range(max_search):
-                result = CallListExtendedSubscribers(session_id=None, offset=offset, limit=limit)
-                rows = result.get("extendedSubscriberEntries") or result.get("subscriberEntries") or result.get("rows", [])
-                
-                for row in rows:
-                    if row.get("subscriberCode") == subscriber_code:
-                        found_subscriber = row
-                        break
-                
-                if found_subscriber:
-                    break
-                
-                offset += limit
-            
+            try:
+                found_subscriber = CallGetSubscriber(subscriber_code=subscriber_code)
+            except PanAccessException as exc:
+                logger.warning(
+                    "[DB] No se pudo obtener el suscriptor %s directo de PanAccess: %s",
+                    subscriber_code,
+                    exc,
+                )
+
             if found_subscriber:
                 logger.info(f"[DB] Suscriptor {subscriber_code} encontrado en PanAccess")
                 
@@ -678,7 +677,45 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
                     logger.error(f"[DB] Error guardando suscriptor en BD: {str(e)}", exc_info=True)
             else:
                 logger.warning(f"[DB] No se pudo encontrar el suscriptor {subscriber_code} en PanAccess después de crearlo")
-                
+                # Sin esto, si getSubscriber falla justo después de un
+                # addSubscriber exitoso, el suscriptor queda existiendo en
+                # PanAccess pero SIN NINGUNA fila local -- no solo sin
+                # contactos/license block, sino invisible para
+                # provisioning_status y para la reconciliación hasta la
+                # próxima corrida de sync. Se crea una fila mínima con lo
+                # que ya se sabe de la request para que quede rastreable de
+                # inmediato (la sync periódica la completa con
+                # smartcards/etc. más adelante).
+                try:
+                    ListOfSubscriber.objects.update_or_create(
+                        code=subscriber_code,
+                        defaults={
+                            "id": subscriber_code,
+                            "lastName": data.get("lastName"),
+                            "firstName": data.get("firstName"),
+                            "regionId": data.get("regionId"),
+                            "countryCode": data.get("countryCode") or "DO",
+                            "caf": data.get("caf"),
+                            "supervisor": "AUTOMATICO",
+                            "comment": data.get("comment"),
+                            "emails": email_normalized,
+                            "phones": phone_normalized or None,
+                            "created": timezone.now(),
+                        },
+                    )
+                    logger.info(
+                        "[DB] Fila mínima creada en ListOfSubscriber para %s "
+                        "(getSubscriber no lo encontró tras crearlo)",
+                        subscriber_code,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "[DB] Error creando fila mínima para %s: %s",
+                        subscriber_code,
+                        str(e),
+                        exc_info=True,
+                    )
+
         except Exception as e:
             logger.error(f"[DB] Error obteniendo información del suscriptor desde PanAccess: {str(e)}", exc_info=True)
 
@@ -818,27 +855,21 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
                 try:
                     logger.info(f"[DB] Actualizando smartcards del suscriptor {subscriber_code} después de addLicenseBlockToSubscriber")
                     
-                    from wind.functions.getSubscriber import CallListExtendedSubscribers
-                    
+                    from wind.functions.getSubscriber import CallGetSubscriber
+
+                    # Mismo cambio que en la búsqueda inicial más arriba:
+                    # pedir el suscriptor directo por código en vez de
+                    # paginar el catálogo completo buscándolo fila por fila.
                     found_subscriber_updated = None
-                    offset = 0
-                    limit = 100
-                    max_search = 3
-                    
-                    for i in range(max_search):
-                        result = CallListExtendedSubscribers(session_id=None, offset=offset, limit=limit)
-                        rows = result.get("extendedSubscriberEntries") or result.get("subscriberEntries") or result.get("rows", [])
-                        
-                        for row in rows:
-                            if row.get("subscriberCode") == subscriber_code:
-                                found_subscriber_updated = row
-                                break
-                        
-                        if found_subscriber_updated:
-                            break
-                        
-                        offset += limit
-                    
+                    try:
+                        found_subscriber_updated = CallGetSubscriber(subscriber_code=subscriber_code)
+                    except PanAccessException as exc:
+                        logger.warning(
+                            "[DB] No se pudo refrescar el suscriptor %s directo de PanAccess: %s",
+                            subscriber_code,
+                            exc,
+                        )
+
                     if found_subscriber_updated:
                         updated_smartcards = found_subscriber_updated.get("smartcards")
                         logger.info(f"[DB] Smartcards actualizadas desde PanAccess: {updated_smartcards}")
@@ -976,6 +1007,31 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
 
         if grant_registration_trial and not (product_add_result or {}).get('trial_granted'):
             revert_trial_reservation(email_normalized, user_provided_code or None)
+
+        # Estado de aprovisionamiento parcial (auditoría): si algo de lo de
+        # arriba no se logró (contacto, license block o producto de
+        # prueba), se marca acá para que retry_partial_provisioning_task lo
+        # reintente periódicamente en vez de dejarlo a medias para siempre.
+        try:
+            from wind.services.subscriber_provisioning import (
+                compute_pending_steps,
+                save_provisioning_result,
+            )
+
+            added_types = {c.get('type') for c in contacts_added}
+            pending_steps = compute_pending_steps(
+                email_contact_ok='email' in added_types,
+                phone_expected=bool(phone_normalized),
+                phone_contact_ok='phone' in added_types,
+                license_block_ok=license_block_success,
+                trial_expected=grant_registration_trial,
+                trial_ok=bool((product_add_result or {}).get('trial_granted')),
+            )
+            save_provisioning_result(subscriber_code, pending_steps)
+        except Exception:
+            logger.exception(
+                "No se pudo evaluar/guardar provisioning_status para %s", subscriber_code
+            )
 
         try:
             from wind.services.welcome_email import enqueue_welcome_credentials_email

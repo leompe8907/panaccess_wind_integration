@@ -599,9 +599,16 @@ def finish_subscriber_provisioning_task(
     # si ya se agotaron los reintentos, revertir la reserva de trial antes
     # de rendirse -- así nunca queda "reservado para siempre" esperando un
     # otorgamiento que ya no va a llegar (auditoría, sección 20).
+    #
+    # contacts_added/license_block_success se inicializan ACÁ (antes del
+    # try), no dentro de cada paso, para que sigan definidas sin importar en
+    # qué paso se haya interrumpido la tarea -- se usan para guardar
+    # provisioning_status incluso cuando se agotan los reintentos de
+    # conectividad (ver el except de más abajo).
+    contacts_added = []
+    license_block_success = False
     try:
         # 3) Contactos: email (+ validación) y teléfono si vino.
-        contacts_added = []
         try:
             add_resp = panaccess.call(
                 "addContactToSubscriber",
@@ -640,7 +647,6 @@ def finish_subscriber_provisioning_task(
         result["contacts_added"] = contacts_added
 
         # 4) License block + producto de prueba (solo si quedaron smartcards).
-        license_block_success = False
         try:
             license_resp = panaccess.call("addLicenseBlockToSubscriber", {"code": subscriber_code})
             license_block_success = bool(license_resp.get("success"))
@@ -703,6 +709,31 @@ def finish_subscriber_provisioning_task(
                 from wind.functions.create_subscriber import revert_trial_reservation
 
                 revert_trial_reservation(email_normalized, user_provided_code or None)
+            # Celery ya no va a reintentar esta tarea -- se marca el
+            # aprovisionamiento como parcial con lo que se sepa hasta acá
+            # para que retry_partial_provisioning_task (periódico, no
+            # Celery-retry) siga intentando terminarlo más adelante en vez
+            # de dejarlo a medias para siempre.
+            try:
+                from wind.services.subscriber_provisioning import (
+                    compute_pending_steps,
+                    save_provisioning_result,
+                )
+
+                pending_steps = compute_pending_steps(
+                    email_contact_ok="email" in contacts_added,
+                    phone_expected=bool(phone_normalized),
+                    phone_contact_ok="phone" in contacts_added,
+                    license_block_ok=license_block_success,
+                    trial_expected=grant_registration_trial,
+                    trial_ok=bool(result.get("trial_granted")),
+                )
+                save_provisioning_result(subscriber_code, pending_steps)
+            except Exception:
+                logger.exception(
+                    "[Async] No se pudo guardar provisioning_status tras agotar reintentos para %s",
+                    subscriber_code,
+                )
             logger.error(
                 "[Async] finish_subscriber_provisioning_task agotó reintentos para %s "
                 "(reserva de trial revertida si aplicaba)",
@@ -730,6 +761,29 @@ def finish_subscriber_provisioning_task(
         from wind.functions.create_subscriber import revert_trial_reservation
 
         revert_trial_reservation(email_normalized, user_provided_code or None)
+
+    # Estado de aprovisionamiento parcial (auditoría): si algún paso no se
+    # logró (contacto, license block o producto de prueba) sin llegar a
+    # agotar los reintentos de Celery -- p. ej. un error de negocio, no de
+    # conectividad -- se marca acá para que retry_partial_provisioning_task
+    # lo reintente periódicamente.
+    try:
+        from wind.services.subscriber_provisioning import (
+            compute_pending_steps,
+            save_provisioning_result,
+        )
+
+        pending_steps = compute_pending_steps(
+            email_contact_ok="email" in contacts_added,
+            phone_expected=bool(phone_normalized),
+            phone_contact_ok="phone" in contacts_added,
+            license_block_ok=license_block_success,
+            trial_expected=grant_registration_trial,
+            trial_ok=bool(result.get("trial_granted")),
+        )
+        save_provisioning_result(subscriber_code, pending_steps)
+    except Exception:
+        logger.exception("[Async] No se pudo guardar provisioning_status para %s", subscriber_code)
 
     # 5) Correo de bienvenida (ya es async por su cuenta).
     try:
@@ -812,6 +866,120 @@ def retry_partial_closures_task(self):
         "success": True,
         "checked": stuck.count(),
         "retried_ok": retried,
+        "exhausted": exhausted,
+    }
+
+
+@shared_task(bind=True)
+def recover_pending_audit_logs_task(self):
+    """
+    Red de seguridad para la cola durable de log_buffer.py: escribe a
+    AuthAuditLog cualquier evento de auditoría que haya quedado encolado en
+    Redis (RPUSH) sin confirmarse en la BD -- p. ej. si el proceso se cayó
+    entre el add() y el bulk_create del flush normal. En operación regular
+    esta tarea no encuentra nada que hacer (la cola durable normalmente se
+    vacía sola en cada flush exitoso); solo actúa tras una caída.
+    """
+    from appConfig import CeleryConfig
+    from wind.utils.log_buffer import recover_pending_audit_logs
+
+    if not CeleryConfig.LOG_BUFFER_RECOVERY_ENABLED:
+        return {"success": True, "skipped": True, "message": "LOG_BUFFER_RECOVERY_ENABLED=false"}
+
+    result = recover_pending_audit_logs()
+    return {"success": True, **result}
+
+
+def _alert_provisioning_exhausted(subscriber_code: str, attempts: int, to_address: str) -> None:
+    if not to_address:
+        return
+    try:
+        send_verification_email_task.delay(
+            to_address,
+            f"[Wind] Aprovisionamiento de {subscriber_code} sigue parcial tras {attempts} intentos",
+            (
+                f"El registro del suscriptor {subscriber_code} lleva {attempts} intentos "
+                "automáticos fallidos y sigue con provisioning_status=partial "
+                "(contactos, license block o producto de prueba pendientes). "
+                "Revisar manualmente en PanAccess/ListOfSubscriber.provisioning_pending_steps."
+            ),
+        )
+    except Exception:
+        logger.exception("No se pudo encolar la alerta de aprovisionamiento agotado para %s", subscriber_code)
+
+
+@shared_task(bind=True)
+def retry_partial_provisioning_task(self):
+    """
+    Reintenta terminar el aprovisionamiento de suscriptores que quedaron en
+    provisioning_status=PARTIAL (contactos, license block o producto de
+    prueba pendientes -- ver wind/services/subscriber_provisioning.py y la
+    auditoría "create_subscriber.py -- fallos parciales no abortan el
+    registro"). Mismo patrón que retry_partial_closures_task: cada
+    suscriptor lleva su propio contador (provisioning_retry_count); al
+    llegar a PROVISIONING_RETRY_MAX_ATTEMPTS se deja de reintentar
+    automáticamente y se manda una alerta.
+    """
+    from appConfig import CeleryConfig, EmailConfig
+    from wind.models import ListOfSubscriber
+    from wind.services.subscriber_provisioning import save_provisioning_result, attempt_pending_provisioning_steps
+
+    if not CeleryConfig.PROVISIONING_RETRY_ENABLED:
+        return {"success": True, "skipped": True, "message": "PROVISIONING_RETRY_ENABLED=false"}
+
+    max_attempts = CeleryConfig.PROVISIONING_RETRY_MAX_ATTEMPTS
+    stuck = ListOfSubscriber.objects.filter(
+        provisioning_status=ListOfSubscriber.PROVISIONING_PARTIAL,
+        provisioning_retry_count__lt=max_attempts,
+    )
+
+    retried_ok = []
+    still_partial = []
+    exhausted = []
+
+    for subscriber in stuck:
+        code = subscriber.code or subscriber.id
+        logger.info(
+            "[Celery] Reintentando aprovisionamiento parcial de %s (intento %s/%s, pendientes=%s)",
+            code,
+            subscriber.provisioning_retry_count + 1,
+            max_attempts,
+            subscriber.provisioning_pending_steps,
+        )
+        try:
+            outcome = attempt_pending_provisioning_steps(subscriber)
+            still_pending = outcome.get("still_pending", [])
+        except Exception:
+            logger.exception("[Celery] Error inesperado reintentando aprovisionamiento de %s", code)
+            still_pending = list(subscriber.provisioning_pending_steps or [])
+
+        save_provisioning_result(code, still_pending)
+
+        if not still_pending:
+            retried_ok.append(code)
+            logger.info("[Celery] Aprovisionamiento completado para %s", code)
+            continue
+
+        still_partial.append(code)
+        subscriber.provisioning_retry_count += 1
+        subscriber.save(update_fields=["provisioning_retry_count"])
+
+        if subscriber.provisioning_retry_count >= max_attempts:
+            exhausted.append(code)
+            logger.error(
+                "[Celery] Aprovisionamiento de %s sigue parcial tras %s intentos "
+                "(pendientes=%s); se deja de reintentar automáticamente",
+                code,
+                subscriber.provisioning_retry_count,
+                still_pending,
+            )
+            _alert_provisioning_exhausted(code, subscriber.provisioning_retry_count, EmailConfig.OPS_ALERT_ADDRESS)
+
+    return {
+        "success": True,
+        "checked": stuck.count(),
+        "retried_ok": retried_ok,
+        "still_partial": still_partial,
         "exhausted": exhausted,
     }
 

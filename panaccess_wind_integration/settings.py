@@ -177,6 +177,7 @@ REST_FRAMEWORK = {
         'sync_admin': ThrottleConfig.SYNC_ADMIN,
         'register': ThrottleConfig.REGISTER,
         'password_reset': ThrottleConfig.PASSWORD_RESET,
+        'social_login': ThrottleConfig.SOCIAL_LOGIN,
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -484,6 +485,26 @@ if CeleryConfig.CLOSURE_RETRY_ENABLED:
         "options": {
             "queue": _PIPELINE_QUEUE,
             "expires": CeleryConfig.CLOSURE_RETRY_MINUTES * 60,
+        },
+    }
+
+if CeleryConfig.LOG_BUFFER_RECOVERY_ENABLED:
+    CELERY_BEAT_SCHEDULE["recover-pending-audit-logs"] = {
+        "task": "wind.tasks.recover_pending_audit_logs_task",
+        "schedule": timedelta(minutes=CeleryConfig.LOG_BUFFER_RECOVERY_MINUTES),
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": CeleryConfig.LOG_BUFFER_RECOVERY_MINUTES * 60,
+        },
+    }
+
+if CeleryConfig.PROVISIONING_RETRY_ENABLED:
+    CELERY_BEAT_SCHEDULE["retry-partial-provisioning"] = {
+        "task": "wind.tasks.retry_partial_provisioning_task",
+        "schedule": timedelta(minutes=CeleryConfig.PROVISIONING_RETRY_MINUTES),
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": CeleryConfig.PROVISIONING_RETRY_MINUTES * 60,
         },
     }
 

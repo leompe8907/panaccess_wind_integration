@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from typing import Dict, Any, Optional
 
 from appConfig import PanaccessConfig
-from wind.utils.panaccess_auth import login, logged_in
+from wind.utils.panaccess_auth import login, logged_in, get_panaccess_session
 from wind.exceptions import (
     PanAccessException,
     PanAccessConnectionError,
@@ -137,7 +137,7 @@ class PanAccessClient:
         
         while attempt < self.MAX_RETRY_ATTEMPTS:
             try:
-                response = requests.post(
+                response = get_panaccess_session().post(
                     url,
                     data=param_string,
                     headers=headers,
