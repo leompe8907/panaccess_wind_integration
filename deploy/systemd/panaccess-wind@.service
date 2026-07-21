@@ -3,6 +3,10 @@ Description=PanAccess Wind Daphne (puerto %i)
 After=network-online.target postgresql.service redis-server.service
 Wants=network-online.target postgresql.service redis-server.service
 PartOf=panaccess-wind.target
+# Ver panaccess-wind.service: el perfil de instancia única también usa el
+# puerto 8000 -- Conflicts= evita que ambos perfiles corran a la vez en
+# vez de depender de acordarse de deshabilitar uno a mano.
+Conflicts=panaccess-wind.service
 
 [Service]
 Type=simple

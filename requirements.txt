@@ -35,7 +35,6 @@ packaging==26.2
 phonenumbers==9.0.30
 prompt_toolkit==3.0.52
 psycopg-binary==3.3.4
-psycopg2==2.9.12
 py-ubjson==0.16.1
 pyasn1==0.6.3
 pyasn1_modules==0.4.2

@@ -2,6 +2,13 @@
 Description=Servicio Web PanAccess Wind Integration (Daphne)
 After=network.target postgresql.service redis-server.service
 Wants=postgresql.service redis-server.service
+# Perfil "instancia única" (puerto 8000 fijo) -- no puede coexistir con el
+# perfil escalado (panaccess-wind.target + panaccess-wind@8000..8007), que
+# también reserva el puerto 8000 (ver auditoría: antes había que acordarse
+# de deshabilitar uno de los dos a mano). Con Conflicts=, si se arranca
+# este servicio, systemd para el perfil escalado automáticamente en vez de
+# competir por el mismo puerto.
+Conflicts=panaccess-wind.target
 
 [Service]
 Type=simple

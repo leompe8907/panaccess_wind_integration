@@ -671,7 +671,11 @@ class EncryptedCredentialsLog(models.Model):
     
     app_type = models.CharField(max_length=50)
     app_version = models.CharField(max_length=20)
-    app_credentials_id = models.ForeignKey(AppCredentials, on_delete=models.CASCADE)
+    # Antes se llamaba `app_credentials_id` -- Django ya agrega el sufijo
+    # `_id` a la columna real de cualquier FK, así que ese nombre generaba
+    # una columna duplicada `app_credentials_id_id` en Postgres (ver
+    # auditoría). Renombrado a `app_credentials` (migración 0006).
+    app_credentials = models.ForeignKey(AppCredentials, on_delete=models.CASCADE)
     
     encryption_algorithm = models.CharField(max_length=50, default="AES-256-CBC + RSA-OAEP")
     encrypted_data_hash = models.CharField(max_length=64)

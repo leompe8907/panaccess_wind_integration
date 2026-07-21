@@ -60,9 +60,11 @@ def change_password_view(request):
         )
 
     except PanAccessException as e:
+        # 502, no 500: el fallo es de la dependencia externa (PanAccess),
+        # no de este servicio -- mismo criterio que profile/views.py.
         return Response(
             {"success": False, "error_type": "PanAccessException", "message": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status=status.HTTP_502_BAD_GATEWAY,
         )
 
     except Exception:

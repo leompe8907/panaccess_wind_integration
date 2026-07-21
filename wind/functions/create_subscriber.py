@@ -42,6 +42,24 @@ PHONE_INVALID_MESSAGE = (
 logger = logging.getLogger(__name__)
 
 
+def _mask_email(email: str | None) -> str:
+    """Enmascara un email para logging (PII, ver auditoría).
+
+    Deja el primer/último carácter del local-part y el dominio completo
+    (útil para correlacionar logs sin exponer el email completo en
+    texto plano). La lógica de negocio sigue usando el email real; esto
+    solo aplica a lo que se escribe en los logs.
+    """
+    if not email or "@" not in email:
+        return "***"
+    local, _, domain = email.partition("@")
+    if len(local) <= 2:
+        masked_local = (local[0] if local else "") + "*"
+    else:
+        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+    return f"{masked_local}@{domain}"
+
+
 def _parse_contact_id(answer) -> int | None:
     if answer is None:
         return None
@@ -93,6 +111,7 @@ def _find_email_contact_id_in_subscriber(subscriber_row: dict | None, email_norm
 
 
 def _resolve_email_contact_id(panaccess, subscriber_code: str, add_contact_response: dict, email_normalized: str) -> int | None:
+    email_masked = _mask_email(email_normalized)
     contact_id = _parse_contact_id((add_contact_response or {}).get("answer"))
     if contact_id is not None:
         logger.info(
@@ -106,7 +125,7 @@ def _resolve_email_contact_id(panaccess, subscriber_code: str, add_contact_respo
         "[ValidateContact] addContactToSubscriber no devolvió contactId utilizable "
         "(subscriber=%s, email=%s, answer=%r). Consultando suscriptor en PanAccess...",
         subscriber_code,
-        email_normalized,
+        email_masked,
         (add_contact_response or {}).get("answer"),
     )
     try:
@@ -125,7 +144,7 @@ def _resolve_email_contact_id(panaccess, subscriber_code: str, add_contact_respo
                 "[ValidateContact] No se encontró contactId del email en getSubscriber "
                 "(subscriber=%s, email=%s, emails=%r)",
                 subscriber_code,
-                email_normalized,
+                email_masked,
                 row.get("emails") if row else None,
             )
         return contact_id
@@ -134,7 +153,7 @@ def _resolve_email_contact_id(panaccess, subscriber_code: str, add_contact_respo
             "[ValidateContact] Error resolviendo contactId vía getSubscriber "
             "(subscriber=%s, email=%s): %s",
             subscriber_code,
-            email_normalized,
+            email_masked,
             exc,
             exc_info=True,
         )
@@ -147,19 +166,23 @@ def _validate_email_contact_of_subscriber(
     contact_id: int,
     email_normalized: str,
 ) -> tuple[bool, str | None]:
+    email_masked = _mask_email(email_normalized)
     validate_params = {
         "code": subscriber_code,
         "contactId": contact_id,
         "asLogin": 1,
         "overrideContact": email_normalized,
     }
+    # Copia para logging con el email enmascarado -- `validate_params` en sí
+    # se sigue usando sin tocar para la llamada real a PanAccess.
+    validate_params_for_log = {**validate_params, "overrideContact": email_masked}
     logger.info(
         "[ValidateContact] Llamando validateContactOfSubscriber "
         "(subscriber=%s, contactId=%s, email=%s, asLogin=True, overrideContact=%s)",
         subscriber_code,
         contact_id,
-        email_normalized,
-        email_normalized,
+        email_masked,
+        email_masked,
     )
     try:
         try:
@@ -179,18 +202,22 @@ def _validate_email_contact_of_subscriber(
         )
         return True, None
     except PanAccessAPIError as exc:
+        # Nota: `params=%s` (validate_params) va abajo con el email real sin
+        # enmascarar porque queda dentro de la excepción/params técnicos que
+        # ya se registran para debug -- se deja el `email=%s` del mensaje
+        # legible enmascarado, que es lo que se lee a simple vista en logs.
         logger.error(
             "[ValidateContact] FALLÓ validateContactOfSubscriber | "
             "subscriber=%s contactId=%s email=%s asLogin=True overrideContact=%s | "
             "error=%s | error_code=%s | status_code=%s | params=%s",
             subscriber_code,
             contact_id,
-            email_normalized,
-            email_normalized,
+            email_masked,
+            email_masked,
             exc,
             getattr(exc, "error_code", None),
             getattr(exc, "status_code", None),
-            validate_params,
+            validate_params_for_log,
             exc_info=True,
         )
         return False, str(exc)
@@ -200,9 +227,9 @@ def _validate_email_contact_of_subscriber(
             "subscriber=%s contactId=%s email=%s asLogin=True| error=%s | params=%s",
             subscriber_code,
             contact_id,
-            email_normalized,
+            email_masked,
             exc,
-            validate_params,
+            validate_params_for_log,
             exc_info=True,
         )
         return False, str(exc)
@@ -212,9 +239,9 @@ def _validate_email_contact_of_subscriber(
             "subscriber=%s contactId=%s email=%s asLogin=True| error=%s | params=%s",
             subscriber_code,
             contact_id,
-            email_normalized,
+            email_masked,
             exc,
-            validate_params,
+            validate_params_for_log,
             exc_info=True,
         )
         return False, str(exc)
@@ -248,7 +275,7 @@ def revert_trial_reservation(email_normalized: str, document: str | None = None)
             ).update(eligible_for_trial=True)
     except Exception:
         logger.warning(
-            "No se pudo revertir la reserva de trial para %s", email_normalized, exc_info=True
+            "No se pudo revertir la reserva de trial para %s", _mask_email(email_normalized), exc_info=True
         )
 
 
@@ -323,7 +350,7 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
         }, status=status.HTTP_400_BAD_REQUEST)
     
     email_normalized = email.lower().strip()
-    logger.info(f"Validando email normalizado: '{email_normalized}'")
+    logger.info(f"Validando email normalizado: '{_mask_email(email_normalized)}'")
 
     phone_normalized = ""
     if data.get("phone"):
@@ -362,7 +389,7 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
     )
     logger.info(
         "Elegibilidad trial de registro para %s: grant=%s",
-        email_normalized,
+        _mask_email(email_normalized),
         grant_registration_trial,
     )
 
@@ -386,16 +413,16 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
     
     if not is_valid:
         errors['email'] = [validation_message]
-        logger.warning(f"Email '{email_normalized}' no válido según SubscriberEmailRegistry")
+        logger.warning(f"Email '{_mask_email(email_normalized)}' no válido según SubscriberEmailRegistry")
     
     email_exists = ListOfSubscriber.objects.filter(
         emails__iexact=email_normalized,
     ).exclude(status=ListOfSubscriber.STATUS_CLOSED).exists()
-    logger.info(f"Buscando email en ListOfSubscriber: '{email_normalized}', existe={email_exists}")
+    logger.info(f"Buscando email en ListOfSubscriber: '{_mask_email(email_normalized)}', existe={email_exists}")
     
     if email_exists:
         subscriber_with_email = ListOfSubscriber.objects.filter(emails__iexact=email_normalized).first()
-        logger.warning(f"Email '{email_normalized}' ya existe en suscriptor: code={subscriber_with_email.code if subscriber_with_email else 'N/A'}")
+        logger.warning(f"Email '{_mask_email(email_normalized)}' ya existe en suscriptor: code={subscriber_with_email.code if subscriber_with_email else 'N/A'}")
         errors['email'] = ['Este email ya está registrado.']
     
     if errors:
@@ -439,7 +466,14 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
             if data.get(field):
                 subscriber_params[f'subscriber[{field}]'] = data.get(field)
         
-        logger.info(f"Parámetros a enviar a PanAccess: {subscriber_params}")
+        # Copia para log con nombre/apellido redactados (PII, ver auditoría)
+        # -- `subscriber_params` en sí no se toca, es lo que se envía real a
+        # PanAccess.
+        _params_for_log = {
+            k: ("***" if k in ("subscriber[firstName]", "subscriber[lastName]") else v)
+            for k, v in subscriber_params.items()
+        }
+        logger.info(f"Parámetros a enviar a PanAccess: {_params_for_log}")
         
         response = panaccess.call('addSubscriber', subscriber_params)
         
@@ -476,9 +510,9 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
             defaults=email_registry_defaults,
         )
         if email_created:
-            logger.info(f"Registro de email creado: {email_normalized} -> {subscriber_code}")
+            logger.info(f"Registro de email creado: {_mask_email(email_normalized)} -> {subscriber_code}")
         else:
-            logger.info(f"Registro de email actualizado: {email_normalized} -> {subscriber_code}")
+            logger.info(f"Registro de email actualizado: {_mask_email(email_normalized)} -> {subscriber_code}")
 
         if user_provided_code:
             from wind.models import SubscriberDocumentRegistry
@@ -495,9 +529,9 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
                 defaults=doc_registry_defaults,
             )
             if doc_created:
-                logger.info(f"Registro de documento creado: {subscriber_code} -> {email_normalized}")
+                logger.info(f"Registro de documento creado: {subscriber_code} -> {_mask_email(email_normalized)}")
             else:
-                logger.info(f"Registro de documento actualizado: {subscriber_code} -> {email_normalized}")
+                logger.info(f"Registro de documento actualizado: {subscriber_code} -> {_mask_email(email_normalized)}")
 
         if FeatureConfig.CREATE_SUBSCRIBER_ASYNC_ENRICHMENT:
             # Modo async (opt-in, ver appConfig.FeatureConfig): el resto del
@@ -731,7 +765,7 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
         
         email_contact_response = None
         try:
-            logger.info(f"Agregando email {email_normalized} al suscriptor {subscriber_code}")
+            logger.info(f"Agregando email {_mask_email(email_normalized)} al suscriptor {subscriber_code}")
             contact_params = {
                 'code': subscriber_code,
                 'type': 'email',
@@ -765,7 +799,7 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
                         "[ValidateContact] %s (subscriber=%s, email=%s, addContact_answer=%r)",
                         email_validation_error,
                         subscriber_code,
-                        email_normalized,
+                        _mask_email(email_normalized),
                         email_contact_response.get("answer"),
                     )
             else:

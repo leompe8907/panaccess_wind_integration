@@ -484,7 +484,7 @@ class AuthenticateWithUDIDView(APIView):
                     sn=req.sn,
                     app_type=app_type,
                     app_version=app_version,
-                    app_credentials_id=app_credentials,
+                    app_credentials=app_credentials,
                     encrypted_data_hash=encrypted_hash,
                     client_ip=client_ip,
                     user_agent=user_agent,

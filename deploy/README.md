@@ -10,6 +10,18 @@
 
 ## Aplicar plantillas en el servidor (perfil escalado)
 
+Este servidor corre el perfil **escalado** (8 instancias, ver tabla arriba) —
+`panaccess-wind.service` (instancia única, puerto 8000 fijo) y
+`panaccess-wind.target` (8 instancias vía `panaccess-wind@.service`, puertos
+8000-8007) **no pueden estar habilitados los dos a la vez**: compiten por el
+mismo puerto 8000. Antes esto dependía de acordarse de correr el
+`systemctl disable --now panaccess-wind.service` de abajo; ahora ambas
+unidades ya declaran `Conflicts=` entre sí, así que si por error se arranca
+una estando la otra activa, systemd para la otra automáticamente en vez de
+que ambas intenten escuchar en el mismo puerto. El paso de abajo se
+mantiene igual (es la forma explícita/documentada de hacerlo), el
+`Conflicts=` es solo una red de seguridad adicional.
+
 ```bash
 cd /opt/panaccess-wind
 git pull

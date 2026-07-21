@@ -128,7 +128,6 @@ class SubscriberRegistrationTestCase(APITestCase):
 
 class SubscriberAuthTestCase(APITestCase):
     def setUp(self):
-        self.login_url = reverse('token_obtain_pair') if hasattr(self, 'token_obtain_pair') else '/api/auth/login/'
         self.username = 'testuser'
         self.password = 'SuperSecurePass123!'
         self.email = 'testuser@example.com'

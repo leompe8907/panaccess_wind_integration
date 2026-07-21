@@ -4,7 +4,6 @@ Django settings for panaccess_wind_integration project.
 import sys
 from pathlib import Path
 from celery.schedules import crontab, timedelta
-from dotenv import load_dotenv
 from appConfig import (
     CacheConfig,
     CeleryConfig,
@@ -24,8 +23,9 @@ from appConfig import (
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Cargar variables de entorno desde .env (si existe)
-load_dotenv(BASE_DIR / '.env')
+# El .env ya se carga una sola vez, de forma explícita y anclada a la raíz
+# del proyecto, al importar appConfig.py (arriba) -- ver ese archivo. No
+# hace falta (ni conviene) repetirlo acá.
 
 # Configurar encoding UTF-8 para Windows
 if sys.platform == 'win32':
@@ -47,7 +47,10 @@ CorsConfig.validate_no_allow_all()
 # Security settings
 SECRET_KEY = DjangoConfig.SECRET_KEY
 DEBUG = DjangoConfig.DEBUG
-ALLOWED_HOSTS = DjangoConfig.ALLOWED_HOSTS or ['localhost', '127.0.0.1']
+# Sin fallback: DjangoConfig.validate() (arriba) ya revienta el arranque si
+# ALLOWED_HOSTS viene vacío, así que para cuando se llega acá nunca puede
+# estarlo -- el `or [...]` que había antes era código muerto.
+ALLOWED_HOSTS = DjangoConfig.ALLOWED_HOSTS
 
 PRODUCTION_HTTPS = DjangoConfig.production_https(debug=DEBUG)
 if PRODUCTION_HTTPS and not DEBUG:

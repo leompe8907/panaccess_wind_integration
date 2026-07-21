@@ -84,7 +84,23 @@ class PanAccessSingleton:
                 panaccess_session_store.set_session_id(session_id)
                 return session_id
                 
-            except (PanAccessAuthenticationError, PanAccessConnectionError, PanAccessTimeoutError) as e:
+            # PanAccessAPIError se suma acá (antes no estaba) como
+            # consecuencia directa de corregir la clasificación en
+            # wind/utils/panaccess_auth.py: antes, prácticamente cualquier
+            # fallo de login (no solo credenciales inválidas) se reportaba
+            # como PanAccessAuthenticationError, así que quedaba cubierto
+            # por este mismo reintento "sin querer". Al corregir la
+            # clasificación, un error genérico de API durante el login
+            # ahora sale como PanAccessAPIError -- si no se agregaba acá,
+            # ese tipo de fallo dejaría de reintentarse y de tener el
+            # backoff/alerta que ya existían, en vez de solo quedar mejor
+            # clasificado en los logs.
+            except (
+                PanAccessAuthenticationError,
+                PanAccessConnectionError,
+                PanAccessTimeoutError,
+                PanAccessAPIError,
+            ) as e:
                 attempt += 1
                 self._retry_count = attempt
                 

@@ -1,7 +1,37 @@
 """
 Permisos reutilizables para API operativa y perfil de usuario.
 """
+import hmac
+
 from rest_framework.permissions import BasePermission, IsAuthenticated
+
+
+class HasCrmApiKey(BasePermission):
+    """
+    Autenticación M2M por API key compartida para la integración del bot de
+    CRM del cliente (ver appConfig.CrmIntegrationConfig y auditoría).
+
+    Exige el header `X-CRM-Api-Key` con el valor configurado en
+    CRM_EMAIL_CHECK_API_KEY, comparado en tiempo constante
+    (hmac.compare_digest, mismo patrón que views_health.py). Si la key no
+    está configurada en el entorno, deniega siempre (fail-closed) -- así
+    nunca queda accidentalmente abierto por olvido de configuración.
+    """
+
+    message = "No autorizado."
+
+    def has_permission(self, request, view):
+        from appConfig import CrmIntegrationConfig
+
+        expected = CrmIntegrationConfig.EMAIL_CHECK_API_KEY
+        if not expected:
+            return False
+
+        provided = request.META.get("HTTP_X_CRM_API_KEY", "")
+        if not provided:
+            return False
+
+        return hmac.compare_digest(provided, expected)
 
 
 class IsOwnerSubscriber(BasePermission):

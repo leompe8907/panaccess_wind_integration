@@ -1,4 +1,6 @@
 """Estado de tareas Celery (staff)."""
+import uuid
+
 from celery.result import AsyncResult
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
@@ -10,6 +12,19 @@ from rest_framework import status
 @permission_classes([IsAdminUser])
 def task_status_view(request, task_id):
     """Consulta el estado de una tarea encolada (ej. full-sync)."""
+    # Los task_id de Celery son UUID4. Validar el formato antes de
+    # consultarlo evita una llamada innecesaria al backend de resultados
+    # (Redis) con un valor que de entrada no puede corresponder a ninguna
+    # tarea real, y devuelve un 400 claro en vez de un 200 con estado
+    # "PENDING" engañoso para un id que nunca existió.
+    try:
+        uuid.UUID(str(task_id))
+    except (ValueError, AttributeError, TypeError):
+        return Response(
+            {"success": False, "message": "task_id inválido (se espera un UUID)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     result = AsyncResult(task_id)
     payload = {
         "task_id": task_id,

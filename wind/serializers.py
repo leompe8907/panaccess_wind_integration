@@ -33,11 +33,19 @@ class ListOfSmartcardsSerializer(serializers.ModelSerializer):
 
 
 class SubscriberLoginInfoSerializer(serializers.ModelSerializer):
-    password_hash = serializers.CharField(read_only=True)
-    
     class Meta:
         model = SubscriberLoginInfo
-        fields = '__all__'
+        # Antes `fields = '__all__'` con `password_hash` declarado
+        # `read_only=True` -- `read_only` solo evita que el cliente lo
+        # escriba, no lo saca de la respuesta serializada (ver auditoría).
+        # Como el hash de la contraseña nunca debería viajar en una
+        # respuesta de API, se lista explícito el resto de los campos y se
+        # excluye `password_hash` del todo, en vez de solo protegerlo de
+        # escritura.
+        fields = [
+            'id', 'subscriberCode', 'login1', 'login2',
+            'additionalLogins', 'licenses',
+        ]
 
 
 class ListOfProductsSerializer(serializers.ModelSerializer):
@@ -49,14 +57,15 @@ class ListOfProductsSerializer(serializers.ModelSerializer):
 class SubscriberInfoSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     pin = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    
-    password_hash = serializers.CharField(read_only=True)
-    pin_hash = serializers.CharField(read_only=True)
+
     failed_login_attempts = serializers.IntegerField(read_only=True)
     locked_until = serializers.DateTimeField(read_only=True)
-    
+
     class Meta:
         model = SubscriberInfo
+        # `password_hash`/`pin_hash` ya no se incluyen: estaban declarados
+        # `read_only=True` pero eso solo bloquea la escritura del cliente,
+        # no evita que se serialicen en la respuesta (ver auditoría).
         fields = [
             'id', 'subscriber_code', 'sn', 'first_name', 'last_name',
             'lastActivation', 'lastContact', 'lastServiceListDownload',
@@ -64,7 +73,7 @@ class SubscriberInfoSerializer(serializers.ModelSerializer):
             'packageNames', 'model', 'login1', 'login2', 'activated',
             'activation_date', 'last_login', 'created_at', 'updated_at',
             'password', 'pin',
-            'password_hash', 'pin_hash', 'failed_login_attempts', 'locked_until'
+            'failed_login_attempts', 'locked_until'
         ]
         
     def create(self, validated_data):

@@ -9,12 +9,22 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
-load_dotenv()
+# Antes: `load_dotenv(override=True)` seguido de `load_dotenv()` -- la
+# segunda llamada es un no-op total (mismo archivo, sin override, todo lo
+# que carga ya lo puso la primera), y ninguna de las dos apunta a una ruta
+# explícita: `load_dotenv()` busca un `.env` subiendo desde el directorio
+# de trabajo actual, no desde la ubicación real de este archivo. Si el
+# proceso arranca con un CWD distinto a la raíz del proyecto (ej. un
+# systemd unit sin `WorkingDirectory`, o un cron), podía no encontrar el
+# `.env` correcto. Se ancla explícitamente a la carpeta de este archivo
+# (la raíz del proyecto, igual que `BASE_DIR` en settings.py) para que
+# funcione igual sin importar desde dónde se invoque el proceso.
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +54,20 @@ def _env_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
     except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Variable de entorno %s='%s' no es un número válido, usando default=%s",
+            name, raw, default,
+        )
         return default
 
 
@@ -986,6 +1010,28 @@ class RecaptchaConfig:
     MIN_SCORE = float(os.getenv("RECAPTCHA_MIN_SCORE", "0.5"))
 
 
+class CrmIntegrationConfig:
+    """
+    Secreto compartido para la integración M2M del bot de CRM del cliente
+    (ver auditoría): `validate_subscriber_email_view` estaba detrás de
+    AllowAny y permitía enumerar emails registrados a cualquiera. La
+    funcionalidad es legítima -- el cliente tiene un bot interno que
+    pre-valida el email antes de lanzar el flujo completo de alta en
+    PanAccess, para no reiniciar todo el proceso cuando PanAccess rechaza
+    un email duplicado a mitad de camino -- pero el endpoint no distinguía
+    a ese bot de cualquier visitante anónimo. Como es una integración
+    máquina-a-máquina (no un formulario con humano detrás), la mitigación
+    correcta es un API key compartido en un header, no reCAPTCHA.
+
+    Sin CRM_EMAIL_CHECK_API_KEY configurado, el endpoint se deniega por
+    completo (fail-closed) en vez de quedar abierto igual que antes --
+    configúrelo acá y entréguele el mismo valor al equipo del bot antes de
+    desplegar este cambio.
+    """
+
+    EMAIL_CHECK_API_KEY = _strip_env(os.getenv("CRM_EMAIL_CHECK_API_KEY"))
+
+
 class HealthCheckConfig:
     """
     Token opcional para habilitar el check profundo (PanAccess) en /health/.
@@ -1004,7 +1050,13 @@ class HealthCheckConfig:
 class SentryConfig:
     DSN = _strip_env(os.getenv("SENTRY_DSN"))
     ENVIRONMENT = _strip_env(os.getenv("SENTRY_ENVIRONMENT"))
-    TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
+    # _env_float en vez de float(os.getenv(...)) a secas -- antes, un valor
+    # no numérico en SENTRY_TRACES_SAMPLE_RATE (typo, valor vacío, etc.)
+    # tumbaba el arranque completo de la aplicación con un ValueError al
+    # importar este módulo, por una variable que ni siquiera es crítica
+    # (solo afecta el muestreo de trazas de Sentry). Ahora loguea un
+    # warning y sigue con el default.
+    TRACES_SAMPLE_RATE = _env_float("SENTRY_TRACES_SAMPLE_RATE", 0.1)
 
     @classmethod
     def environment(cls, *, debug: bool) -> str:
