@@ -1032,6 +1032,25 @@ class CrmIntegrationConfig:
     EMAIL_CHECK_API_KEY = _strip_env(os.getenv("CRM_EMAIL_CHECK_API_KEY"))
 
 
+class TrustedProxyConfig:
+    """
+    Proxies de confianza desde los que sí se acepta `X-Forwarded-For` como
+    IP real del cliente (ver auditoría: bypass de IP allowlist falseando
+    este header). Por defecto solo localhost, coherente con que
+    Daphne/Django solo escuchan en 127.0.0.1 detrás de nginx (ver
+    deploy/systemd/*.service) -- si REMOTE_ADDR no está en esta lista, el
+    header se ignora por completo y se usa REMOTE_ADDR tal cual.
+
+    Usado hoy por `wind/utils/websocket_utils.get_client_ip()` (superficie
+    de pareo UDID). El mismo problema en `sync_admin_ip_middleware.py`
+    sigue pendiente de una decisión de deploy más amplia (nginx +
+    variable), ver auditoría -- esta config queda lista para reutilizarse
+    ahí también cuando se implemente esa parte.
+    """
+
+    TRUSTED_PROXIES = _csv("TRUSTED_PROXIES") or ["127.0.0.1", "::1"]
+
+
 class HealthCheckConfig:
     """
     Token opcional para habilitar el check profundo (PanAccess) en /health/.

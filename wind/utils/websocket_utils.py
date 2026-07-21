@@ -7,14 +7,14 @@ import logging
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
-from appConfig import RedisConfig
+from appConfig import RedisConfig, TrustedProxyConfig
 
 logger = logging.getLogger('rate_limiting')
 
 
 def is_valid_app_type(app_type: str) -> bool:
     return app_type in [
-        'android_tv', 'samsung_tv', 'lg_tv', 'set_top_box', 'mobile_app', 'web_player'
+        'web', 'lg', 'samsung', 'android', 'androidtv', 'amazon', 'iOS', 'iOStv'
     ]
 
 
@@ -45,15 +45,15 @@ def _get_header_value(source, header_name):
 def _build_device_fingerprint_string(headers_dict):
     app_type = headers_dict.get('app_type', '')
     mac_address = headers_dict.get('mac_address', '')
-    
-    if app_type in ['android_tv', 'samsung_tv', 'lg_tv', 'set_top_box']:
+
+    if app_type in ['lg', 'samsung', 'androidtv', 'amazon', 'iOStv']:
         fingerprint_string = (
             f"{app_type}|{headers_dict.get('tv_serial', '')}|"
             f"{headers_dict.get('tv_model', '')}|{headers_dict.get('firmware_version', '')}|"
             f"{headers_dict.get('device_id', '')}|{mac_address}|"
             f"{headers_dict.get('app_version', '')}|{headers_dict.get('user_agent', '')}"
         )
-    elif app_type in ['android_mobile', 'ios_mobile', 'mobile_app']:
+    elif app_type in ['android', 'iOS']:
         fingerprint_string = (
             f"{app_type}|{headers_dict.get('device_id', '')}|"
             f"{headers_dict.get('build_id', '')}|{headers_dict.get('device_model', '')}|"
@@ -73,14 +73,12 @@ def _build_device_fingerprint_string(headers_dict):
 
 
 def generate_device_fingerprint(request_or_scope):
-    direct_fingerprint = _get_header_value(request_or_scope, 'HTTP_X_DEVICE_FINGERPRINT')
-    if direct_fingerprint and len(direct_fingerprint) == 32:
-        try:
-            int(direct_fingerprint, 16)
-            return direct_fingerprint
-        except ValueError:
-            pass
-    
+    # Antes: si el cliente mandaba su propio header `X-Device-Fingerprint`
+    # con forma de hex de 32 caracteres, se aceptaba tal cual sin derivar
+    # nada -- cualquiera podía "declarar" el fingerprint que quisiera y
+    # saltarse por completo el rate-limit por dispositivo (ver auditoría).
+    # Ahora el fingerprint SIEMPRE se deriva server-side de las
+    # características de la conexión; el cliente no puede declararlo.
     headers_dict = {
         'user_agent': _get_header_value(request_or_scope, 'HTTP_USER_AGENT'),
         'accept_language': _get_header_value(request_or_scope, 'HTTP_ACCEPT_LANGUAGE'),
@@ -436,7 +434,25 @@ def should_apply_retry_delay(udid, action_type='reconnection', system_load=None)
 
 
 def get_client_ip(request):
+    """
+    IP real del cliente. Antes confiaba en `X-Forwarded-For` sin verificar
+    que la request viniera de verdad de un proxy conocido -- cualquier
+    cliente podía mandar su propio `X-Forwarded-For` y falsificar la IP que
+    termina guardada en `UDIDAuthRequest`/`AuthAuditLog`/
+    `EncryptedCredentialsLog` (ver auditoría; mismo patrón de fondo que
+    `sync_admin_ip_middleware._client_ip()`, que sigue pendiente de una
+    decisión de deploy más amplia -- acá se corrige para esta superficie
+    con `TrustedProxyConfig`).
+
+    Solo se confía en `X-Forwarded-For` si la conexión llegó realmente
+    desde un proxy conocido (`REMOTE_ADDR` en la allowlist); si no, se usa
+    `REMOTE_ADDR` tal cual y el header se ignora por completo.
+    """
+    remote_addr = request.META.get('REMOTE_ADDR')
+    if remote_addr not in TrustedProxyConfig.TRUSTED_PROXIES:
+        return remote_addr
+
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
-        return x_forwarded_for.split(',')[0]
-    return request.META.get('REMOTE_ADDR')
+        return x_forwarded_for.split(',')[0].strip()
+    return remote_addr

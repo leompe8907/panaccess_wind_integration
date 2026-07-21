@@ -492,13 +492,20 @@ class AppCredentials(models.Model):
     Llaves RSA asociadas por tipo de aplicación.
     La clave privada encripta/firma y la pública se embebe en la app del Smart TV.
     """
+    # Catálogo de tipos de cliente. Ya no se usa para resolver la llave de
+    # cifrado (ver UDIDAuthRequest.device_public_key / crypto_tv.py) -- cada
+    # pareo trae su propia llave efímera generada por el dispositivo, así
+    # que este modelo queda solo como catálogo informativo/de auditoría por
+    # tipo de app.
     APP_TYPES = [
-        ('android_tv', 'Android TV'),
-        ('samsung_tv', 'Samsung Tizen TV'),
-        ('lg_tv', 'LG webOS TV'),
-        ('set_top_box', 'Set Top Box'),
-        ('mobile_app', 'Mobile Application'),
-        ('web_player', 'Web Player'),
+        ('web', 'Web'),
+        ('lg', 'LG webOS TV'),
+        ('samsung', 'Samsung Tizen TV'),
+        ('android', 'Android'),
+        ('androidtv', 'Android TV'),
+        ('amazon', 'Amazon Fire TV'),
+        ('iOS', 'iOS'),
+        ('iOStv', 'iOS TV'),
     ]
 
     app_type = models.CharField(max_length=50, choices=APP_TYPES)
@@ -578,7 +585,22 @@ class UDIDAuthRequest(models.Model):
     user_agent = models.TextField(null=True, blank=True)
     attempts_count = models.IntegerField(default=0)
     device_fingerprint = models.CharField(max_length=255, null=True, blank=True)
-    
+
+    # Llave pública RSA generada por el propio dispositivo al pedir el UDID
+    # (WebCrypto del lado del cliente) -- reemplaza el esquema anterior de
+    # una llave estática por tipo de app embebida en el cliente (ver
+    # auditoría: esa llave termina siendo extraíble de cualquier forma,
+    # ofuscada o no, porque el propio JS del cliente la necesita en runtime
+    # para descifrar). Con esto, cada pareo tiene su propia llave efímera:
+    # el backend cifra las credenciales para ESTA llave pública específica,
+    # y la privada nunca sale de la memoria del dispositivo ni se persiste
+    # en ningún lado -- si el pareo expira o se usa, la llave deja de servir
+    # para nada más.
+    device_public_key = models.TextField(
+        null=True, blank=True,
+        help_text="Llave pública RSA (PEM) generada por el dispositivo para este pareo específico.",
+    )
+
     app_type = models.CharField(max_length=50, null=True, blank=True)
     app_version = models.CharField(max_length=20, null=True, blank=True)
     encrypted_response_sent = models.BooleanField(default=False)
@@ -675,7 +697,15 @@ class EncryptedCredentialsLog(models.Model):
     # `_id` a la columna real de cualquier FK, así que ese nombre generaba
     # una columna duplicada `app_credentials_id_id` en Postgres (ver
     # auditoría). Renombrado a `app_credentials` (migración 0006).
-    app_credentials = models.ForeignKey(AppCredentials, on_delete=models.CASCADE)
+    # Ahora nullable (migración 0007): las entregas por llave efímera de
+    # pareo (`UDIDAuthRequest.device_public_key`) ya no pasan por
+    # `AppCredentials` en absoluto, así que no siempre hay una fila que
+    # referenciar aquí. `SET_NULL` en vez de `CASCADE` porque borrar una
+    # `AppCredentials` vieja no debería borrar el historial de auditoría de
+    # entregas que sí la usaron.
+    app_credentials = models.ForeignKey(
+        AppCredentials, on_delete=models.SET_NULL, null=True, blank=True
+    )
     
     encryption_algorithm = models.CharField(max_length=50, default="AES-256-CBC + RSA-OAEP")
     encrypted_data_hash = models.CharField(max_length=64)
@@ -692,6 +722,66 @@ class EncryptedCredentialsLog(models.Model):
         ]
 
 
+class DeviceSession(models.Model):
+    """
+    Dispositivo vinculado a una cuenta (Fase 3 -- panel tipo "dispositivos
+    vinculados" de WhatsApp). A diferencia de `UDIDAuthRequest` (pensado
+    para el pareo inicial de una TV vía QR, de vida corta y con
+    `temp_token`), este modelo registra CUALQUIER dispositivo que termine
+    de loguearse por cualquier método (manual, social, o TV pareada por
+    QR) y se identifique ante `/ws/device/` -- vive mientras el usuario no
+    lo revoque.
+
+    `device_token` es el secreto que el propio dispositivo guarda
+    localmente para volver a identificarse en la próxima conexión (y así
+    refrescar esta misma fila en vez de crear una duplicada) -- nunca se
+    expone en el listado del dashboard (`GET /devices/` solo devuelve el
+    `id`), solo se lo conoce el dispositivo dueño y el backend.
+    """
+    STATUSES = [
+        ('active', 'Active'),
+        ('revoked', 'Revoked'),
+    ]
+
+    device_token = models.CharField(max_length=64, unique=True, db_index=True)
+    subscriber_code = models.CharField(max_length=100, db_index=True)
+
+    # Mismo catálogo que `AppCredentials.APP_TYPES` -- un dispositivo real
+    # (TV, celular, web) es justamente lo que ese enum ya modela.
+    device_type = models.CharField(max_length=50, choices=AppCredentials.APP_TYPES, null=True, blank=True)
+    device_model = models.CharField(max_length=200, null=True, blank=True, help_text="Texto libre reportado por el cliente, p.ej. 'Samsung QN90A' o 'Chrome en Windows'.")
+
+    status = models.CharField(max_length=20, choices=STATUSES, default='active')
+
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    client_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['subscriber_code', 'status']),
+            models.Index(fields=['device_token']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.device_token:
+            self.device_token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def revoke(self, *, reason: str = "revoked_by_subscriber"):
+        self.status = 'revoked'
+        self.revoked_at = timezone.now()
+        self.revoked_reason = reason
+        self.save(update_fields=['status', 'revoked_at', 'revoked_reason'])
+
+    def __str__(self):
+        return f"DeviceSession: {self.subscriber_code} - {self.device_type or '?'} ({self.status})"
+
+
 # ============================================================================
 # AUDITORÍA DE EVENTOS
 # ============================================================================
@@ -701,6 +791,10 @@ class AuthAuditLog(models.Model):
         ('udid_generated', 'UDID Generated'),
         ('udid_validated', 'UDID Validated'),
         ('udid_used', 'UDID Used'),
+        # Faltaba -- DisassociateUDIDView ya escribía este valor con
+        # .objects.create() (que no valida choices), pero quedaba fuera de
+        # este listado (ver auditoría).
+        ('udid_revoked', 'UDID Revoked'),
         ('login_attempt', 'Login Attempt'),
         ('login_success', 'Login Success'),
         ('login_failed', 'Login Failed'),

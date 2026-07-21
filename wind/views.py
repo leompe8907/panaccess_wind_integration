@@ -2,17 +2,16 @@ import logging
 import secrets
 from datetime import timedelta
 import base64
-import json
 
 from django.db import transaction
 from django.utils import timezone
-from django.core.cache import cache
 from django.conf import settings
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from cryptography.hazmat.primitives import serialization
 
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 
@@ -25,9 +24,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from wind.models import UDIDAuthRequest, SubscriberInfo, AppCredentials, EncryptedCredentialsLog
+from wind.models import UDIDAuthRequest, SubscriberInfo
 from wind.serializers import UDIDAssociationSerializer
-from wind.services.udid_auth_service import authenticate_with_udid_service, compute_encrypted_hash
+from wind.services.udid_auth_service import authenticate_with_udid_service
 from wind.utils.websocket_utils import (
     get_client_ip,
     generate_device_fingerprint,
@@ -43,30 +42,9 @@ from wind.utils.websocket_utils import (
     get_retry_info,
     is_valid_app_type
 )
-from wind.utils.crypto_tv import hybrid_encrypt_for_app
 from wind.utils.log_buffer import log_audit_async
 
 logger = logging.getLogger(__name__)
-
-
-def get_cached_app_credentials(app_type, app_version):
-    """
-    Devuelve AppCredentials desde cache de corto plazo para reducir
-    consultas a BD bajo alta concurrencia.
-    """
-    cache_key = f"appcred:{app_type}:{app_version}"
-    app_credentials = cache.get(cache_key)
-    if app_credentials is not None:
-        return app_credentials
-
-    app_credentials = AppCredentials.objects.filter(
-        app_type=app_type,
-        app_version=app_version,
-        is_active=True
-    ).first()
-
-    cache.set(cache_key, app_credentials, timeout=10)
-    return app_credentials
 
 
 class RequestUDIDManualView(APIView):
@@ -85,13 +63,13 @@ class RequestUDIDManualView(APIView):
         
         try:
             device_fingerprint = generate_device_fingerprint(request)
-            
+
             is_allowed, remaining, retry_after = check_device_fingerprint_rate_limit(
                 device_fingerprint,
                 max_requests=1,
                 window_minutes=5
             )
-            
+
             if not is_allowed:
                 logger.warning(
                     f"RequestUDIDManualView: Rate limit excedido - device_fingerprint={device_fingerprint[:8]}..., ip={client_ip}, retry_after={retry_after}s"
@@ -106,19 +84,44 @@ class RequestUDIDManualView(APIView):
                     "Retry-After": str(retry_after)
                 })
 
+            # Llave pública efímera generada por el propio dispositivo para
+            # este pareo (ver auditoría / crypto_tv.hybrid_encrypt_for_device_public_key).
+            # Opcional a propósito: un cliente que todavía no la manda sigue
+            # funcionando con el esquema viejo de llave estática por
+            # app_type (AppCredentials) en el momento de entregar las
+            # credenciales -- ver udid_auth_service.py.
+            device_public_key = None
+            raw_device_public_key = request.META.get('HTTP_X_DEVICE_PUBLIC_KEY')
+            if raw_device_public_key:
+                try:
+                    device_public_key = base64.b64decode(raw_device_public_key).decode('utf-8')
+                    # Validar que sea de verdad una llave pública PEM antes
+                    # de guardarla -- si es basura, mejor fallar acá con un
+                    # 400 claro que descubrirlo al momento de cifrar.
+                    serialization.load_pem_public_key(device_public_key.encode('utf-8'))
+                except Exception:
+                    logger.warning(
+                        "RequestUDIDManualView: X-Device-Public-Key inválida - ip=%s", client_ip
+                    )
+                    return Response(
+                        {"error": "X-Device-Public-Key inválida (se espera una llave pública PEM en base64)."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
             udid = self.generate_unique_udid()
-            
+
             auth_request = UDIDAuthRequest.objects.create(
                 udid=udid,
                 status='pending',
                 client_ip=client_ip,
                 user_agent=user_agent,
-                device_fingerprint=device_fingerprint
+                device_fingerprint=device_fingerprint,
+                device_public_key=device_public_key,
             )
-            
+
             auth_request.refresh_from_db()
             increment_rate_limit_counter('device_fp', device_fingerprint)
-            
+
             log_audit_async(
                 action_type='udid_generated',
                 udid=udid,
@@ -128,16 +131,22 @@ class RequestUDIDManualView(APIView):
                     'method': 'manual_request',
                     'device_fingerprint': device_fingerprint,
                     'device_fingerprint_stored': auth_request.device_fingerprint,
+                    'has_device_public_key': bool(device_public_key),
                     'rate_limit_remaining': remaining - 1
                 }
             )
-            
+
             logger.info(
                 f"RequestUDIDManualView: UDID generado exitosamente - udid={udid}, device_fingerprint={device_fingerprint[:8]}..., ip={client_ip}"
             )
-            
+
             return Response({
                 "udid": auth_request.udid,
+                # `temp_token` es el secreto real del pareo (el udid de 8
+                # caracteres ya no alcanza por sí solo -- ver auditoría).
+                # Debe viajar junto al udid en el QR/deep-link y volver a
+                # mandarse en cada paso siguiente del flujo.
+                "temp_token": auth_request.temp_token,
                 "expires_at": auth_request.expires_at,
                 "status": auth_request.status,
                 "expires_in_minutes": 5,
@@ -148,7 +157,7 @@ class RequestUDIDManualView(APIView):
                     "reset_in_seconds": 5 * 60
                 }
             }, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             logger.error(f"RequestUDIDManualView: Error interno - ip={client_ip}, error={str(e)}", exc_info=True)
             return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -324,9 +333,17 @@ class AuthenticateWithUDIDView(APIView):
     def post(self, request):
         """
         Autentica con UDID y entrega credenciales cifradas (híbrido).
+
+        Antes reimplementaba (mal, con un bug de sintaxis fatal --
+        `json.serialize_credentials` no existe) toda la lógica de cifrado
+        y entrega inline, en paralelo a la versión correcta que ya usaba el
+        consumer de WebSocket (`udid_auth_service.authenticate_with_udid_service`).
+        Ahora delega en esa misma función compartida -- una sola
+        implementación para los dos caminos (REST y WS), ver auditoría.
         """
         udid = request.data.get('udid')
-        app_type = request.data.get('app_type', 'android_tv')
+        temp_token = request.data.get('temp_token', '')
+        app_type = request.data.get('app_type', 'web')
         app_version = request.data.get('app_version', '1.0')
         client_ip = get_client_ip(request)
         user_agent = request.META.get('HTTP_USER_AGENT', '')
@@ -337,10 +354,16 @@ class AuthenticateWithUDIDView(APIView):
 
         if not udid:
             return Response({"error": "UDID is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        if not temp_token:
+            return Response({"error": "temp_token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
         if not is_valid_app_type(app_type):
             return Response({
-                "error": "Invalid app_type. Must be: android_tv, samsung_tv, lg_tv, set_top_box, mobile_app, web_player"
+                "error": (
+                    "Invalid app_type. Must be one of: "
+                    "web, lg, samsung, android, androidtv, amazon, iOS, iOStv"
+                )
             }, status=status.HTTP_400_BAD_REQUEST)
 
         client_token = get_client_token(request)
@@ -412,109 +435,54 @@ class AuthenticateWithUDIDView(APIView):
                 })
 
         try:
-            with transaction.atomic():
-                try:
-                    req = UDIDAuthRequest.objects.select_for_update().get(udid=udid)
-                except UDIDAuthRequest.DoesNotExist:
-                    return Response({"error": "Invalid UDID"}, status=status.HTTP_404_NOT_FOUND)
+            result = authenticate_with_udid_service(
+                udid=udid,
+                temp_token=temp_token,
+                app_type=app_type,
+                app_version=app_version,
+                client_ip=client_ip,
+                user_agent=user_agent,
+            )
 
-                if req.status != 'validated':
-                    return Response({"error": f"UDID not valid. Status: {req.status}"}, status=status.HTTP_403_FORBIDDEN)
-
-                if req.is_expired():
-                    req.status = 'expired'
-                    req.save()
-                    return Response({"error": "UDID has expired"}, status=status.HTTP_403_FORBIDDEN)
-
-                try:
-                    subscriber = SubscriberInfo.objects.get(subscriber_code=req.subscriber_code, sn=req.sn)
-                except SubscriberInfo.DoesNotExist:
-                    return Response({"error": "Subscriber info not found or mismatched SN"}, status=status.HTTP_404_NOT_FOUND)
-
-                credentials_payload = {
-                    "subscriber_code": subscriber.subscriber_code,
-                    "sn": subscriber.sn,
-                    "login1": subscriber.login1,
-                    "login2": subscriber.login2,
-                    "password": subscriber.get_password(),
-                    "pin": subscriber.get_pin(),
-                    "packages": subscriber.packages,
-                    "products": subscriber.products,
-                    "timestamp": timezone.now().isoformat()
+            if not result.get("ok"):
+                code = result.get("code")
+                status_by_code = {
+                    "invalid_udid": status.HTTP_404_NOT_FOUND,
+                    "invalid_temp_token": status.HTTP_403_FORBIDDEN,
+                    "expired": status.HTTP_403_FORBIDDEN,
+                    "not_validated": status.HTTP_403_FORBIDDEN,
+                    "not_associated": status.HTTP_403_FORBIDDEN,
+                    "subscriber_not_found": status.HTTP_404_NOT_FOUND,
+                    "no_device_public_key": status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "no_app_credentials": status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "encryption_failed": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 }
-
-                app_credentials = get_cached_app_credentials(app_type, app_version)
-                if not app_credentials:
-                    return Response({
-                        "error": f"No valid app credentials available for app_type='{app_type}'"
-                    }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-                try:
-                    encrypted_result = hybrid_encrypt_for_app(
-                        json.serialize_credentials(credentials_payload), app_type
-                    )
-                except Exception as e:
-                    return Response({"error": "Encryption failed", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-                req.app_type = app_type
-                req.app_version = app_version
-                req.app_credentials_used = app_credentials
-                req.mark_credentials_delivered(app_credentials)
-                req.mark_as_used()
-
-                log_audit_async(
-                    action_type='udid_used',
-                    udid=req.udid,
-                    subscriber_code=req.subscriber_code,
-                    client_ip=client_ip,
-                    user_agent=user_agent,
-                    details={
-                        "sn_assigned": subscriber.sn,
-                        "app_type": app_type,
-                        "app_version": app_version,
-                        "encryption_method": "Hybrid AES-256 + RSA-OAEP",
-                        "key_fingerprint": app_credentials.key_fingerprint
-                    }
+                http_status = status_by_code.get(code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(
+                    {"error": result.get("error", "Error"), "code": code},
+                    status=http_status,
                 )
 
-                encrypted_hash = compute_encrypted_hash(encrypted_result['encrypted_data'])
-                EncryptedCredentialsLog.objects.create(
-                    udid=req.udid,
-                    subscriber_code=req.subscriber_code,
-                    sn=req.sn,
-                    app_type=app_type,
-                    app_version=app_version,
-                    app_credentials=app_credentials,
-                    encrypted_data_hash=encrypted_hash,
-                    client_ip=client_ip,
-                    user_agent=user_agent,
-                    delivered_successfully=True
-                )
-                
-                increment_rate_limit_counter('udid', udid)
-                if is_reconnection:
-                    reset_retry_info(udid, 'reconnection')
+            increment_rate_limit_counter('udid', udid)
+            if is_reconnection:
+                reset_retry_info(udid, 'reconnection')
 
-                return Response({
-                    "encrypted_credentials": encrypted_result,
-                    "security_info": {
-                        "encryption_method": "Hybrid AES-256 + RSA-OAEP",
-                        "app_type": app_type,
-                        "app_version": app_credentials.app_version
-                    },
-                    "expires_at": req.expires_at,
-                    "remaining_requests": remaining - 1,
-                    "rate_limit": {
-                        "remaining": remaining - 1,
-                        "reset_in_seconds": 5 * 60
-                    }
-                }, status=status.HTTP_200_OK)
+            return Response({
+                "encrypted_credentials": result["encrypted_credentials"],
+                "security_info": result["security_info"],
+                "expires_at": result.get("expires_at"),
+                "remaining_requests": remaining - 1,
+                "rate_limit": {
+                    "remaining": remaining - 1,
+                    "reset_in_seconds": 5 * 60
+                }
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             if is_reconnection:
                 get_retry_info(udid, 'reconnection')
             logger.error(f"AuthenticateWithUDIDView: Error interno - error={str(e)}", exc_info=True)
-            return Response({"error": "Internal server error", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ValidateStatusUDIDView(APIView):
@@ -524,12 +492,18 @@ class ValidateStatusUDIDView(APIView):
         """
         Valida el estado de un UDID (polling de respaldo).
         """
+        import hmac
+
         udid = request.query_params.get('udid') or request.META.get('HTTP_X_UDID')
+        temp_token = request.query_params.get('temp_token') or request.META.get('HTTP_X_TEMP_TOKEN')
         client_ip = get_client_ip(request)
         user_agent = request.META.get('HTTP_USER_AGENT', '')
 
         if not udid:
             return Response({"error": "UDID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not temp_token:
+            return Response({"error": "temp_token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         client_token = get_client_token(request)
         if client_token:
@@ -573,6 +547,13 @@ class ValidateStatusUDIDView(APIView):
                 details={'error': 'UDID not found'}
             )
             return Response({"error": "Invalid UDID"})
+
+        # temp_token obligatorio -- esta vista devuelve subscriber_code/sn
+        # una vez validado el pareo; sin este chequeo, cualquiera que
+        # enumerara/adivinara un udid de 8 caracteres podía leer a qué
+        # suscriptor quedó asociado (ver auditoría).
+        if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
+            return Response({"error": "Invalid temp_token"}, status=status.HTTP_403_FORBIDDEN)
 
         if req.status == 'revoked':
             log_audit_async(
@@ -663,13 +644,19 @@ class DisassociateUDIDView(APIView):
         """
         Desvincula un SN de un UDID específico.
         """
+        import hmac
+
         udid = request.data.get('udid')
+        temp_token = request.data.get('temp_token', '')
         operator_id = request.data.get('operator_id')
         reason = request.data.get('reason', 'Voluntary disassociation')
         client_ip = get_client_ip(request)
 
         if not udid:
             return Response({"error": "UDID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not temp_token:
+            return Response({"error": "temp_token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         client_token = get_client_token(request)
         if client_token:
@@ -707,6 +694,9 @@ class DisassociateUDIDView(APIView):
                     req = UDIDAuthRequest.objects.select_for_update().get(udid=udid)
                 except UDIDAuthRequest.DoesNotExist:
                     return Response({"error": "UDID not found"}, status=status.HTTP_404_NOT_FOUND)
+
+                if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
+                    return Response({"error": "Invalid temp_token"}, status=status.HTTP_403_FORBIDDEN)
 
                 if req.status not in ['validated', 'used', 'expired']:
                     return Response({
@@ -749,8 +739,11 @@ class DisassociateUDIDView(APIView):
                 }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            # No devolver str(e) al cliente -- puede filtrar detalles internos
+            # (ver auditoría, mismo patrón ya corregido en change_password.py/
+            # profile/views.py). El detalle completo queda en el log.
             logger.error(f"DisassociateUDIDView: Error interno - error={str(e)}", exc_info=True)
-            return Response({"error": "Internal server error", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def login_page_view(request):

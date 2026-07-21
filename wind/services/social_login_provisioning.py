@@ -153,16 +153,21 @@ def build_panaccess_credentials(subscriber_code: str) -> dict | None:
     }
 
 
-def resolve_panaccess_credentials_for_user(
+def resolve_subscriber_code_for_social_user(
     user,
     *,
     first_name: str = "",
     last_name: str = "",
     comment: str = "Creado vía Social Login",
-) -> dict | None:
+) -> str | None:
     """
-    Resuelve credenciales PanAccess para un User Django tras login social.
-    Crea/vincula el suscriptor si hace falta.
+    Resuelve (o crea, siguiendo el flujo de prueba gratis de siempre vía
+    `_create_subscriber_core`) el `subscriber_code` PanAccess para un User
+    Django tras login social. Extraído de `resolve_panaccess_credentials_for_user`
+    para poder reutilizarlo en flujos que NO necesitan (ni deben) obtener el
+    password real -- por ejemplo, el pareo de TV por login social (Fase 2):
+    ahí solo hace falta saber a qué suscriptor asociar el pareo, el password
+    real se cifra y entrega directo a la TV, nunca al celular que hizo login.
     """
     if not user or not getattr(user, "email", None):
         return None
@@ -183,4 +188,21 @@ def resolve_panaccess_credentials_for_user(
         if registry:
             subscriber_code = registry.subscriber_code
 
+    return subscriber_code
+
+
+def resolve_panaccess_credentials_for_user(
+    user,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+    comment: str = "Creado vía Social Login",
+) -> dict | None:
+    """
+    Resuelve credenciales PanAccess para un User Django tras login social.
+    Crea/vincula el suscriptor si hace falta.
+    """
+    subscriber_code = resolve_subscriber_code_for_social_user(
+        user, first_name=first_name, last_name=last_name, comment=comment,
+    )
     return build_panaccess_credentials(subscriber_code) if subscriber_code else None

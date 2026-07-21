@@ -34,6 +34,7 @@ from wind.views import (
     DisassociateUDIDView,
 )
 from wind.auth_views import GoogleLoginView, FacebookLoginView
+from wind.device_views import DeviceSessionListView, DeviceSessionRevokeView
 
 urlpatterns = [
     # Portal de usuario
@@ -99,4 +100,8 @@ urlpatterns = [
     path('authenticate-with-udid/', AuthenticateWithUDIDView.as_view(), name='authenticate-with-udid'),
     path('validate/', ValidateStatusUDIDView.as_view(), name='validate_udid'),
     path('disassociate-udid/', DisassociateUDIDView.as_view(), name='disassociate-udid'),
+
+    # Fase 3 -- "dispositivos vinculados" (listar/revocar, JWT requerido)
+    path('devices/', DeviceSessionListView.as_view(), name='device-session-list'),
+    path('devices/<int:device_id>/revoke/', DeviceSessionRevokeView.as_view(), name='device-session-revoke'),
 ]

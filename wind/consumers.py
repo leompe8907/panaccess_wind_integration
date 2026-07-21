@@ -8,12 +8,11 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 
-from wind.services.udid_auth_service import authenticate_with_udid_service
+import hmac
+
+from wind.services.udid_auth_service import authenticate_with_udid_service, FATAL_CODES
 from wind.utils.websocket_utils import (
     generate_device_fingerprint,
-    check_websocket_rate_limit,
-    increment_websocket_connection,
-    decrement_websocket_connection,
     check_websocket_limits,
     decrement_websocket_limits,
 )
@@ -42,6 +41,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
 
     async def connect(self):
         self.udid = None
+        self.temp_token = None
         self.app_type = None
         self.app_version = None
         self.group_name = None
@@ -54,38 +54,27 @@ class AuthWaitWS(AsyncWebsocketConsumer):
         self.ping_task = None
         self.inactivity_task = None
 
-        # Rate limiting por device fingerprint
+        # Rate limiting por device fingerprint. Antes había dos sistemas de
+        # conteo de conexiones corriendo en paralelo para lo mismo
+        # (`check_websocket_limits`, directo contra Redis, y
+        # `check_websocket_rate_limit`/`increment_websocket_connection`,
+        # basado en el cache de Django) -- podían desincronizarse entre sí
+        # y duplicaban configuración (dos límites/ventanas distintos para
+        # la misma conexión). Se consolida en uno solo: el conteo directo
+        # en Redis (ver auditoría).
         self.device_fingerprint = await sync_to_async(generate_device_fingerprint)(self.scope)
-        
+
         is_allowed, reason, retry_after = await sync_to_async(check_websocket_limits)(
             udid=None,
             device_fingerprint=self.device_fingerprint,
             max_per_token=self.MAX_CONNECTIONS_PER_TOKEN,
             max_global=self.MAX_GLOBAL_CONNECTIONS
         )
-        
+
         if not is_allowed:
             await self.close(code=4001, reason=f"{reason}. Retry after {retry_after}s")
             return
-        
-        is_allowed_old, remaining, retry_after_old = await sync_to_async(check_websocket_rate_limit)(
-            udid=None,
-            device_fingerprint=self.device_fingerprint,
-            max_connections=5,
-            window_minutes=5
-        )
-        
-        if not is_allowed_old:
-            await sync_to_async(decrement_websocket_limits)(None, self.device_fingerprint)
-            await self.close(code=4001, reason=f"Too many connections. Retry after {retry_after_old}s")
-            return
-        
-        await sync_to_async(increment_websocket_connection)(
-            udid=None,
-            device_fingerprint=self.device_fingerprint,
-            window_minutes=5
-        )
-        
+
         await self.accept()
         
         self.ping_task = asyncio.create_task(self._ping_loop())
@@ -112,11 +101,15 @@ class AuthWaitWS(AsyncWebsocketConsumer):
             return await self._send_err("bad_type", "Usa type=auth_with_udid", close=True)
 
         self.udid = (data.get("udid") or "").strip()
-        self.app_type = (data.get("app_type") or "android_tv").strip()
+        self.temp_token = (data.get("temp_token") or "").strip()
+        self.app_type = (data.get("app_type") or "web").strip()
         self.app_version = (data.get("app_version") or "1.0").strip()
         if not self.udid:
             return await self._send_err("missing_udid", "UDID es requerido", close=True)
-        
+
+        if not self.temp_token:
+            return await self._send_err("missing_temp_token", "temp_token es requerido", close=True)
+
         if self.udid:
             is_allowed_new, reason_new, retry_after_new = await sync_to_async(check_websocket_limits)(
                 udid=self.udid,
@@ -124,7 +117,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                 max_per_token=self.MAX_CONNECTIONS_PER_TOKEN,
                 max_global=self.MAX_GLOBAL_CONNECTIONS
             )
-            
+
             if not is_allowed_new:
                 await self._send_err(
                     "rate_limit_exceeded",
@@ -132,34 +125,13 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                     close=True
                 )
                 return
-            
-            is_allowed_old, remaining, retry_after_old = await sync_to_async(check_websocket_rate_limit)(
-                udid=self.udid,
-                device_fingerprint=self.device_fingerprint,
-                max_connections=5,
-                window_minutes=5
-            )
-            
-            if not is_allowed_old:
-                await sync_to_async(decrement_websocket_limits)(self.udid, self.device_fingerprint)
-                await self._send_err(
-                    "rate_limit_exceeded",
-                    f"Too many connections for this device. Retry after {retry_after_old}s",
-                    close=True
-                )
-                return
-            
-            await sync_to_async(increment_websocket_connection)(
-                udid=self.udid,
-                device_fingerprint=self.device_fingerprint,
-                window_minutes=5
-            )
 
         client_ip = (self.scope.get("client") or [""])[0] or ""
         user_agent = _get_header(self.scope, "user-agent")
 
         res = await sync_to_async(authenticate_with_udid_service)(
             udid=self.udid,
+            temp_token=self.temp_token,
             app_type=self.app_type,
             app_version=self.app_version,
             client_ip=client_ip,
@@ -170,14 +142,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
             await self._send_result(res)
             return await self.close()
 
-        fatal_codes = {
-            "invalid_udid",
-            "expired",
-            "subscriber_not_found",
-            "no_app_credentials",
-            "encryption_failed",
-        }
-        if res.get("code") in fatal_codes:
+        if res.get("code") in FATAL_CODES:
             await self._send_result(res, status="error")
             return await self.close()
 
@@ -234,6 +199,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
 
         res = await sync_to_async(authenticate_with_udid_service)(
             udid=self.udid,
+            temp_token=self.temp_token,
             app_type=self.app_type,
             app_version=self.app_version,
             client_ip=client_ip,
@@ -248,10 +214,16 @@ class AuthWaitWS(AsyncWebsocketConsumer):
 
     async def _send_result(self, res: dict, status: str | None = None):
         self.done = True
+        # `res` puede traer un `details` con el texto crudo de una excepción
+        # interna (ver authenticate_with_udid_service, casos
+        # encryption_failed/internal_error) -- no reenviarlo tal cual a un
+        # cliente que todavía ni se autenticó (mismo criterio ya aplicado a
+        # las respuestas HTTP equivalentes, ver auditoría).
+        safe_res = {k: v for k, v in res.items() if k != "details"}
         payload = {
             "type": "auth_with_udid:result",
             "status": status or ("ok" if res.get("ok") else "error"),
-            "result": res,
+            "result": safe_res,
         }
         await self._send_json(payload)
 
@@ -289,6 +261,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
 
                 res = await sync_to_async(authenticate_with_udid_service)(
                     udid=self.udid,
+                    temp_token=self.temp_token,
                     app_type=self.app_type,
                     app_version=self.app_version,
                     client_ip=client_ip,
@@ -299,14 +272,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                     await self._send_result(res, status="ok")
                     return await self._finish()
 
-                fatal_codes = {
-                    "invalid_udid",
-                    "expired",
-                    "subscriber_not_found",
-                    "no_app_credentials",
-                    "encryption_failed",
-                }
-                if res.get("code") in fatal_codes:
+                if res.get("code") in FATAL_CODES:
                     await self._send_result(res, status="error")
                     return await self._finish()
         except asyncio.CancelledError:
@@ -353,12 +319,6 @@ class AuthWaitWS(AsyncWebsocketConsumer):
 
         if self.device_fingerprint:
             await sync_to_async(decrement_websocket_limits)(
-                udid=self.udid,
-                device_fingerprint=self.device_fingerprint
-            )
-        
-        if self.device_fingerprint:
-            await sync_to_async(decrement_websocket_connection)(
                 udid=self.udid,
                 device_fingerprint=self.device_fingerprint
             )

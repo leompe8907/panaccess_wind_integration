@@ -17,6 +17,7 @@ from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from wind.exceptions import PanAccessException
 from wind.models import PasswordResetTokenUse, SubscriberEmailRegistry, SubscriberLoginInfo
 from wind.services import get_panaccess
+from wind.services.device_session_service import revoke_all_device_sessions_for_subscriber
 from wind.services.jwt_invalidation import mark_password_changed
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,15 @@ def sync_password_locally(subscriber_code: str, email: str, new_pass: str) -> No
         # contraseña" como "cambiar contraseña" desde el perfil, porque
         # ambos flujos llaman a esta misma función.
         mark_password_changed(user)
+
+    # Fase 4: además de cortar el JWT, revoca en bloque cualquier
+    # dispositivo vinculado (`DeviceSession`, Fase 3) de este suscriptor --
+    # sin esto, una TV/app ya vinculada seguía "activa" en el dashboard y
+    # no se enteraba del cambio de contraseña hasta reconectarse por su
+    # cuenta. Se hace por `subscriber_code` (no depende de que exista un
+    # `User` Django con ese email -- p. ej. reset hecho antes de tener
+    # ningún login social/portal asociado).
+    revoke_all_device_sessions_for_subscriber(subscriber_code, reason="password_changed")
 
 
 def request_password_reset(email: str, reset_page_url: str) -> dict:

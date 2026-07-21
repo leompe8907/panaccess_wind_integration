@@ -17,6 +17,7 @@ from wind.models import (
     UDIDAuthRequest,
 )
 from wind.services.panaccess_deprovision import deprovision_subscriber_in_panaccess
+from wind.services.device_session_service import revoke_all_device_sessions_for_subscriber
 from wind.functions.getSubscriber import delete_subscriber_operational_data
 
 logger = logging.getLogger(__name__)
@@ -228,6 +229,13 @@ def close_subscriber_account(
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)
     local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)
     local_result["udid_revoked"] = _revoke_udid_requests(subscriber_code)
+    # Fase 4: mismo criterio que _revoke_udid_requests, pero para
+    # dispositivos vinculados (Fase 3) -- cerrar la cuenta también
+    # desloguea en vivo cualquier TV/app ya vinculada, no solo corta el
+    # pareo UDID de bootstrap.
+    local_result["device_sessions_revoked"] = revoke_all_device_sessions_for_subscriber(
+        subscriber_code, reason="account_closed"
+    )
 
     log_status = SubscriberClosureLog.STATUS_COMPLETED
     closure_log = SubscriberClosureLog.objects.create(

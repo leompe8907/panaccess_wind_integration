@@ -227,12 +227,21 @@ class AuthAuditLogSerializer(serializers.ModelSerializer):
 
 class UDIDAssociationSerializer(serializers.Serializer):
     udid = serializers.CharField(max_length=100)
+    # Antes solo el `udid` (8 caracteres hex, ~4mil millones de combinaciones)
+    # actuaba como credencial de todo el flujo de pareo. `temp_token` ya se
+    # generaba en `UDIDAuthRequest.save()` pero no lo verificaba nadie (ver
+    # auditoría) -- ahora es obligatorio y es el secreto real que demuestra
+    # que quien llama de verdad tiene el pareo en curso (lo recibió junto al
+    # QR), no solo que adivinó/enumeró un udid.
+    temp_token = serializers.CharField(max_length=255)
     subscriber_code = serializers.CharField(max_length=100)
     sn = serializers.CharField(max_length=100)
     operator_id = serializers.CharField(max_length=100)
     method = serializers.ChoiceField(choices=[('automatic', 'Automatic'), ('manual', 'Manual')], default='automatic')
 
     def validate(self, attrs):
+        import hmac
+
         udid = attrs['udid']
         subscriber_code = attrs['subscriber_code']
         sn = attrs['sn']
@@ -241,6 +250,9 @@ class UDIDAssociationSerializer(serializers.Serializer):
             udid_request = UDIDAuthRequest.objects.get(udid=udid)
         except UDIDAuthRequest.DoesNotExist:
             raise serializers.ValidationError("UDID no encontrado")
+
+        if not hmac.compare_digest(attrs['temp_token'] or "", udid_request.temp_token or ""):
+            raise serializers.ValidationError("temp_token inválido para este UDID")
 
         # Verificar si expiró
         if udid_request.is_expired():
