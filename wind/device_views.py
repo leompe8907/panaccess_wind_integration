@@ -15,6 +15,7 @@ from rest_framework import status
 from wind.models import DeviceSession
 from wind.services.device_session_service import revoke_device_session
 from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
+from wind.throttles import DeviceSessionThrottle
 
 
 def _serialize_device(session: DeviceSession) -> dict:
@@ -35,6 +36,7 @@ class DeviceSessionListView(APIView):
     """GET -- lista los dispositivos vinculados activos del usuario autenticado."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [DeviceSessionThrottle]
 
     def get(self, request):
         subscriber_code = resolve_subscriber_code_for_user(request.user)
@@ -52,6 +54,7 @@ class DeviceSessionRevokeView(APIView):
     """POST -- revoca un dispositivo vinculado (debe pertenecer al usuario autenticado)."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [DeviceSessionThrottle]
 
     def post(self, request, device_id):
         subscriber_code = resolve_subscriber_code_for_user(request.user)

@@ -36,11 +36,25 @@ _PROTECTED_PREFIXES = (
 
 
 def _client_ip(request) -> str:
-    """IP del cliente; usa X-Forwarded-For si el proxy es de confianza (nginx local)."""
+    """
+    IP del cliente -- usa X-Forwarded-For SOLO si `REMOTE_ADDR` está en la
+    lista de proxies de confianza (`appConfig.TrustedProxyConfig`, por
+    defecto 127.0.0.1/::1, coherente con que Daphne/Django solo escuchan en
+    loopback detrás de nginx). Antes este middleware confiaba en el header
+    sin validar el proxy -- un cliente podía mandar su propio
+    `X-Forwarded-For: 127.0.0.1` (o cualquier IP de la allowlist) y saltarse
+    por completo el filtro de este archivo (Crítico #4 de la auditoría
+    original). Reutiliza la misma lógica que ya se corrigió para el pareo
+    UDID/WebSocket en `wind/utils/websocket_utils.get_client_ip()`, en vez
+    de mantener una segunda implementación divergente (segunda auditoría).
+    """
+    from appConfig import TrustedProxyConfig
+
+    remote_addr = request.META.get("REMOTE_ADDR") or ""
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
+    if forwarded and remote_addr in TrustedProxyConfig.TRUSTED_PROXIES:
         return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR") or ""
+    return remote_addr
 
 
 def _ip_allowed(client_ip: str, allowlist: list[str]) -> bool:

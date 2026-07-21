@@ -170,6 +170,37 @@ def close_subscriber_account(
         # seguía cargando, señal de que la sesión seguía autenticando bien).
         _deactivate_portal_users(subscriber_code)
 
+        # Auditoría (segunda ronda): _revoke_udid_requests y la revocación
+        # de DeviceSession (Fase 3/4) vivían más abajo, condicionadas a que
+        # la desaprovisión en PanAccess terminara en éxito completo -- el
+        # mismo hueco que la sección 22 ya había cerrado para
+        # _deactivate_portal_users/JWT. Un cierre que queda PARTIAL (ver
+        # sección 11: es un estado normal, no raro) dejaba pareos UDID y
+        # dispositivos vinculados activos indefinidamente, sin aviso. Se
+        # mueven acá, junto al resto del corte de acceso inmediato --
+        # revocar dos veces (acá y si el flujo llega al final) sería
+        # inofensivo (son operaciones idempotentes), pero se guardan los
+        # conteos acá y NO se repite la llamada más abajo, para no
+        # confundir logs con revocaciones duplicadas.
+        # Ninguna de las dos debe poder tumbar el cierre completo si falla
+        # -- son un efecto colateral de seguridad, no el objetivo principal
+        # de este request.
+        try:
+            udid_revoked_count = _revoke_udid_requests(subscriber_code)
+        except Exception:
+            logger.exception("Error revocando UDIDAuthRequest de %s durante cierre de cuenta", subscriber_code)
+            udid_revoked_count = None
+        try:
+            device_sessions_revoked_count = revoke_all_device_sessions_for_subscriber(
+                subscriber_code, reason="account_closed"
+            )
+        except Exception:
+            logger.exception("Error revocando DeviceSession de %s durante cierre de cuenta", subscriber_code)
+            device_sessions_revoked_count = None
+    else:
+        udid_revoked_count = None
+        device_sessions_revoked_count = None
+
     panaccess_result: dict[str, Any] = {"skipped": skip_panaccess}
     if not skip_panaccess:
         panaccess_result = deprovision_subscriber_in_panaccess(
@@ -202,7 +233,15 @@ def close_subscriber_account(
             reason=reason,
             dry_run=False,
             panaccess_result=panaccess_result,
-            local_result={"skipped": "panaccess_partial_failure"},
+            local_result={
+                "skipped": "panaccess_partial_failure",
+                # Aunque PanAccess quedó parcial, el acceso local ya se
+                # cortó de una vez arriba (users/udid/device_sessions) --
+                # se deja constancia acá para que quede trazado incluso en
+                # un cierre que queda PARTIAL.
+                "udid_revoked": udid_revoked_count,
+                "device_sessions_revoked": device_sessions_revoked_count,
+            },
             status=SubscriberClosureLog.STATUS_PARTIAL,
         )
         return {
@@ -228,14 +267,13 @@ def close_subscriber_account(
 
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)
     local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)
-    local_result["udid_revoked"] = _revoke_udid_requests(subscriber_code)
-    # Fase 4: mismo criterio que _revoke_udid_requests, pero para
-    # dispositivos vinculados (Fase 3) -- cerrar la cuenta también
-    # desloguea en vivo cualquier TV/app ya vinculada, no solo corta el
-    # pareo UDID de bootstrap.
-    local_result["device_sessions_revoked"] = revoke_all_device_sessions_for_subscriber(
-        subscriber_code, reason="account_closed"
-    )
+    # udid_revoked/device_sessions_revoked ya se ejecutaron arriba (bloque
+    # de corte de acceso inmediato, antes de llamar a PanAccess) -- se
+    # reportan los mismos conteos acá para el log de éxito completo, sin
+    # volver a revocar (idempotente de todos modos, pero evita duplicar la
+    # notificación WebSocket de revocación a dispositivos ya conectados).
+    local_result["udid_revoked"] = udid_revoked_count
+    local_result["device_sessions_revoked"] = device_sessions_revoked_count
 
     log_status = SubscriberClosureLog.STATUS_COMPLETED
     closure_log = SubscriberClosureLog.objects.create(

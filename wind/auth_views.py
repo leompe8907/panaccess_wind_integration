@@ -62,12 +62,29 @@ def _maybe_authorize_tv_pairing(request, user, response, *, comment: str) -> boo
     if not udid or not temp_token:
         return False
 
-    subscriber_code = resolve_subscriber_code_for_social_user(
-        user,
-        first_name=user.first_name or "",
-        last_name=user.last_name or "",
-        comment=comment,
-    )
+    # resolve_subscriber_code_for_social_user puede terminar creando un
+    # suscriptor nuevo en PanAccess (prueba gratis) -- si esa llamada falla
+    # (red, PanAccess caído, etc.), no debe dejar escapar la excepción: el
+    # login social en sí (allauth/JWT) ya se completó antes de llegar acá,
+    # así que un fallo solo en esta parte debe reportarse como
+    # "no se pudo autorizar la TV", no como un 500 genérico que además
+    # dejaría sin usar la respuesta JWT ya generada (revisión adversarial,
+    # segunda auditoría).
+    try:
+        subscriber_code = resolve_subscriber_code_for_social_user(
+            user,
+            first_name=user.first_name or "",
+            last_name=user.last_name or "",
+            comment=comment,
+        )
+    except Exception:
+        logger.exception(
+            "Error resolviendo subscriber_code para pareo TV (%s, pk=%s)",
+            user.email,
+            user.pk,
+        )
+        subscriber_code = None
+
     if not subscriber_code:
         logger.error(
             "No se pudo resolver subscriber_code para pareo TV (%s, pk=%s)",

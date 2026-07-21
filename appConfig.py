@@ -481,7 +481,20 @@ class RedisConfig:
 
         from redis.lock import Lock
 
-        lock = Lock(cls.get_client(), key, timeout=timeout)
+        # thread_local=False es necesario para que auto_extend funcione: por
+        # default (thread_local=True) redis-py guarda el token del lock en
+        # threading.local(), visible solo para el hilo que llamó acquire().
+        # El hilo de heartbeat (_renew, más abajo) es OTRO hilo -- con el
+        # default, lock.extend() ahí siempre ve local.token=None y lanza
+        # LockError("Cannot extend an unlocked lock") en cada tick, atrapado
+        # en silencio por el except genérico de _renew() (auditoría: el TTL
+        # nunca se renovaba de verdad pese a auto_extend=True, contradiciendo
+        # lo documentado en las secciones 15/19/20/24 -- una tarea que supere
+        # su TTL inicial podía perder el lock a mitad de corrida y dejar que
+        # otra instancia arrancara en paralelo sobre las mismas tablas).
+        # thread_local=False comparte el token en un SimpleNamespace normal,
+        # visible para cualquier hilo que use esta misma instancia de Lock.
+        lock = Lock(cls.get_client(), key, timeout=timeout, thread_local=False)
         acquired = lock.acquire(blocking=blocking, blocking_timeout=blocking_timeout)
 
         stop_heartbeat = None
@@ -897,6 +910,11 @@ class ThrottleConfig:
     # password_reset porque es una acción legítima de uso frecuente (ver
     # auditoría).
     SOCIAL_LOGIN = _strip_env(os.getenv("DRF_THROTTLE_SOCIAL_LOGIN")) or "20/minute"
+    # Listar/revocar dispositivos vinculados (Fase 3): antes sin scope
+    # propio, caía en el límite genérico de usuario (600/minute) -- pensado
+    # para navegación normal, no para una acción de escritura que además
+    # dispara un broadcast por WebSocket en cada llamada (segunda auditoría).
+    DEVICE_SESSION = _strip_env(os.getenv("DRF_THROTTLE_DEVICE_SESSION")) or "60/minute"
 
 
 # ---------------------------------------------------------------------------

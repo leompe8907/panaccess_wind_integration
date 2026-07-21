@@ -112,26 +112,43 @@ def revoke_all_device_sessions_for_subscriber(subscriber_code: str, *, reason: s
     dashboard (`revoke_device_session`), aplicado a todos a la vez.
 
     Devuelve cuántos `DeviceSession` se revocaron (0 si no había ninguno
-    activo, o si `subscriber_code` viene vacío).
+    activo, o si `subscriber_code` viene vacío), o `None` si algo falló
+    internamente -- esta función es un efecto colateral de seguridad sobre
+    un cambio de contraseña o un cierre de cuenta que YA ocurrió; nunca
+    debe dejar escapar una excepción que le haga parecer al caller que la
+    acción principal (cambiar contraseña / cerrar cuenta) falló cuando en
+    realidad sí se completó (revisión adversarial: antes de este try/except
+    una falla acá se propagaba tal cual, y los tres call-sites de
+    `sync_password_locally` capturan cualquier excepción y responden
+    "no se pudo cambiar la contraseña" -- un password ya cambiado con
+    normalidad quedaría reportado como error al usuario).
     """
     if not subscriber_code:
         return 0
 
-    with transaction.atomic():
-        sessions = list(
-            DeviceSession.objects.select_for_update().filter(
-                subscriber_code=subscriber_code, status="active"
+    try:
+        with transaction.atomic():
+            sessions = list(
+                DeviceSession.objects.select_for_update().filter(
+                    subscriber_code=subscriber_code, status="active"
+                )
             )
+            device_tokens = []
+            for session in sessions:
+                session.revoke(reason=reason)
+                device_tokens.append(session.device_token)
+
+            if device_tokens:
+                transaction.on_commit(lambda tokens=device_tokens: _notify_many_revoked(tokens, reason))
+
+        return len(sessions)
+    except Exception:
+        logger.exception(
+            "Error revocando DeviceSession en bloque para subscriber_code=%s (reason=%s)",
+            subscriber_code,
+            reason,
         )
-        device_tokens = []
-        for session in sessions:
-            session.revoke(reason=reason)
-            device_tokens.append(session.device_token)
-
-        if device_tokens:
-            transaction.on_commit(lambda tokens=device_tokens: _notify_many_revoked(tokens, reason))
-
-    return len(sessions)
+        return None
 
 
 def _notify_many_revoked(device_tokens: list, reason: str) -> None:

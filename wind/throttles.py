@@ -52,3 +52,18 @@ class SocialLoginThrottle(AnonRateThrottle):
     """
 
     scope = "social_login"
+
+
+class DeviceSessionThrottle(UserRateThrottle):
+    """
+    Listar/revocar dispositivos vinculados (Fase 3) — antes sin throttle
+    propio, caía en el límite genérico de usuario (`UserBurstThrottle`,
+    600/minute), pensado para navegación normal de la app, no para una
+    acción de escritura que además dispara un broadcast por WebSocket
+    (`notify_device_revoked`) por cada llamada. Un JWT válido pero
+    comprometido podría, si no fuera por esto, golpear el endpoint de
+    revocar cientos de veces por minuto sin ningún límite más ajustado
+    (segunda auditoría).
+    """
+
+    scope = "device_session"
