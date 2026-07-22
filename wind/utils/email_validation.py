@@ -25,8 +25,19 @@ def _has_active_local_subscriber_for_email(email_lower: str) -> bool:
 
 
 def _has_active_local_subscriber_for_document(document_normalized: str) -> bool:
+    """
+    Esta función solo se usa para el flujo de registro manual (login social
+    nunca pasa por `validate_document_for_registration`, ver
+    `wind/functions/create_subscriber.py`) -- ahí el `subscriber_code` final
+    ahora lleva el prefijo "BM$" (ajuste solicitado por el cliente), así que
+    hay que comparar contra el código con prefijo, no contra el documento
+    crudo, o esta validación dejaría de encontrar suscriptores activos
+    existentes y permitiría registros duplicados con el mismo documento.
+    """
+    from wind.functions.create_subscriber import MANUAL_CODE_PREFIX
+
     return ListOfSubscriber.objects.filter(
-        code=document_normalized,
+        code=f"{MANUAL_CODE_PREFIX}{document_normalized}",
     ).exclude(status=ListOfSubscriber.STATUS_CLOSED).exists()
 
 

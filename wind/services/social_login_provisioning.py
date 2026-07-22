@@ -7,6 +7,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 
+from appConfig import FeatureConfig
 from wind.functions.create_subscriber import _create_subscriber_core
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 from wind.models import ListOfSubscriber, SubscriberEmailRegistry
@@ -17,6 +18,16 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class SocialLoginSubscriberNotFound(Exception):
+    """
+    Se lanza cuando `FeatureConfig.SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER`
+    está activo y el correo del login social no tiene un suscriptor
+    existente -- distinta de un fallo real de PanAccess/red, para que el
+    caller (wind/adapters.py) pueda devolver un aviso específico ("el
+    suscriptor no existe") en vez del error genérico.
+    """
+
+
 def create_subscriber_in_panaccess(
     email,
     first_name,
@@ -24,6 +35,7 @@ def create_subscriber_in_panaccess(
     auto_generate_code=True,
     comment="",
     is_social_account=False,
+    social_provider=None,
 ):
     """
     Crea el suscriptor invocando directamente la lógica de negocio
@@ -42,7 +54,9 @@ def create_subscriber_in_panaccess(
         "email": email,
         "comment": comment,
     }
-    response = _create_subscriber_core(data, is_social_account=is_social_account)
+    response = _create_subscriber_core(
+        data, is_social_account=is_social_account, social_provider=social_provider,
+    )
     return response.data
 
 
@@ -81,6 +95,7 @@ def ensure_subscriber_for_social_email(
     first_name: str = "",
     last_name: str = "",
     comment: str = "Creado vía Social Login",
+    social_provider: str | None = None,
 ) -> str | None:
     """
     Garantiza que el email tenga un subscriber_code en SubscriberEmailRegistry.
@@ -98,6 +113,17 @@ def ensure_subscriber_for_social_email(
     if code:
         return code
 
+    if FeatureConfig.SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER:
+        # Bandera activa: no auto-registrar. A este punto ya se buscó en
+        # SubscriberEmailRegistry y en ListOfSubscriber sin encontrar nada,
+        # así que el correo definitivamente no tiene suscriptor todavía.
+        logger.info(
+            "Login social bloqueado (SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER activo): "
+            "no existe suscriptor para %s, no se auto-registra",
+            email,
+        )
+        raise SocialLoginSubscriberNotFound(email)
+
     if not last_name:
         last_name = "Social Login"
     if not first_name:
@@ -110,6 +136,7 @@ def ensure_subscriber_for_social_email(
         auto_generate_code=True,
         comment=comment,
         is_social_account=True,
+        social_provider=social_provider,
     )
 
     if result.get("success"):
@@ -159,6 +186,7 @@ def resolve_subscriber_code_for_social_user(
     first_name: str = "",
     last_name: str = "",
     comment: str = "Creado vía Social Login",
+    social_provider: str | None = None,
 ) -> str | None:
     """
     Resuelve (o crea, siguiendo el flujo de prueba gratis de siempre vía
@@ -181,6 +209,7 @@ def resolve_subscriber_code_for_social_user(
             first_name=first_name or (user.first_name or ""),
             last_name=last_name or (user.last_name or ""),
             comment=comment,
+            social_provider=social_provider,
         )
 
     if not subscriber_code:
@@ -197,12 +226,17 @@ def resolve_panaccess_credentials_for_user(
     first_name: str = "",
     last_name: str = "",
     comment: str = "Creado vía Social Login",
+    social_provider: str | None = None,
 ) -> dict | None:
     """
     Resuelve credenciales PanAccess para un User Django tras login social.
     Crea/vincula el suscriptor si hace falta.
     """
     subscriber_code = resolve_subscriber_code_for_social_user(
-        user, first_name=first_name, last_name=last_name, comment=comment,
+        user,
+        first_name=first_name,
+        last_name=last_name,
+        comment=comment,
+        social_provider=social_provider,
     )
     return build_panaccess_credentials(subscriber_code) if subscriber_code else None

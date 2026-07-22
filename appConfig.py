@@ -1002,6 +1002,16 @@ class FeatureConfig:
     CREATE_SUBSCRIBER_ASYNC_ENRICHMENT = _env_bool("CREATE_SUBSCRIBER_ASYNC_ENRICHMENT", False)
     CLOSE_SUBSCRIBER_HTTP_ENABLED = _env_bool("CLOSE_SUBSCRIBER_HTTP_ENABLED", False)
     CLOSE_SUBSCRIBER_DASHBOARD_ENABLED = _env_bool("CLOSE_SUBSCRIBER_DASHBOARD_ENABLED", True)
+    # Por defecto OFF: login social (Google/Facebook) sigue auto-registrando
+    # (con prueba gratis) a quien inicie sesión con un correo que todavía no
+    # tiene suscriptor -- comportamiento actual, sin cambios. Si se activa,
+    # ese auto-registro se desactiva: un correo sin suscriptor existente
+    # recibe un aviso ("el suscriptor no existe") en vez de crear uno nuevo
+    # (pedido del cliente, ver `ensure_subscriber_for_social_email` en
+    # wind/services/social_login_provisioning.py).
+    SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER = _env_bool(
+        "SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER", False
+    )
 
 
 # ---------------------------------------------------------------------------

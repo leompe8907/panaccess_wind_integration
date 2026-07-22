@@ -10,6 +10,7 @@ from wind.auth_serializers import (
     PanAccessSocialLoginSerializer,
 )
 from wind.services.social_login_provisioning import (
+    SocialLoginSubscriberNotFound,
     resolve_panaccess_credentials_for_user,
     resolve_subscriber_code_for_social_user,
 )
@@ -20,14 +21,33 @@ from wind.utils.websocket_utils import get_client_ip
 logger = logging.getLogger(__name__)
 
 
-def _attach_panaccess_credentials(response, user, *, comment: str):
+def _attach_panaccess_credentials(response, user, *, comment: str, social_provider: str | None = None):
     """Añade panaccess_credentials a la respuesta JWT del login social."""
-    credentials = resolve_panaccess_credentials_for_user(
-        user,
-        first_name=user.first_name or "",
-        last_name=user.last_name or "",
-        comment=comment,
-    )
+    try:
+        credentials = resolve_panaccess_credentials_for_user(
+            user,
+            first_name=user.first_name or "",
+            last_name=user.last_name or "",
+            comment=comment,
+            social_provider=social_provider,
+        )
+    except SocialLoginSubscriberNotFound:
+        # Caso borde defensivo (revisión adversarial): en el flujo normal
+        # `pre_social_login` (wind/adapters.py) ya corta antes de llegar acá
+        # si SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER está activo y el correo
+        # no tiene suscriptor -- pero este resolver tiene su propio fallback
+        # (por si el User Django ya existe sin subscriber_code resuelto), así
+        # que igual puede llegar acá. No debe tumbar la respuesta del login
+        # ya emitido (JWT válido); solo se deja sin credenciales.
+        logger.warning(
+            "No hay suscriptor para %s (pk=%s) y SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER "
+            "está activo -- no se auto-registra",
+            user.email,
+            user.pk,
+        )
+        response.data["panaccess_credentials"] = None
+        return
+
     if credentials:
         response.data["panaccess_credentials"] = credentials
         return
@@ -40,7 +60,9 @@ def _attach_panaccess_credentials(response, user, *, comment: str):
     response.data["panaccess_credentials"] = None
 
 
-def _maybe_authorize_tv_pairing(request, user, response, *, comment: str) -> bool:
+def _maybe_authorize_tv_pairing(
+    request, user, response, *, comment: str, social_provider: str | None = None
+) -> bool:
     """
     Fase 2 -- pareo de TV vía login social (QR escaneado desde el celular).
 
@@ -76,7 +98,25 @@ def _maybe_authorize_tv_pairing(request, user, response, *, comment: str) -> boo
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             comment=comment,
+            social_provider=social_provider,
         )
+    except SocialLoginSubscriberNotFound:
+        # SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER activo y este correo no
+        # tiene suscriptor -- distinto de un fallo real, se reporta con su
+        # propio código para que el celular no lo confunda con un problema
+        # transitorio de PanAccess.
+        logger.info(
+            "Pareo TV rechazado (SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER activo): "
+            "no existe suscriptor para %s (pk=%s)",
+            user.email,
+            user.pk,
+        )
+        response.data["udid_pairing"] = {
+            "ok": False,
+            "code": "subscriber_not_found",
+            "error": "No existe un suscriptor asociado a este correo.",
+        }
+        return True
     except Exception:
         logger.exception(
             "Error resolviendo subscriber_code para pareo TV (%s, pk=%s)",
@@ -130,6 +170,7 @@ class GoogleLoginView(SocialLoginView):
         if _maybe_authorize_tv_pairing(
             self.request, self.user, response,
             comment="Creado vía Google Social Login (pareo TV)",
+            social_provider="google",
         ):
             # Camino "solo autorizar la TV" (Fase 2): a propósito NO se
             # llama a _attach_panaccess_credentials acá -- el password real
@@ -140,6 +181,7 @@ class GoogleLoginView(SocialLoginView):
             response,
             self.user,
             comment="Creado vía Google Social Login",
+            social_provider="google",
         )
         return response
 
@@ -166,6 +208,7 @@ class FacebookLoginView(SocialLoginView):
         if _maybe_authorize_tv_pairing(
             self.request, self.user, response,
             comment="Creado vía Facebook Social Login (pareo TV)",
+            social_provider="facebook",
         ):
             response.data.setdefault("panaccess_credentials", None)
             return response
@@ -173,5 +216,6 @@ class FacebookLoginView(SocialLoginView):
             response,
             self.user,
             comment="Creado vía Facebook Social Login",
+            social_provider="facebook",
         )
         return response

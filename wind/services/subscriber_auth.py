@@ -48,7 +48,24 @@ def find_login_record(login: str) -> SubscriberLoginInfo | None:
     if record:
         return record
 
-    return SubscriberLoginInfo.objects.filter(subscriberCode=login).first()
+    record = SubscriberLoginInfo.objects.filter(subscriberCode=login).first()
+    if record:
+        return record
+
+    if login.isdigit():
+        # Registro manual (ajuste de subscriber_code): el código ahora se
+        # guarda como "BM$<documento>", pero el usuario puede seguir
+        # tecleando solo su documento por costumbre -- se intenta también con
+        # el prefijo antes de rendirse.
+        from wind.functions.create_subscriber import MANUAL_CODE_PREFIX
+
+        record = SubscriberLoginInfo.objects.filter(
+            subscriberCode=f"{MANUAL_CODE_PREFIX}{login}"
+        ).first()
+        if record:
+            return record
+
+    return None
 
 
 def resolve_subscriber_code(login: str) -> str | None:
@@ -60,6 +77,13 @@ def resolve_subscriber_code(login: str) -> str | None:
     sub = ListOfSubscriber.objects.filter(code=login).first()
     if not sub:
         sub = ListOfSubscriber.objects.filter(code__iexact=login).first()
+    if not sub and login.isdigit():
+        # Mismo fallback que find_login_record(): el código de registro
+        # manual ahora lleva el prefijo "BM$", el usuario sigue tecleando
+        # solo su documento.
+        from wind.functions.create_subscriber import MANUAL_CODE_PREFIX
+
+        sub = ListOfSubscriber.objects.filter(code=f"{MANUAL_CODE_PREFIX}{login}").first()
     if sub and sub.code:
         return sub.code
 

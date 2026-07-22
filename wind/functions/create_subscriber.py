@@ -39,6 +39,29 @@ PHONE_INVALID_MESSAGE = (
     "(ej: +1 809 555 1234 o 8095551234). Déjalo vacío si no deseas indicarlo."
 )
 
+# Prefijos de subscriber_code según origen del registro (ajuste solicitado
+# por el cliente): registro manual -> "BM$" + documento; login social ->
+# "BG$"/"BF$" + documento si viene (hoy el login social no captura documento
+# en ningún punto del flujo, así que en la práctica siempre cae al número
+# progresivo) o número progresivo por prefijo si no. Solo aplica a
+# suscriptores NUEVOS -- los códigos ya existentes en producción no se tocan.
+MANUAL_CODE_PREFIX = "BM$"
+SOCIAL_PROVIDER_CODE_PREFIXES = {"google": "BG$", "facebook": "BF$"}
+DEFAULT_SOCIAL_CODE_PREFIX = "BG$"
+
+# Prefijo SEPARADO para cuando el registro manual no trae documento (el
+# formulario público lo permite -- `code`/`document_number` son opcionales en
+# CreateSubscriberSerializer) y hay que generar un número progresivo. Si se
+# usara el mismo "BM$" para esto, `generate_unique_subscriber_code` mezclaría
+# en la misma consulta (`code__startswith`) códigos progresivos puramente
+# numéricos ("BM$1", "BM$2"...) con códigos de documento no numéricos
+# ("BM$AB123456"...) -- el `order_by('-code')` es un ordenamiento de texto,
+# no numérico, así que un documento no numérico puede "ganarle" al último
+# progresivo real y romper el conteo (se detectó en revisión adversarial de
+# este mismo ajuste). Al no reutilizarse el mismo prefijo, ambos universos
+# quedan separados y esto no puede pasar.
+MANUAL_AUTO_CODE_PREFIX = "BM$AUTO"
+
 logger = logging.getLogger(__name__)
 
 
@@ -319,7 +342,13 @@ def _persist_subscriber_contacts_to_db(
         )
 
 
-def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_social_account: bool = False):
+def _create_subscriber_core(
+    data: dict,
+    *,
+    raw_extra: dict | None = None,
+    is_social_account: bool = False,
+    social_provider: str | None = None,
+):
     """
     Lógica de creación de suscriptor en PanAccess + BD local.
 
@@ -369,6 +398,25 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
 
     user_provided_code = (data.get('code') or data.get('document_number') or "").strip()
 
+    # Prefijo según origen del registro -- ver constantes arriba. El
+    # documento crudo (`user_provided_code`) se sigue usando tal cual para
+    # locking, elegibilidad de trial y `SubscriberDocumentRegistry` (esos no
+    # cambian); solo el `subscriber_code` final que se guarda en
+    # `ListOfSubscriber`/PanAccess lleva el prefijo.
+    if is_social_account:
+        code_prefix = SOCIAL_PROVIDER_CODE_PREFIXES.get(
+            (social_provider or "").strip().lower(), DEFAULT_SOCIAL_CODE_PREFIX
+        )
+        # Login social hoy nunca trae documento, así que este universo nunca
+        # se mezcla con códigos no numéricos -- se puede reusar el mismo
+        # prefijo para el progresivo sin riesgo de colisión (ver
+        # MANUAL_AUTO_CODE_PREFIX para el caso donde sí hace falta separar).
+        auto_code_prefix = code_prefix
+    else:
+        code_prefix = MANUAL_CODE_PREFIX
+        auto_code_prefix = MANUAL_AUTO_CODE_PREFIX
+    user_provided_code_prefixed = f"{code_prefix}{user_provided_code}" if user_provided_code else ""
+
     # Cierra el hueco de doble alta / doble trial (auditoria, seccion 16):
     # sin este lock, dos requests concurrentes para el mismo email o
     # documento podian pasar ambas la validacion de "no existe todavia"
@@ -394,19 +442,25 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
     )
 
     if user_provided_code:
-        subscriber_code_provided = user_provided_code
-        logger.info(f"Validando código proporcionado: '{subscriber_code_provided}'")
-        
+        subscriber_code_provided = user_provided_code_prefixed
+        logger.info(
+            "Validando código proporcionado: '%s' (documento base: '%s')",
+            subscriber_code_provided,
+            user_provided_code,
+        )
+
         if not validate_subscriber_code_uniqueness(subscriber_code_provided):
             errors['code'] = [f'El código "{subscriber_code_provided}" ya está en uso. Por favor, elija otro.']
             logger.warning(f"Código '{subscriber_code_provided}' ya existe en BD")
 
-        # Validar en SubscriberDocumentRegistry
+        # Validar en SubscriberDocumentRegistry -- este registro guarda el
+        # documento crudo (sin prefijo), así que se valida contra
+        # `user_provided_code`, no contra el código final con prefijo.
         from wind.utils.email_validation import validate_document_for_registration
-        doc_valid, doc_message, doc_registry = validate_document_for_registration(subscriber_code_provided)
+        doc_valid, doc_message, doc_registry = validate_document_for_registration(user_provided_code)
         if not doc_valid:
             errors['document_number'] = [doc_message]
-            logger.warning(f"Documento '{subscriber_code_provided}' no válido según SubscriberDocumentRegistry")
+            logger.warning(f"Documento '{user_provided_code}' no válido según SubscriberDocumentRegistry")
     
     is_valid, validation_message, email_registry = validate_email_for_registration(email_normalized)
     logger.info(f"Validación en SubscriberEmailRegistry: is_valid={is_valid}, message='{validation_message}'")
@@ -438,11 +492,11 @@ def _create_subscriber_core(data: dict, *, raw_extra: dict | None = None, is_soc
         panaccess = get_panaccess()
         
         if user_provided_code and user_provided_code.strip():
-            subscriber_code = user_provided_code.strip()
-            logger.info(f"Usando código proporcionado: {subscriber_code}")
+            subscriber_code = user_provided_code_prefixed
+            logger.info(f"Usando código proporcionado con prefijo: {subscriber_code}")
         else:
-            logger.info("Generando código único de suscriptor automáticamente...")
-            subscriber_code = generate_unique_subscriber_code(prefix='AUTO')
+            logger.info(f"Generando código único de suscriptor automáticamente (prefijo '{auto_code_prefix}')...")
+            subscriber_code = generate_unique_subscriber_code(prefix=auto_code_prefix)
             logger.info(f"Código generado automáticamente: {subscriber_code}")
         
         logger.info(f"Creando suscriptor: {subscriber_code}")
