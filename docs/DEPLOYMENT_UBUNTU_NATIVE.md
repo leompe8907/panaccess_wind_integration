@@ -909,12 +909,12 @@ Usa este bloque tras `git pull`, cambios de dependencias o migraciones en el dí
 cd /opt/panaccess-wind
 source env/bin/activate
 
-# --- 1. Código y Django ---
-git pull
-pip install -r requirements.txt
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput
-python manage.py check
+# --- 1. Código y Django (Ejecutar como usuario wind para evitar errores de permisos) ---
+sudo -u wind git pull
+sudo -u wind env/bin/pip install -r requirements.txt
+sudo -u wind env/bin/python manage.py migrate --noinput
+sudo -u wind env/bin/python manage.py collectstatic --noinput
+sudo -u wind env/bin/python manage.py check
 
 # --- 2. Reinicio de aplicación (sin parar PostgreSQL/Redis) ---
 DAPHNE_INSTANCES=8 sudo deploy/manage_daphne.sh restart

@@ -1,7 +1,12 @@
+from pathlib import Path
 import os
 import sys
 import django
-sys.path.append(r"f:\Back-Wind-V2")
+
+# Obtiene la raíz del proyecto de forma dinámica (carpeta padre de docs)
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(BASE_DIR))
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'panaccess_wind_integration.settings')
 django.setup()
 from django.db import connection
