@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from wind.models import ListOfSubscriber
 from wind.permissions import HasCrmApiKey
 from wind.serializers import ValidateSubscriberEmailSerializer
-from wind.throttles import RegisterThrottle
+from wind.throttles import CrmEmailCheckThrottle
 from wind.utils.email_validation import validate_email_for_registration
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @api_view(["POST"])
 @permission_classes([HasCrmApiKey])
-@throttle_classes([RegisterThrottle])
+@throttle_classes([CrmEmailCheckThrottle])
 def validate_subscriber_email_view(request):
     """
     Valida si un email ya está registrado como suscriptor.

@@ -179,6 +179,7 @@ REST_FRAMEWORK = {
         'profile': ThrottleConfig.PROFILE,
         'sync_admin': ThrottleConfig.SYNC_ADMIN,
         'register': ThrottleConfig.REGISTER,
+        'crm_email_check': ThrottleConfig.CRM_EMAIL_CHECK,
         'password_reset': ThrottleConfig.PASSWORD_RESET,
         'social_login': ThrottleConfig.SOCIAL_LOGIN,
         'device_session': ThrottleConfig.DEVICE_SESSION,

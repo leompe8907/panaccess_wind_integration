@@ -903,6 +903,7 @@ class ThrottleConfig:
     PROFILE = _strip_env(os.getenv("DRF_THROTTLE_PROFILE")) or "120/minute"
     SYNC_ADMIN = _strip_env(os.getenv("DRF_THROTTLE_SYNC_ADMIN")) or "30/minute"
     REGISTER = _strip_env(os.getenv("DRF_THROTTLE_REGISTER")) or "10/hour"
+    CRM_EMAIL_CHECK = _strip_env(os.getenv("DRF_THROTTLE_CRM_EMAIL_CHECK")) or "100/hour"
     PASSWORD_RESET = _strip_env(os.getenv("DRF_THROTTLE_PASSWORD_RESET")) or "5/hour"
     # Login social (Google/Facebook): antes sin scope propio, caía en el
     # límite genérico anónimo (60/minute) -- mucho más permisivo que el resto

@@ -36,6 +36,12 @@ class RegisterThrottle(AnonRateThrottle):
     scope = "register"
 
 
+class CrmEmailCheckThrottle(AnonRateThrottle):
+    """Validación de email de suscriptor desde CRM bot — límite propio separado."""
+
+    scope = "crm_email_check"
+
+
 class PasswordResetThrottle(AnonRateThrottle):
     """Recuperación de contraseña — límite bajo por IP."""
 
