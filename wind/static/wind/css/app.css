@@ -1,0 +1,1330 @@
+/* Estilos compartidos: login, registro, dashboard */
+:root {
+  color-scheme: dark;
+  --bg: #001222;
+  --bg-2: #00182d;
+  --card: #012b4f;
+  --text: #ffffff;
+  --muted: #b3e3ff;
+  --line: rgba(74, 199, 215, 0.3);
+  --line-2: rgba(74, 199, 215, 0.15);
+  --focus: rgba(74, 199, 215, 0.35);
+  --ok: #10b981;
+  --bad: #ef4444;
+  --btn: #4ac7d7;
+  --btn-hover: #b3e3ff;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.6);
+  /* Acento cálido (idea 2): exclusivo para insignias de estado/promoción
+     (trial, producto activo, etc.) -- nunca para texto de cuerpo ni para
+     botones de acción, para no competir con --btn (cian) ni con --ok/--bad. */
+  --amber: #f2b84b;
+  --amber-ink: #402a05;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.app-body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg);
+  /* Idea 2: panel sólido, así que el contraste extra recae en el fondo --
+     degradado diagonal más marcado que el original, pensado para pantallas
+     con más densidad de información (dashboard, perfil). */
+  background-image: linear-gradient(160deg, rgba(0, 24, 45, 0.55) 10%, rgba(0, 12, 22, 0.85) 75%),
+    url("../images/backgroundalt.webp");
+  background-position: center, center;
+  background-size: cover, cover;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body.app-body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(900px 520px at 18% 0%, rgba(74, 199, 215, 0.15), transparent 60%),
+    radial-gradient(900px 520px at 92% 15%, rgba(1, 43, 79, 0.25), transparent 62%);
+  z-index: -1;
+  opacity: 0.9;
+}
+
+.app-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 22px 16px;
+}
+
+.app-card {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.app-card.wide {
+  max-width: 920px;
+}
+
+.app-header {
+  padding: 18px;
+  background: #00182d;
+  border-bottom: 2px solid #4ac7d7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: radial-gradient(16px 16px at 30% 30%, rgba(255,255,255,0.75), transparent 60%),
+              linear-gradient(135deg, rgba(74,199,215,0.85), rgba(1,43,79,0.7));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.app-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.app-content {
+  padding: 18px;
+  background: #012b4f;
+}
+
+.app-panel {
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background: rgba(0, 24, 45, 0.4);
+  padding: 16px;
+}
+
+.app-form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.app-field {
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  display: grid;
+  gap: 6px;
+  align-items: start;
+}
+
+.app-field label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.app-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 24, 45, 0.5);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-field input::placeholder {
+  color: rgba(179, 227, 255, 0.5);
+}
+
+.app-field input:focus {
+  outline: none;
+  border-color: #4ac7d7;
+  box-shadow: 0 0 0 4px rgba(74, 199, 215, 0.25);
+}
+
+.app-btn {
+  appearance: none;
+  border: 1px solid rgba(74, 199, 215, 0.3);
+  background: rgba(0, 24, 45, 0.5);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.app-btn:hover {
+  background: rgba(0, 24, 45, 0.75);
+  border-color: rgba(74, 199, 215, 0.5);
+}
+
+.app-btn.primary {
+  border-color: #4ac7d7;
+  background: var(--btn);
+  color: #00182d;
+}
+
+.app-btn.primary:hover {
+  background: var(--btn-hover);
+  border-color: var(--btn-hover);
+  box-shadow: 0 0 12px rgba(74, 199, 215, 0.4);
+}
+
+.app-btn.ghost {
+  background: transparent;
+}
+
+.app-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 420px;
+  margin: 16px auto;
+  width: 100%;
+}
+
+.app-divider::before,
+.app-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.social-row {
+  display: grid;
+  gap: 10px;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.app-alert {
+  display: none;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.app-alert.show {
+  display: block;
+}
+
+.app-alert.error {
+  color: #ff9999;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.app-alert.success {
+  color: #a7f3d0;
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+.app-link {
+  color: #4ac7d7;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-link:hover {
+  color: #b3e3ff;
+  text-decoration: underline;
+}
+
+/* Insignia de estado/promoción (idea 2) -- trial, producto activo, etc.
+   No usar para botones ni texto de cuerpo: es el único lugar del sitio que
+   usa --amber, para que mantenga su significado de "atención puntual". */
+.pill-amber {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: var(--amber-ink);
+}
+
+/* Dashboard */
+.dash-page {
+  align-items: start;
+  padding: 36px 20px 48px;
+}
+
+.dash-shell {
+  border-radius: 24px;
+}
+
+.dash-header {
+  padding: 24px 28px;
+}
+
+.dash-greeting {
+  font-size: 14px;
+}
+
+.dash-content {
+  padding: 28px 32px 36px;
+  display: grid;
+  gap: 20px;
+}
+
+.dash-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.dash-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dash-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.dash-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.dash-tab.is-active {
+  color: var(--btn);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--line-2);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.dash-tabpanels {
+  min-height: 0;
+}
+
+.dash-tabpanel {
+  display: none;
+}
+
+.dash-tabpanel.is-active {
+  display: block;
+}
+
+.dash-tabpanel[hidden] {
+  display: none !important;
+}
+
+.account-fields {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .account-fields {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 32px;
+  }
+}
+
+.dash-module.module-card {
+  padding: 24px 28px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.88));
+}
+
+.dash-module .module-desc {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.password-form {
+  max-width: 420px;
+}
+
+.products-list {
+  display: grid;
+  gap: 14px;
+}
+
+.products-placeholder,
+.products-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.smartcard-card {
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.smartcard-card-header h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.smartcard-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.product-items {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.product-items li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--line-2);
+  display: grid;
+  gap: 4px;
+}
+
+.product-items strong {
+  font-size: 14px;
+}
+
+.product-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (min-width: 720px) {
+  .products-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dash-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.dash-modal[hidden] {
+  display: none !important;
+}
+
+.dash-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.dash-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 26px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.dash-modal-text {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.dash-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.dash-account.module-card {
+  padding: 28px 32px 32px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.88));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.account-layout {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-around;
+  gap: 28px;
+}
+
+.account-column {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .account-column + .account-column {
+    border-left: 1px solid var(--line-2);
+    padding-left: 40px;
+  }
+
+  .account-summary {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .account-summary .account-line-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-block {
+  display: grid;
+  gap: 16px;
+}
+
+.account-summary {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+@media (max-width: 719px) {
+  .account-summary {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line-2);
+  }
+}
+
+.account-section-title {
+  margin: 0 0 18px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.account-line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.account-line-row {
+  display: grid;
+  gap: 16px 32px;
+}
+
+@media (min-width: 640px) {
+  .account-line-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.account-line-label {
+  color: var(--muted);
+  font-weight: 500;
+  margin-right: 6px;
+}
+
+.account-line-value {
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.dash-account.is-loading .account-line-value {
+  color: transparent;
+  background: linear-gradient(90deg, var(--line-2) 0%, rgba(15, 23, 42, 0.06) 50%, var(--line-2) 100%);
+  background-size: 200% 100%;
+  animation: account-shimmer 1.2s ease-in-out infinite;
+  border-radius: 6px;
+  min-width: 4rem;
+  display: inline-block;
+}
+
+@keyframes account-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.account-details-block {
+  gap: 14px;
+}
+
+.account-status {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.dash-grid {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .dash-grid.modules {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dash-user {
+  display: grid;
+  gap: 6px;
+}
+
+.dash-user strong {
+  font-size: 16px;
+}
+
+.module-card {
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.module-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.module-card p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.module-card.disabled {
+  opacity: 0.65;
+}
+
+.module-card .badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#google-btn-container {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.section-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* .account-name / .account-email definidos en bloque dashboard (.account-hero) */
+
+.account-status-error {
+  color: var(--bad);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.subscriber-details {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-2);
+  font-size: 13px;
+}
+
+.subscriber-details-loading,
+.subscriber-details-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.subscriber-details-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.subscriber-details-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.subscriber-detail-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.subscriber-detail-label {
+  color: var(--muted);
+}
+
+.subscriber-detail-value {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+@media (max-width: 520px) {
+  .subscriber-detail-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .dash-content {
+    padding: 20px 18px 28px;
+  }
+
+  .dash-tablist {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .dash-tablist::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dash-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .dash-account.module-card {
+    padding: 22px 20px 24px;
+  }
+
+  .dash-header {
+    padding: 18px 20px;
+    flex-wrap: wrap;
+  }
+
+  .account-line-row {
+    grid-template-columns: 1fr;
+  }
+
+  .account-column + .account-column {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
+.dash-tab-danger {
+  color: #b91c1c;
+}
+
+.dash-tab-danger.is-active {
+  color: #fff;
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.dash-danger-zone {
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.95), rgba(255, 255, 255, 0.92));
+}
+
+.dash-danger-text {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.dash-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dash-checkbox-row input {
+  margin-top: 3px;
+}
+
+.dash-json-result {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #0f172a;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-btn.danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.app-btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.app-btn.danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   LAYOUT "SPLIT CINEMATOGRÁFICO" -- opción elegida para las pantallas simples
+   de un solo formulario (login, registro, olvidé/resetear contraseña, borrar
+   cuenta). La foto ya no es wallpaper detrás de una tarjeta flotante: ocupa
+   la mitad de la pantalla sin difuminar, y el formulario vive en un panel
+   sólido al lado, con inputs de línea (sin caja) y botón en píldora.
+   ============================================================================ */
+
+body.split-body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-2);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.split-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.split-photo {
+  flex: 1.4;
+  position: relative;
+  background-image: url("../images/backgroundalt.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* La foto se funde con el color del panel en el borde de unión, en vez de
+   cortar en seco -- así se lee como una sola composición, no dos mitades
+   pegadas. */
+.split-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, var(--bg-2) 100%);
+}
+
+.split-panel {
+  flex: 1;
+  min-width: 340px;
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px clamp(28px, 6vw, 72px);
+}
+
+.split-panel-inner {
+  max-width: 380px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.split-brand {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #4ac7d7;
+  margin-bottom: 28px;
+}
+
+.split-panel h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.split-sub {
+  color: var(--muted);
+  font-size: 13.5px;
+  margin: 0 0 28px;
+}
+
+.split-field {
+  margin-bottom: 18px;
+}
+
+.split-field label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.line-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  padding: 10px 2px;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.2s ease;
+}
+
+.line-input::placeholder {
+  color: rgba(179, 227, 255, 0.45);
+}
+
+.line-input:focus {
+  outline: none;
+  border-bottom-color: #4ac7d7;
+}
+
+.btn-flat {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--btn);
+  color: #00182d;
+  border: none;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.btn-flat:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.btn-flat:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-flat.btn-block {
+  width: 100%;
+}
+
+.btn-flat.btn-facebook {
+  background: #1877f2;
+  color: #fff;
+}
+
+.btn-flat.btn-facebook:hover:not(:disabled) {
+  background: #3b8bfa;
+}
+
+.split-links {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 13px;
+}
+
+.split-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 26px 0 18px;
+}
+
+.split-divider::before,
+.split-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+
+.split-social {
+  display: grid;
+  gap: 10px;
+}
+
+/* Por debajo de este ancho, un split 60/40 aprieta demasiado el formulario --
+   la foto pasa a ser una franja superior corta y el panel ocupa todo el
+   ancho, en vez de forzar dos columnas angostas en un teléfono. */
+@media (max-width: 860px) {
+  .split-shell {
+    flex-direction: column;
+  }
+
+  .split-photo {
+    flex: none;
+    height: 200px;
+  }
+
+  .split-photo::after {
+    background: linear-gradient(180deg, transparent 40%, var(--bg-2) 100%);
+  }
+
+  .split-panel {
+    padding: 32px 24px 48px;
+  }
+}
+
+/* ============================================================================
+   DASHBOARD v2 -- panel lateral. A diferencia del resto del sitio (login,
+   registro, olvidé contraseña -- pantallas de un solo formulario, cinematográficas
+   con foto de fondo), "Mi cuenta" es una vista densa de datos que se consulta
+   seguido, no una pantalla de marketing. Por eso NO usa la foto de fondo ni
+   tarjetas flotantes: navegación lateral fija + contenido resuelto con
+   tipografía y espaciado, al estilo Stripe/Linear. Esto también corrige el bug
+   de contraste que tenía la versión anterior (tarjeta casi blanca con texto
+   --muted/--text pensado para fondo oscuro, quedaba casi ilegible).
+   ============================================================================ */
+body.dash-body-v2 {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-2);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.dash-shell-v2 {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.dash-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border-right: 1px solid var(--line-2);
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-sidebar-brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--btn);
+  margin: 0 0 30px;
+  padding-left: 6px;
+}
+
+.dash-sidebar .dash-tablist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+}
+
+.dash-sidebar .dash-tab {
+  flex: none;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #6f93ab;
+  font-size: 13.5px;
+}
+
+.dash-sidebar .dash-tab:hover {
+  color: var(--text);
+  background: rgba(74, 199, 215, 0.07);
+}
+
+.dash-sidebar .dash-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.dash-sidebar .dash-tab.is-active {
+  color: var(--text);
+  background: rgba(74, 199, 215, 0.1);
+  border-left-color: var(--btn);
+  box-shadow: none;
+}
+
+.dash-sidebar-spacer {
+  flex: 1;
+}
+
+.dash-sidebar .dash-tab-danger {
+  margin-top: 10px;
+  padding: 16px 12px 0;
+  border-top: 1px solid var(--line-2);
+  border-left: none;
+  border-radius: 0;
+  color: #d97a7a;
+  font-size: 13px;
+}
+
+.dash-sidebar .dash-tab-danger:hover {
+  background: none;
+  color: #ef8f8f;
+}
+
+.dash-sidebar .dash-tab-danger.is-active {
+  background: none;
+  border-left: none;
+  color: #ef8f8f;
+}
+
+.dash-main {
+  flex: 1;
+  min-width: 0;
+  padding: 34px 40px 48px;
+}
+
+.dash-main-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.dash-main-top h1 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.dash-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--btn), var(--card));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-2);
+  flex-shrink: 0;
+}
+
+.dash-logout-link {
+  appearance: none;
+  background: none;
+  border: none;
+  color: #7fa8c2;
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.dash-logout-link:hover {
+  color: var(--text);
+}
+
+/* Sin tarjeta: tipografía directamente sobre el fondo oscuro */
+.dash-body-v2 .account-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 40px;
+}
+
+.dash-body-v2 .account-line {
+  display: block;
+  border-bottom: 1px solid var(--line-2);
+  padding-bottom: 14px;
+}
+
+.dash-body-v2 .account-line-label {
+  display: block;
+  margin-right: 0;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6f93ab;
+}
+
+.dash-body-v2 .account-line-value {
+  font-size: 15.5px;
+}
+
+/* El resto de los módulos (contraseña, productos, eliminar cuenta) también
+   pierden la tarjeta clara -- mismo criterio de "tipografía sobre fondo
+   oscuro", y de paso corrige el contraste que tenían las smartcards/productos
+   con fondos pensados para tema claro. */
+.dash-body-v2 .module-card {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.dash-body-v2 .dash-section-title {
+  color: var(--text);
+}
+
+.dash-body-v2 .smartcard-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-2);
+}
+
+.dash-body-v2 .product-items li {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-2);
+}
+
+.dash-body-v2 .dash-danger-zone {
+  max-width: 520px;
+}
+
+@media (max-width: 760px) {
+  .dash-shell-v2 {
+    flex-direction: column;
+  }
+
+  .dash-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+
+  .dash-sidebar-brand {
+    margin: 0 14px 0 0;
+  }
+
+  .dash-sidebar .dash-tablist {
+    flex-direction: row;
+  }
+
+  .dash-sidebar-spacer {
+    display: none;
+  }
+
+  .dash-sidebar .dash-tab-danger {
+    margin: 0 0 0 10px;
+    padding: 8px 10px;
+    border-top: none;
+    border-left: 1px solid var(--line-2);
+  }
+
+  .dash-main {
+    padding: 24px 20px 40px;
+  }
+
+  .dash-body-v2 .account-fields {
+    grid-template-columns: 1fr;
+  }
+}
