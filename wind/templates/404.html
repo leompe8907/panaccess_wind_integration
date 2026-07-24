@@ -1,0 +1,149 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Página no encontrada | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=7" />
+    <style>
+      /* Página de error "señal perdida" -- ilustrativa, con guiño temático
+         (Wind = middleware de IPTV/broadcast). Autónoma: no depende de la
+         foto de fondo de login/registro, solo de la paleta/tipografía
+         compartida de app.css (:root, --bg-2, --btn, --muted, .btn-flat). */
+      body.error-body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        padding: 40px 20px;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(900px 520px at 50% -10%, rgba(74, 199, 215, 0.14), transparent 60%),
+          var(--bg-2);
+      }
+
+      /* Estática sutil de fondo -- textura de "sin señal", muy discreta. */
+      .error-noise {
+        position: absolute;
+        inset: 0;
+        opacity: 0.05;
+        background-image: radial-gradient(circle, #fff 1px, transparent 1px);
+        background-size: 3px 3px;
+        animation: error-static 0.4s steps(2) infinite;
+        pointer-events: none;
+      }
+      @keyframes error-static {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(-3px, 3px); }
+      }
+
+      .error-inner {
+        text-align: center;
+        max-width: 460px;
+        position: relative;
+        z-index: 1;
+      }
+      .error-brand {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #4ac7d7;
+        margin: 0 0 30px;
+      }
+
+      .error-dish {
+        width: 168px;
+        height: 168px;
+        margin: 0 auto 30px;
+        position: relative;
+      }
+      .error-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1.5px solid rgba(74, 199, 215, 0.55);
+        animation: error-ping 2.6s cubic-bezier(.2, .7, .3, 1) infinite;
+        opacity: 0;
+      }
+      .error-ring.r2 { animation-delay: .65s; }
+      .error-ring.r3 { animation-delay: 1.3s; }
+      @keyframes error-ping {
+        0% { transform: scale(0.35); opacity: 0; }
+        12% { opacity: .9; }
+        100% { transform: scale(1.15); opacity: 0; }
+      }
+      .error-core {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-mark {
+        width: 78px;
+        height: 78px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background:
+          radial-gradient(20px 20px at 30% 28%, rgba(255, 255, 255, 0.8), transparent 60%),
+          linear-gradient(135deg, rgba(74, 199, 215, 0.9), rgba(1, 43, 79, 0.75));
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-mark svg {
+        width: 34px;
+        height: 34px;
+      }
+
+      .error-eyebrow {
+        font-size: 13px;
+        letter-spacing: .18em;
+        color: #6f93ab;
+        font-weight: 700;
+        margin: 0 0 14px;
+      }
+      .error-inner h1 {
+        font-size: 25px;
+        margin: 0 0 12px;
+        line-height: 1.35;
+      }
+      .error-inner p.sub {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+        margin: 0 0 34px;
+      }
+    </style>
+  </head>
+  <body class="error-body">
+    <div class="error-noise"></div>
+    <div class="error-inner">
+      <div class="error-brand">WIND</div>
+      <div class="error-dish">
+        <div class="error-ring r1"></div>
+        <div class="error-ring r2"></div>
+        <div class="error-ring r3"></div>
+        <div class="error-core">
+          <div class="error-mark">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 9C4 9 8 5 12 5C16 5 20 9 20 9" stroke="#00182d" stroke-width="1.6" stroke-linecap="round" />
+              <path d="M7 12.5C7 12.5 9.2 10 12 10C14.8 10 17 12.5 17 12.5" stroke="#00182d" stroke-width="1.6" stroke-linecap="round" />
+              <circle cx="12" cy="16.5" r="1.6" fill="#00182d" />
+            </svg>
+          </div>
+        </div>
+      </div>
+      <p class="error-eyebrow">SEÑAL 404</p>
+      <h1>Se perdió la señal en este canal</h1>
+      <p class="sub">La página que buscas no está transmitiendo — puede que el enlace esté mal escrito o ya no exista.</p>
+      <a class="btn-flat" href="{% url 'home' %}">Volver al inicio</a>
+    </div>
+  </body>
+</html>
