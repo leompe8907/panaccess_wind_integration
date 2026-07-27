@@ -119,6 +119,10 @@ class ListOfSubscriber(models.Model):
             # UPPER(emails) = UPPER(...) y NO puede usar el índice plano de
             # 'emails' -- sin esto, cada login hacía un scan completo.
             models.Index(Upper('emails'), name='wind_lof_sub_emails_upper'),
+            # Mismo motivo que el índice de 'emails' de arriba: subscriber_auth.py
+            # resuelve login por code__iexact, que compila a UPPER(code) = UPPER(...)
+            # y no puede usar el índice único plano de 'code'.
+            models.Index(Upper('code'), name='wind_lof_sub_code_upper'),
         ]
 
     def __str__(self):
@@ -219,6 +223,15 @@ class SubscriberLoginInfo(models.Model):
     additionalLogins = models.JSONField(null=True, blank=True)
     password_hash = models.CharField(max_length=255, null=True, blank=True)
     licenses = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            # subscriber_auth.py resuelve login por login2__iexact, que compila
+            # a UPPER(login2) = UPPER(...) y no puede usar el índice plano
+            # existente (db_index=True de arriba) -- mismo patrón que
+            # ListOfSubscriber.emails/code.
+            models.Index(Upper('login2'), name='wind_sli_login2_upper'),
+        ]
 
     def __str__(self):
         return f"Login Info - Subscriber: {self.subscriberCode or 'N/A'}"
@@ -354,29 +367,42 @@ class SubscriberEmailRegistry(models.Model):
     """
     Control de correos registrados para evitar múltiples registros.
     """
-    email = models.EmailField(unique=True, db_index=True)
+    # unique=True ya crea su propio índice único -- 'db_index=True' además de
+    # eso, más una entrada en Meta.indexes para el mismo campo, mantenía TRES
+    # índices btree idénticos sobre 'email' (mismo bug que 'code'/'sn' en
+    # ListOfSubscriber/ListOfSmartcards, ver migración 0004). Igual para
+    # document/trial_used/account_closed_at: db_index=True + Meta.Index para
+    # el mismo campo duplicaba el índice, doblando el costo de escritura de
+    # esta tabla (se reescribe en cada registro/compra/cierre) sin ningún
+    # beneficio de lectura.
+    email = models.EmailField(unique=True)
     subscriber_code = models.CharField(max_length=100, null=True, blank=True)
-    document = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    document = models.CharField(max_length=50, null=True, blank=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)
-    trial_used = models.BooleanField(default=False, db_index=True)
+    trial_used = models.BooleanField(default=False)
     trial_granted_at = models.DateTimeField(null=True, blank=True)
     trial_expires_at = models.DateTimeField(null=True, blank=True)
     eligible_for_trial = models.BooleanField(default=True)
-    account_closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    account_closed_at = models.DateTimeField(null=True, blank=True)
     closed_subscriber_code = models.CharField(max_length=100, null=True, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         indexes = [
-            models.Index(fields=['email']),
             models.Index(fields=['document']),
             models.Index(fields=['trial_used']),
             models.Index(fields=['account_closed_at']),
+            # subscriber_catalog.py/password_reset.py/subscriber_auth.py/
+            # subscriber_trial.py/social_login_provisioning.py resuelven
+            # esta tabla por email__iexact en casi cada request autenticado
+            # -- UPPER(email) = UPPER(...) no puede usar el índice único
+            # plano de 'email'. Mismo patrón que ListOfSubscriber.emails.
+            models.Index(Upper('email'), name='wind_email_reg_upper'),
         ]
-    
+
     def __str__(self):
         return f"{self.email} -> {self.subscriber_code or 'N/A'}"
 
@@ -385,28 +411,31 @@ class SubscriberDocumentRegistry(models.Model):
     """
     Control de documentos de identidad registrados.
     """
-    document = models.CharField(max_length=50, unique=True, db_index=True)
+    # Mismo bug de índices duplicados que SubscriberEmailRegistry (ver
+    # comentario ahí): unique=True + db_index=True + Meta.Index para el
+    # mismo campo triplicaba el índice de 'document'; db_index=True +
+    # Meta.Index para trial_used/account_closed_at lo duplicaba.
+    document = models.CharField(max_length=50, unique=True)
     subscriber_code = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)
-    trial_used = models.BooleanField(default=False, db_index=True)
+    trial_used = models.BooleanField(default=False)
     trial_granted_at = models.DateTimeField(null=True, blank=True)
     trial_expires_at = models.DateTimeField(null=True, blank=True)
     eligible_for_trial = models.BooleanField(default=True)
-    account_closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    account_closed_at = models.DateTimeField(null=True, blank=True)
     closed_subscriber_code = models.CharField(max_length=100, null=True, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         indexes = [
-            models.Index(fields=['document']),
             models.Index(fields=['trial_used']),
             models.Index(fields=['account_closed_at']),
         ]
-    
+
     def __str__(self):
         return f"{self.document} -> {self.subscriber_code or 'N/A'}"
 
