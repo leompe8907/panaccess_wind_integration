@@ -115,14 +115,18 @@ class JWTUserDetailsSerializer(serializers.ModelSerializer):
         read_only_fields = ['pk', 'email', 'first_name', 'last_name', 'subscriber_code']
 
     def get_subscriber_code(self, obj):
-        if not obj or not getattr(obj, 'email', None):
+        # Antes solo miraba SubscriberEmailRegistry -- distinto (y más angosto)
+        # que el resolver que ya usan el resto de los endpoints autenticados
+        # (perfil, dispositivos vinculados, etc.), que además revisa
+        # SubscriberLoginInfo por username numérico y ListOfSubscriber.emails
+        # como respaldo. Un suscriptor real cuyo código solo resolviera por
+        # esas otras vías recibía "subscriber_code": null en el login pese a
+        # tener cuenta -- ahora usa el mismo resolver en todos lados.
+        from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
+
+        if not obj:
             return None
-        try:
-            return SubscriberEmailRegistry.objects.get(
-                email__iexact=obj.email,
-            ).subscriber_code
-        except SubscriberEmailRegistry.DoesNotExist:
-            return None
+        return resolve_subscriber_code_for_user(obj)
 
 
 class ContactSerializer(serializers.Serializer):

@@ -195,6 +195,17 @@ REST_AUTH = {
     'USE_JWT': True,
     'USER_DETAILS_SERIALIZER': 'wind.serializers.JWTUserDetailsSerializer',
     'LOGIN_SERIALIZER': 'wind.auth_serializers.PanAccessLoginSerializer',
+    # dj-rest-auth por defecto asume JWT_AUTH_HTTPONLY=True -- vacía "refresh"
+    # en el body de /api/auth/login/ dando por hecho que el refresh token
+    # viaja en una cookie httponly en su lugar. Como JWT_USE_COOKIES es False
+    # por defecto en este despliegue (ver appConfig.JwtConfig), esa cookie
+    # nunca se llega a configurar -- el refresh token no llegaba NI por body
+    # NI por cookie, dejando a cualquier cliente sin forma de refrescar la
+    # sesión (confirmado en producción: /api/auth/login/ devolvía
+    # "refresh": ""). Con esto, el refresh siempre viaja en el body; si más
+    # adelante se activa JWT_USE_COOKIES, además se seguirá poniendo la
+    # cookie (ver bloque de abajo) -- las dos vías no son excluyentes.
+    'JWT_AUTH_HTTPONLY': False,
 }
 
 if JwtConfig.USE_COOKIES:
