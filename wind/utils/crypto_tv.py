@@ -34,12 +34,35 @@ def generate_rsa_key_pair(key_size=2048):
     return private_pem, public_pem
 
 
-def _hybrid_encrypt_with_public_key(plaintext: str, public_key_pem: str, *, app_type: str | None = None) -> dict:
+def _hybrid_encrypt_with_public_key(
+    plaintext: str, public_key_pem: str, *, app_type: str | None = None, use_aead: bool = False
+) -> dict:
     """
-    Núcleo común de cifrado híbrido (AES-256-CBC + RSA-OAEP) para una llave
-    pública ya resuelta -- usado tanto por el esquema histórico de llave
-    estática por `app_type` (`hybrid_encrypt_for_app`) como por el nuevo
-    esquema de llave efímera por pareo (`hybrid_encrypt_for_device_public_key`).
+    Núcleo común de cifrado híbrido para una llave pública ya resuelta --
+    usado tanto por el esquema histórico de llave estática por `app_type`
+    (`hybrid_encrypt_for_app`) como por el esquema de llave efímera por
+    pareo (`hybrid_encrypt_for_device_public_key`).
+
+    `use_aead` decide el modo de AES:
+
+    - `False` (default) -- AES-256-CBC sin autenticación, el comportamiento
+      histórico intacto. Es el que sigue usando `hybrid_encrypt_for_app`
+      a propósito: ese esquema de llave estática por `app_type` tiene HOY
+      un cliente real en producción (cableatlantico, un proyecto
+      completamente distinto de Wind) desencriptando ese formato exacto en
+      TVs ya desplegadas -- cambiarle el algoritmo o el formato del
+      payload sin coordinar con ese equipo sería un incidente de
+      producción para un cliente que no tiene nada que ver con este
+      cambio (revisión adversarial).
+    - `True` -- AES-256-GCM, modo autenticado: antes CBC daba
+      confidencialidad pero nada garantizaba que el ciphertext no fue
+      alterado en tránsito (vulnerable a bit-flipping/padding oracle, sin
+      HMAC). GCM agrega un tag de integridad en la misma operación de
+      cifrado, sin padding manual (es un modo de flujo, no de bloque).
+      Reservado para `hybrid_encrypt_for_device_public_key` (esquema
+      nuevo de llave efímera por pareo), que todavía no tiene ningún
+      cliente integrado en producción -- es seguro adoptar el formato
+      nuevo ahí sin romper a nadie.
     """
     public_key = serialization.load_pem_public_key(
         public_key_pem.encode(),
@@ -47,16 +70,29 @@ def _hybrid_encrypt_with_public_key(plaintext: str, public_key_pem: str, *, app_
     )
 
     aes_key = os.urandom(32)
-    iv = os.urandom(16)
+    extra_fields = {}
 
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
+    if use_aead:
+        iv = os.urandom(12)  # 96 bits -- tamaño de nonce recomendado para GCM
+        cipher = Cipher(algorithms.AES(aes_key), modes.GCM(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        aes_encrypted_data = encryptor.update(plaintext.encode('utf-8')) + encryptor.finalize()
+        # El tag de autenticación (16 bytes) no es secreto, viaja junto al
+        # resto -- es lo que permite al que desencripta detectar
+        # alteraciones del ciphertext antes de confiar en el resultado.
+        extra_fields["tag"] = base64.b64encode(encryptor.tag).decode('utf-8')
+        algorithm_label = "AES-256-GCM + RSA-OAEP"
+    else:
+        iv = os.urandom(16)
+        cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
 
-    plaintext_bytes = plaintext.encode('utf-8')
-    padding_length = 16 - (len(plaintext_bytes) % 16)
-    padded_plaintext = plaintext_bytes + bytes([padding_length] * padding_length)
+        plaintext_bytes = plaintext.encode('utf-8')
+        padding_length = 16 - (len(plaintext_bytes) % 16)
+        padded_plaintext = plaintext_bytes + bytes([padding_length] * padding_length)
 
-    aes_encrypted_data = encryptor.update(padded_plaintext) + encryptor.finalize()
+        aes_encrypted_data = encryptor.update(padded_plaintext) + encryptor.finalize()
+        algorithm_label = "AES-256-CBC + RSA-OAEP"
 
     rsa_encrypted_aes_key = public_key.encrypt(
         aes_key,
@@ -71,7 +107,8 @@ def _hybrid_encrypt_with_public_key(plaintext: str, public_key_pem: str, *, app_
         "encrypted_data": base64.b64encode(aes_encrypted_data).decode('utf-8'),
         "encrypted_key": base64.b64encode(rsa_encrypted_aes_key).decode('utf-8'),
         "iv": base64.b64encode(iv).decode('utf-8'),
-        "algorithm": "AES-256-CBC + RSA-OAEP",
+        "algorithm": algorithm_label,
+        **extra_fields,
     }
     if app_type is not None:
         result["app_type"] = app_type
@@ -126,7 +163,7 @@ def hybrid_encrypt_for_device_public_key(plaintext: str, device_public_key_pem: 
     if not device_public_key_pem:
         raise Exception("El pareo no tiene una llave pública de dispositivo registrada.")
     try:
-        return _hybrid_encrypt_with_public_key(plaintext, device_public_key_pem)
+        return _hybrid_encrypt_with_public_key(plaintext, device_public_key_pem, use_aead=True)
     except Exception as e:
         raise Exception(f"Error de encriptación híbrida (llave efímera): {str(e)}")
 

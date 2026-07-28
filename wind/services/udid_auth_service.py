@@ -15,7 +15,7 @@ from wind.models import (
 )
 from wind.utils.crypto_tv import hybrid_encrypt_for_app, hybrid_encrypt_for_device_public_key
 from wind.utils.log_buffer import log_audit_async
-from wind.utils.websocket_utils import check_udid_rate_limit, increment_rate_limit_counter
+from wind.utils.websocket_utils import check_udid_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -424,7 +424,9 @@ def associate_udid_after_social_login(
 
             transaction.on_commit(lambda: _notify_udid_validated(udid))
 
-        increment_rate_limit_counter("udid", udid)
+        # El cupo de este udid ya quedó reservado en el propio chequeo
+        # (`check_udid_rate_limit`, ver revisión adversarial en
+        # websocket_utils.py) -- ya no hace falta incrementarlo acá.
         return {"ok": True, "udid": udid, "subscriber_code": subscriber_code}
 
     except Exception as e:

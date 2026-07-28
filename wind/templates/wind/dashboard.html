@@ -47,6 +47,18 @@
           >
             Productos
           </button>
+          <button
+            type="button"
+            class="dash-tab"
+            role="tab"
+            id="tab-btn-devices"
+            aria-selected="false"
+            aria-controls="tab-panel-devices"
+            data-tab="devices"
+            hidden
+          >
+            Dispositivos
+          </button>
         </nav>
         <div class="dash-sidebar-spacer"></div>
         <button
@@ -161,6 +173,25 @@
 
           <div
             role="tabpanel"
+            id="tab-panel-devices"
+            class="dash-tabpanel"
+            aria-labelledby="tab-btn-devices"
+            hidden
+          >
+            <section class="dash-module module-card" id="devices-module">
+              <div class="dash-module-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="dash-section-title" style="margin: 0;">Dispositivos vinculados</h2>
+                <button type="button" class="app-btn ghost" id="btn-devices-refresh" style="padding: 6px 12px; font-size: 14px;">Actualizar</button>
+              </div>
+              <p id="devices-status" class="app-alert" role="status"></p>
+              <div id="devices-list" class="devices-list">
+                <p class="devices-placeholder">Cargando dispositivos…</p>
+              </div>
+            </section>
+          </div>
+
+          <div
+            role="tabpanel"
             id="tab-panel-close-account"
             class="dash-tabpanel"
             aria-labelledby="tab-btn-close-account"
@@ -230,6 +261,20 @@
       </div>
     </div>
 
+    <div id="device-revoke-modal" class="dash-modal" hidden aria-hidden="true">
+      <div class="dash-modal-backdrop" data-device-modal-close></div>
+      <div class="dash-modal-card" role="dialog" aria-labelledby="device-modal-title" aria-modal="true">
+        <h3 id="device-modal-title" class="account-section-title">¿Desvincular dispositivo?</h3>
+        <p class="dash-modal-text">
+          Este dispositivo perderá el acceso a tu cuenta inmediatamente. ¿Deseas continuar?
+        </p>
+        <div class="dash-modal-actions">
+          <button type="button" class="app-btn ghost" id="device-modal-cancel">Cancelar</button>
+          <button type="button" class="app-btn danger" id="device-modal-confirm">Desvincular</button>
+        </div>
+      </div>
+    </div>
+
     <script src="{% static 'wind/js/auth-store.js' %}"></script>
     <script>
       (function () {
@@ -259,10 +304,22 @@
         var tabPanels = document.querySelectorAll(".dash-tabpanel");
         var tabBtnPassword = document.getElementById("tab-btn-password");
         var tabBtnProducts = document.getElementById("tab-btn-products");
+        var tabBtnDevices = document.getElementById("tab-btn-devices");
         var tabBtnCloseAccount = document.getElementById("tab-btn-close-account");
         var pageTitleEl = document.getElementById("dash-page-title");
         var activeTab = "account";
         var productsLoaded = false;
+        var devicesLoaded = false;
+        var devicesList = document.getElementById("devices-list");
+        var devicesStatus = document.getElementById("devices-status");
+        var devicesRefreshBtn = document.getElementById("btn-devices-refresh");
+        var deviceModal = document.getElementById("device-revoke-modal");
+        var deviceModalConfirm = document.getElementById("device-modal-confirm");
+        var deviceModalCancel = document.getElementById("device-modal-cancel");
+        var pendingRevokeDeviceId = null;
+        var DEVICE_TOKEN_STORAGE_KEY = "wind_dashboard_device_token";
+        var selfDeviceId = null;
+        var deviceSessionRegisterStarted = false;
         var closeConfirmInput = document.getElementById("close-confirm-code");
         var closeReasonInput = document.getElementById("close-reason");
         var closeDryRunInput = document.getElementById("close-dry-run");
@@ -277,6 +334,7 @@
           account: "Mi cuenta",
           password: "Contraseña",
           products: "Productos",
+          devices: "Dispositivos vinculados",
           "close-account": "Eliminar cuenta",
         };
 
@@ -342,6 +400,9 @@
           if (name === "products" && subscriberCode && !productsLoaded) {
             loadProducts();
           }
+          if (name === "devices" && subscriberCode && !devicesLoaded) {
+            loadDevices();
+          }
         }
 
         function updateSubscriberTabs(hasSubscriber) {
@@ -349,6 +410,7 @@
 
           if (tabBtnPassword) tabBtnPassword.hidden = !hasSubscriber;
           if (tabBtnProducts) tabBtnProducts.hidden = !hasSubscriber;
+          if (tabBtnDevices) tabBtnDevices.hidden = !hasSubscriber;
           if (tabBtnCloseAccount) tabBtnCloseAccount.hidden = !hasSubscriber;
           if (tablist) tablist.hidden = !hasSubscriber;
 
@@ -393,6 +455,10 @@
           if (avatarEl) avatarEl.textContent = initials(name, sub.code);
 
           updateSubscriberTabs(!!subscriberCode);
+
+          if (subscriberCode) {
+            registerThisDeviceSession();
+          }
         }
 
         function showProductsMsg(text, type) {
@@ -483,6 +549,261 @@
             .catch(function (err) {
               productsList.innerHTML = "";
               showProductsMsg(err.message || "Error al cargar productos", "error");
+            });
+        }
+
+        function showDevicesMsg(text, type) {
+          if (!devicesStatus) return;
+          devicesStatus.textContent = text;
+          devicesStatus.className = "app-alert show " + (type || "error");
+        }
+
+        function clearDevicesMsg() {
+          if (!devicesStatus) return;
+          devicesStatus.textContent = "";
+          devicesStatus.className = "app-alert";
+        }
+
+        var DEVICE_TYPE_LABELS = {
+          web: "PC / Web",
+          lg: "LG webOS TV",
+          samsung: "Samsung Tizen TV",
+          android: "Android móvil",
+          androidtv: "Android TV",
+          amazon: "Amazon Fire TV",
+          iOS: "iPhone / iPad",
+          iOStv: "Apple TV"
+        };
+
+        function formatDate(iso) {
+          if (!iso) return "—";
+          try {
+            return new Date(iso).toLocaleString("es-ES");
+          } catch (e) {
+            return String(iso);
+          }
+        }
+
+        function renderDevices(list) {
+          if (!devicesList) return;
+          clearDevicesMsg();
+
+          if (!list || !list.length) {
+            devicesList.innerHTML = '<p class="devices-placeholder">No tienes otros dispositivos vinculados.</p>';
+            return;
+          }
+
+          var html = "";
+          var i;
+          for (i = 0; i < list.length; i++) {
+            var dev = list[i];
+            var typeLabel = DEVICE_TYPE_LABELS[dev.device_type] || dev.device_type || "Dispositivo";
+            var modelLabel = dev.device_model || "";
+            var isSelf = selfDeviceId != null && String(dev.id) === selfDeviceId;
+
+            html += '<article class="smartcard-card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:15px;">';
+            html += '<div>';
+            html += '<h4 style="margin:0 0 5px 0; font-size:16px;">' + escapeHtml(typeLabel);
+            if (isSelf) {
+              html += ' <span style="font-size:11px; font-weight:normal; color:#7fd17f; border:1px solid #7fd17f; border-radius:10px; padding:1px 8px; margin-left:6px;">Este dispositivo</span>';
+            }
+            html += '</h4>';
+            if (modelLabel) {
+              html += '<p class="smartcard-meta" style="margin:0 0 5px 0; font-size:13px; color:#aaa;">' + escapeHtml(modelLabel) + '</p>';
+            }
+            html += '<p style="margin:0; font-size:12px; color:#888;">Última conexión: ' + escapeHtml(formatDate(dev.last_seen_at)) + ' · IP: ' + escapeHtml(dev.client_ip) + '</p>';
+            html += '</div>';
+            html += '<button type="button" class="app-btn danger" style="padding:6px 12px; font-size:13px;" data-revoke-id="' + dev.id + '">' +
+              (isSelf ? 'Cerrar sesión aquí' : 'Desvincular') + '</button>';
+            html += '</article>';
+          }
+
+          devicesList.innerHTML = html;
+
+          devicesList.querySelectorAll("[data-revoke-id]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+              pendingRevokeDeviceId = btn.dataset.revokeId;
+              openDeviceModal();
+            });
+          });
+        }
+
+        /**
+         * Registra esta propia pestaña/navegador como "dispositivo vinculado"
+         * (mismo protocolo `ws/device/` que ya usa appVideo, ver
+         * `deviceSessionService.js` en ese repo) -- sin esto, la lista de
+         * "Dispositivos vinculados" de este portal siempre aparecía vacía:
+         * `GET /wind/devices/` solo lista filas de `DeviceSession`, y la
+         * única forma de crear una es que algún cliente se conecte a
+         * `ws/device/` y mande `register_device` -- este portal nunca lo
+         * hacía. Se conecta, registra, guarda el `device_token` devuelto
+         * (localStorage, para refrescar el mismo registro en la próxima
+         * visita en vez de crear uno nuevo) y cierra -- a diferencia de
+         * appVideo, esta página no queda abierta como una app de uso
+         * continuo, así que no vale la pena mantener el socket vivo en
+         * segundo plano solo para recibir `device_revoked` en vivo.
+         */
+        function registerThisDeviceSession() {
+          if (deviceSessionRegisterStarted) return;
+          deviceSessionRegisterStarted = true;
+
+          var token = window.WindAuth && WindAuth.getAccessToken();
+          if (!token) return;
+
+          var wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          var wsUrl = wsProtocol + "//" + window.location.host + "/ws/device/?token=" + encodeURIComponent(token);
+
+          var ws;
+          try {
+            ws = new WebSocket(wsUrl);
+          } catch (e) {
+            return;
+          }
+
+          ws.onopen = function () {
+            try {
+              var existingToken = localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY) || "";
+              var payload = {
+                type: "register_device",
+                device_type: "web",
+                device_model: String(navigator.userAgent || "").slice(0, 200),
+              };
+              if (existingToken) payload.device_token = existingToken;
+              ws.send(JSON.stringify(payload));
+            } catch (e) {
+              try { ws.close(); } catch (e2) { /* noop */ }
+            }
+          };
+
+          ws.onmessage = function (event) {
+            var message = null;
+            try {
+              message = JSON.parse(event.data);
+            } catch (e) {
+              return;
+            }
+
+            if (message.type === "ping") {
+              try { ws.send(JSON.stringify({ type: "pong" })); } catch (e) { /* noop */ }
+              return;
+            }
+
+            if (message.type === "device_registered") {
+              try {
+                localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, message.device_token || "");
+              } catch (e) { /* noop */ }
+              selfDeviceId = message.id != null ? String(message.id) : null;
+              // Ya quedó registrado -- no hace falta mantener la conexión
+              // abierta (ver nota de la función).
+              try { ws.close(); } catch (e) { /* noop */ }
+              if (devicesLoaded) {
+                // Si la pestaña de dispositivos ya se había cargado antes de
+                // que terminara este registro, se refresca para que "este
+                // dispositivo" quede marcado y visible sin tener que
+                // apretar "Actualizar" a mano.
+                loadDevices();
+              }
+              return;
+            }
+
+            if (message.type === "error" && message.code === "device_token_invalid") {
+              // El device_token guardado ya no sirve (revocado, o de otra
+              // cuenta) -- se limpia para que el próximo intento registre
+              // uno nuevo en vez de reintentar en loop con el mismo.
+              try { localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY); } catch (e) { /* noop */ }
+            }
+          };
+
+          ws.onerror = function () {
+            // Silencioso a propósito -- este registro es "best effort" y
+            // nunca debe interrumpir el resto del dashboard si falla.
+          };
+        }
+
+        function loadDevices() {
+          if (!subscriberCode || !devicesList) return;
+          devicesList.innerHTML = '<p class="devices-placeholder">Cargando dispositivos…</p>';
+          clearDevicesMsg();
+
+          WindAuth.fetchApi("/wind/devices/", { method: "GET" })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok) {
+                throw new Error(out.data.error || "No se pudieron cargar los dispositivos");
+              }
+              devicesLoaded = true;
+              renderDevices(out.data.devices);
+            })
+            .catch(function (err) {
+              devicesList.innerHTML = "";
+              showDevicesMsg(err.message || "Error al cargar los dispositivos", "error");
+            });
+        }
+
+        function openDeviceModal() {
+          if (!deviceModal) return;
+          deviceModal.hidden = false;
+          deviceModal.setAttribute("aria-hidden", "false");
+        }
+
+        function closeDeviceModal() {
+          if (!deviceModal) return;
+          deviceModal.hidden = true;
+          deviceModal.setAttribute("aria-hidden", "true");
+          pendingRevokeDeviceId = null;
+        }
+
+        function submitDeviceRevocation() {
+          if (!pendingRevokeDeviceId) return;
+          // Se guarda acá, antes de que `closeDeviceModal()` lo borre --
+          // revocar el propio dispositivo del dashboard no invalida el JWT
+          // por sí solo (son dos cosas independientes: el JWT sigue
+          // siendo válido hasta que expire o se cierre sesión de verdad),
+          // así que si el usuario se está desvinculando a SÍ MISMO, hay
+          // que forzar el logout de esta pestaña -- si no, "Cerrar sesión
+          // aquí" desvincularía el registro pero la persona seguiría
+          // viendo el dashboard como si nada.
+          var isSelfRevocation = selfDeviceId != null && pendingRevokeDeviceId === selfDeviceId;
+          clearDevicesMsg();
+          if (deviceModalConfirm) deviceModalConfirm.disabled = true;
+
+          WindAuth.fetchApi("/wind/devices/" + pendingRevokeDeviceId + "/revoke/", {
+            method: "POST"
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok || !out.data.ok) {
+                throw new Error(out.data.error || "No se pudo desvincular el dispositivo");
+              }
+              closeDeviceModal();
+
+              if (isSelfRevocation) {
+                try { localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY); } catch (e) { /* noop */ }
+                showDevicesMsg("Sesión cerrada en este dispositivo. Redirigiendo…", "success");
+                WindAuth.logout();
+                window.setTimeout(function () {
+                  window.location.href = "/wind/login/";
+                }, 1500);
+                return;
+              }
+
+              showDevicesMsg("Dispositivo desvinculado correctamente.", "success");
+              loadDevices();
+            })
+            .catch(function (err) {
+              closeDeviceModal();
+              showDevicesMsg(err.message || "Error al desvincular el dispositivo", "error");
+            })
+            .finally(function () {
+              if (deviceModalConfirm) deviceModalConfirm.disabled = false;
             });
         }
 
@@ -659,6 +980,9 @@
           if (e.key === "Escape" && closeAccountModal && !closeAccountModal.hidden) {
             closeCloseAccountModal();
           }
+          if (e.key === "Escape" && deviceModal && !deviceModal.hidden) {
+            closeDeviceModal();
+          }
         });
 
         function showCloseAccountMsg(text, type) {
@@ -813,6 +1137,24 @@
         if (closeAccountModal) {
           closeAccountModal.querySelectorAll("[data-close-modal-close]").forEach(function (el) {
             el.addEventListener("click", closeCloseAccountModal);
+          });
+        }
+
+        if (devicesRefreshBtn) {
+          devicesRefreshBtn.addEventListener("click", loadDevices);
+        }
+
+        if (deviceModalConfirm) {
+          deviceModalConfirm.addEventListener("click", submitDeviceRevocation);
+        }
+
+        if (deviceModalCancel) {
+          deviceModalCancel.addEventListener("click", closeDeviceModal);
+        }
+
+        if (deviceModal) {
+          deviceModal.querySelectorAll("[data-device-modal-close]").forEach(function (el) {
+            el.addEventListener("click", closeDeviceModal);
           });
         }
 

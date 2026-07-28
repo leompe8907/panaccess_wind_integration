@@ -31,7 +31,6 @@ from wind.utils.websocket_utils import (
     get_client_ip,
     generate_device_fingerprint,
     check_device_fingerprint_rate_limit,
-    increment_rate_limit_counter,
     get_client_token,
     check_token_bucket_lua,
     check_udid_rate_limit,
@@ -120,7 +119,11 @@ class RequestUDIDManualView(APIView):
             )
 
             auth_request.refresh_from_db()
-            increment_rate_limit_counter('device_fp', device_fingerprint)
+            # El cupo de este device_fingerprint ya quedó reservado en el
+            # propio chequeo (`check_device_fingerprint_rate_limit`, ver
+            # revisión adversarial en websocket_utils.py) -- llamar acá a
+            # `increment_rate_limit_counter` de nuevo lo contaría dos
+            # veces por request.
 
             log_audit_async(
                 action_type='udid_generated',
@@ -132,7 +135,11 @@ class RequestUDIDManualView(APIView):
                     'device_fingerprint': device_fingerprint,
                     'device_fingerprint_stored': auth_request.device_fingerprint,
                     'has_device_public_key': bool(device_public_key),
-                    'rate_limit_remaining': remaining - 1
+                    # `remaining` ya refleja el estado posterior a la
+                    # reserva atómica del cupo (ver check_device_fingerprint_rate_limit) --
+                    # antes había que restar 1 a mano porque el incremento
+                    # real todavía no había pasado en este punto.
+                    'rate_limit_remaining': remaining
                 }
             )
 
@@ -151,9 +158,9 @@ class RequestUDIDManualView(APIView):
                 "status": auth_request.status,
                 "expires_in_minutes": 5,
                 "device_fingerprint": auth_request.device_fingerprint,
-                "remaining_requests": remaining - 1,
+                "remaining_requests": remaining,
                 "rate_limit": {
-                    "remaining": remaining - 1,
+                    "remaining": remaining,
                     "reset_in_seconds": 5 * 60
                 }
             }, status=status.HTTP_201_CREATED)
@@ -270,8 +277,9 @@ class ValidateAndAssociateUDIDView(APIView):
             f"ValidateAndAssociateUDIDView: Asociación exitosa - udid={udid_request.udid}, subscriber_code={subscriber.subscriber_code}, sn={sn}, ip={client_ip}"
         )
         
-        if udid:
-            increment_rate_limit_counter('udid', udid)
+        # El cupo de este udid ya quedó reservado en el propio chequeo
+        # (`check_udid_rate_limit`, ver revisión adversarial en
+        # websocket_utils.py) -- ya no hace falta incrementarlo acá.
 
         response_data = {
             "message": "UDID validated and associated successfully",
@@ -285,9 +293,12 @@ class ValidateAndAssociateUDIDView(APIView):
         }
         
         if udid and remaining is not None:
-            response_data["remaining_requests"] = remaining - 1
+            # `remaining` ya refleja el estado posterior a la reserva
+            # atómica del cupo (ver check_udid_rate_limit) -- ya no hay que
+            # restar 1 a mano.
+            response_data["remaining_requests"] = remaining
             response_data["rate_limit"] = {
-                "remaining": remaining - 1,
+                "remaining": remaining,
                 "reset_in_seconds": 60
             }
 
@@ -463,7 +474,9 @@ class AuthenticateWithUDIDView(APIView):
                     status=http_status,
                 )
 
-            increment_rate_limit_counter('udid', udid)
+            # El cupo de este udid ya quedó reservado en el propio chequeo
+            # (`check_udid_rate_limit`, ver revisión adversarial en
+            # websocket_utils.py) -- ya no hace falta incrementarlo acá.
             if is_reconnection:
                 reset_retry_info(udid, 'reconnection')
 
@@ -471,9 +484,11 @@ class AuthenticateWithUDIDView(APIView):
                 "encrypted_credentials": result["encrypted_credentials"],
                 "security_info": result["security_info"],
                 "expires_at": result.get("expires_at"),
-                "remaining_requests": remaining - 1,
+                # `remaining` ya refleja el estado posterior a la reserva
+                # atómica del cupo (ver check_udid_rate_limit).
+                "remaining_requests": remaining,
                 "rate_limit": {
-                    "remaining": remaining - 1,
+                    "remaining": remaining,
                     "reset_in_seconds": 5 * 60
                 }
             }, status=status.HTTP_200_OK)
@@ -630,9 +645,10 @@ class ValidateStatusUDIDView(APIView):
             }
         )
 
-        if req.status == 'pending':
-            req.attempts_count += 1
-            req.save()
+        # `attempts_count` ya no se incrementa acá -- esto es una consulta
+        # de estado (polling), no un intento real de asociación; el
+        # incremento vive en `UDIDAssociationSerializer.validate()` (ver
+        # revisión adversarial en ese archivo).
 
         return Response(response_data, status=status.HTTP_200_OK)
 

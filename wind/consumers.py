@@ -15,6 +15,7 @@ from wind.utils.websocket_utils import (
     generate_device_fingerprint,
     check_websocket_limits,
     decrement_websocket_limits,
+    get_client_ip_from_scope,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                 )
                 return
 
-        client_ip = (self.scope.get("client") or [""])[0] or ""
+        client_ip = get_client_ip_from_scope(self.scope)
         user_agent = _get_header(self.scope, "user-agent")
 
         res = await sync_to_async(authenticate_with_udid_service)(
@@ -194,7 +195,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
         if self.done or not self.udid or event.get("udid") != self.udid:
             return
 
-        client_ip = (self.scope.get("client") or [""])[0] or ""
+        client_ip = get_client_ip_from_scope(self.scope)
         user_agent = _get_header(self.scope, "user-agent")
 
         res = await sync_to_async(authenticate_with_udid_service)(
@@ -256,7 +257,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
             while not self.done:
                 await asyncio.sleep(seconds)
 
-                client_ip = (self.scope.get("client") or [""])[0] or ""
+                client_ip = get_client_ip_from_scope(self.scope)
                 user_agent = _get_header(self.scope, "user-agent")
 
                 res = await sync_to_async(authenticate_with_udid_service)(

@@ -1,3 +1,5 @@
+> ⚠️ **Documento superado.** Ver `docs/GUIA_INTEGRACION_UNIFICADA.md` (2026-07-28) -- consolida este documento y `GUIA_INTEGRACION_APPS.md` en una sola fuente, organizada por plataforma. Se conserva este archivo solo como referencia histórica.
+
 # Integración móvil (iOS/Android): pareo de TV, dispositivos vinculados y gestión de cuenta
 
 Fecha: 2026-07-27

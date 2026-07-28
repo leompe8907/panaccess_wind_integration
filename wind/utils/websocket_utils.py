@@ -100,58 +100,78 @@ def generate_device_fingerprint(request_or_scope):
     return hashlib.sha256(fingerprint_string.encode()).hexdigest()[:32]
 
 
+def _reserve_atomic_slot(cache_key, max_requests, window_seconds):
+    """
+    Verifica y reserva 1 unidad de cupo en una sola operación atómica de
+    caché (`cache.add` para el primer hit de la ventana, `cache.incr` en
+    caso contrario, ambos atómicos en el backend de caché).
+
+    Antes, el chequeo (leer el contador con `cache.get`) y la reserva real
+    (incrementarlo, en otro punto del código -- `increment_rate_limit_counter`,
+    llamado solo después de que la operación de negocio tuviera éxito) eran
+    dos pasos separados por I/O de red intermedio: dos requests concurrentes
+    podían leer el mismo valor por debajo del límite antes de que cualquiera
+    incrementara, dejando pasar más tráfico del configurado (revisión
+    adversarial). Cambio de comportamiento aceptado a propósito: ahora el
+    cupo se reserva en el momento del chequeo, así que un intento que
+    después falla por otra razón (validación, etc.) también cuenta contra
+    el límite -- más conservador que antes, nunca menos.
+    """
+    # Reintento acotado (no un loop sin límite): si la clave expira justo
+    # entre el `add` fallido y el `incr` de una misma vuelta, se reintenta
+    # desde el `cache.add` -- que es atómico -- en vez de usar `cache.set`
+    # a ciegas, que aceptaría a dos requests concurrentes como "la
+    # primera" en ese mismo instante y perdería un incremento justo en el
+    # borde de expiración de la ventana (revisión adversarial sobre el
+    # propio fix).
+    for _ in range(2):
+        added = cache.add(cache_key, 1, timeout=window_seconds)
+        if added:
+            return True, max(0, max_requests - 1), 0
+
+        try:
+            current = cache.incr(cache_key)
+        except ValueError:
+            continue
+
+        if current > max_requests:
+            # No se "devuelve" el incremento -- se resta de vuelta para
+            # que el contador no siga creciendo sin límite mientras dure
+            # la ventana (mismo criterio que ya usa check_websocket_limits
+            # al exceder su propio límite).
+            try:
+                cache.decr(cache_key)
+            except Exception:
+                pass
+            return False, 0, window_seconds
+
+        return True, max(0, max_requests - current), 0
+
+    # Ventana inusualmente inestable (la clave expiró en ambos intentos) --
+    # se concede el cupo en vez de bloquear indefinidamente.
+    cache.set(cache_key, 1, timeout=window_seconds)
+    return True, max(0, max_requests - 1), 0
+
+
 def check_device_fingerprint_rate_limit(device_fingerprint, max_requests=3, window_minutes=5):
     if not device_fingerprint:
         return False, 0, 0
-    
     cache_key = f"rate_limit:device_fp:{device_fingerprint}"
-    cached_count = cache.get(cache_key)
-    
-    if cached_count is not None:
-        remaining = max(0, max_requests - cached_count)
-        if cached_count >= max_requests:
-            retry_after = window_minutes * 60
-            return False, remaining, retry_after
-        return True, remaining, 0
-    
-    cache.set(cache_key, 1, timeout=window_minutes * 60)
-    return True, max_requests, 0
+    return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
 
 
 def check_udid_rate_limit(udid, max_requests=20, window_minutes=60):
     if not udid:
         return False, 0, 0
-    
     cache_key = f"rate_limit:udid:{udid}"
-    cached_count = cache.get(cache_key)
-    
-    if cached_count is not None:
-        remaining = max(0, max_requests - cached_count)
-        if cached_count >= max_requests:
-            retry_after = window_minutes * 60
-            return False, remaining, retry_after
-        return True, remaining, 0
-    
-    cache.set(cache_key, 1, timeout=window_minutes * 60)
-    return True, max_requests, 0
+    return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
 
 
 def check_temp_token_rate_limit(temp_token, max_requests=10, window_minutes=5):
     if not temp_token:
         return False, 0, 0
-    
     cache_key = f"rate_limit:temp_token:{temp_token}"
-    cached_count = cache.get(cache_key)
-    
-    if cached_count is not None:
-        remaining = max(0, max_requests - cached_count)
-        if cached_count >= max_requests:
-            retry_after = window_minutes * 60
-            return False, remaining, retry_after
-        return True, remaining, 0
-    
-    cache.set(cache_key, 1, timeout=window_minutes * 60)
-    return True, max_requests, 0
+    return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
 
 
 def check_websocket_rate_limit(udid, device_fingerprint, max_connections=5, window_minutes=5):
@@ -218,36 +238,71 @@ def decrement_websocket_connection(udid, device_fingerprint):
 
 
 def check_websocket_limits(udid, device_fingerprint, max_per_token=5, max_global=1000):
+    token_identifier = udid or device_fingerprint
+    if not token_identifier:
+        return True, None, 0
+
+    token_key = f"ws_connections:token:{token_identifier}"
+    global_key = "ws_connections:global"
+    redis_client = None
+    incremented_token = False
+    incremented_global = False
+
     try:
         redis_client = RedisConfig.get_client()
-        token_identifier = udid or device_fingerprint
-        if not token_identifier:
-            return True, None, 0
-        
-        token_key = f"ws_connections:token:{token_identifier}"
+
         token_count = redis_client.incr(token_key)
+        incremented_token = True
         if token_count == 1:
             redis_client.expire(token_key, 300)
-        
+
         if token_count > max_per_token:
             redis_client.decr(token_key)
             return False, "Too many connections for this token", 60
-        
-        global_key = "ws_connections:global"
+
         global_count = redis_client.incr(global_key)
+        incremented_global = True
         if global_count == 1:
             redis_client.expire(global_key, 300)
-        
+
         if global_count > max_global:
             redis_client.decr(global_key)
             redis_client.decr(token_key)
             return False, "Too many global WebSocket connections", 60
-        
+
         return True, None, 0
-        
+
     except Exception as e:
         logger.error(f"Error checking WebSocket limits: {e}", exc_info=True)
-        return True, None, 0
+        # Si algún incremento ya se aplicó en Redis antes de que otra
+        # operación de esta misma llamada fallara (p.ej. el `.expire()` o
+        # el segundo `.incr()`, por una desconexión intermitente), se
+        # revierte -- sin esto, la conexión rechazada nunca pasaría por
+        # `decrement_websocket_limits()` (no llega a aceptarse), y fallos
+        # transitorios repetidos de Redis podrían ir inflando el contador
+        # de forma artificial, rechazando conexiones legítimas incluso
+        # después de que Redis se recupere, hasta que la clave expire
+        # (revisión adversarial sobre el propio fix de fail-closed).
+        if redis_client is not None:
+            try:
+                if incremented_global:
+                    redis_client.decr(global_key)
+            except Exception:
+                pass
+            try:
+                if incremented_token:
+                    redis_client.decr(token_key)
+            except Exception:
+                pass
+        # Antes: fail-open (dejaba pasar la conexión sin límite si Redis no
+        # respondía) -- es una superficie de evasión real: quien logre
+        # saturar o tumbar Redis externamente se salta el límite por
+        # completo (revisión adversarial). Ahora falla cerrado: sin poder
+        # verificar el cupo, no se acepta la conexión nueva. Costo
+        # aceptado: si Redis cae, ningún WS nuevo de pareo/dispositivo se
+        # acepta hasta que Redis vuelva (las conexiones ya abiertas no se
+        # ven afectadas).
+        return False, "Servicio de límites temporalmente no disponible", 30
 
 
 def decrement_websocket_limits(udid, device_fingerprint):
@@ -277,22 +332,58 @@ def decrement_websocket_limits(udid, device_fingerprint):
 
 def check_token_bucket_lua(identifier, capacity=10, refill_rate=1, window_seconds=60, tokens_requested=1):
     """
-    Verificación de rate limit usando contador estándar en Cache
-    como alternativa portable y segura a scripts Lua.
+    Verificación + reserva de rate limit usando contador estándar en Cache
+    como alternativa portable a scripts Lua.
+
+    Antes: leía el contador (`cache.get`) y, si había cupo, lo reescribía
+    con `cache.set(current + tokens_requested)` -- dos operaciones
+    separadas por I/O de red, a pesar del nombre/comentario que sugería
+    una verificación atómica tipo Lua. Bajo concurrencia alta, dos
+    llamadas simultáneas podían leer el mismo `current` antes de que
+    cualquiera escribiera el nuevo valor, y ambas pasar aunque juntas
+    superen `capacity` (revisión adversarial) -- exactamente el caso que
+    usa `device_consumers.py` para el límite de 20 dispositivos nuevos por
+    hora, y el que usan varios endpoints de UDID en `views.py`. Ahora usa
+    `cache.add`/`cache.incr` (atómicos), igual que `_reserve_atomic_slot`.
     """
     cache_key = f"rate_limit:tb:{identifier}"
-    current = cache.get(cache_key)
-    if current is not None:
-        if current >= capacity:
+
+    # Mismo criterio de reintento acotado que `_reserve_atomic_slot`: si la
+    # clave expira justo entre el `add` fallido y el `incr`, se reintenta
+    # desde el `add` (atómico) en vez de `cache.set` a ciegas, que podría
+    # perder un incremento si dos requests caen ahí al mismo tiempo.
+    for _ in range(2):
+        added = cache.add(cache_key, tokens_requested, timeout=window_seconds)
+        if added:
+            return True, max(0, capacity - tokens_requested), 0
+
+        try:
+            current = cache.incr(cache_key, tokens_requested)
+        except ValueError:
+            continue
+
+        if current > capacity:
+            try:
+                cache.decr(cache_key, tokens_requested)
+            except Exception:
+                pass
             return False, 0, window_seconds
-        cache.set(cache_key, current + tokens_requested, timeout=window_seconds)
-        return True, capacity - (current + tokens_requested), 0
-    
+
+        return True, max(0, capacity - current), 0
+
     cache.set(cache_key, tokens_requested, timeout=window_seconds)
-    return True, capacity - tokens_requested, 0
+    return True, max(0, capacity - tokens_requested), 0
 
 
 def increment_rate_limit_counter(identifier_type, identifier):
+    """
+    @deprecated -- `check_device_fingerprint_rate_limit`/`check_udid_rate_limit`/
+    `check_temp_token_rate_limit` ya reservan el cupo de forma atómica en el
+    momento del chequeo (ver `_reserve_atomic_slot`); llamar a esta función
+    después, como se hacía antes, incrementaría el contador dos veces por
+    request. No queda ningún call-site en este repo -- se deja definida
+    solo por si algo externo todavía la importa.
+    """
     cache_key = f"rate_limit:{identifier_type}:{identifier}"
     try:
         cache.incr(cache_key)
@@ -456,3 +547,33 @@ def get_client_ip(request):
     if x_forwarded_for:
         return x_forwarded_for.split(',')[0].strip()
     return remote_addr
+
+
+def get_client_ip_from_scope(scope):
+    """
+    Mismo criterio que `get_client_ip()` (HTTP) pero para el scope ASGI de
+    un consumer de WebSocket -- antes, `consumers.py`/`device_consumers.py`
+    tomaban directo `scope["client"][0]` (el peer inmediato de la conexión
+    TCP) sin pasar por ningún filtro de proxy confiable. Si el despliegue
+    real corre detrás de un proxy/load balancer, eso guarda la IP del
+    proxy (a menudo `127.0.0.1` o la IP interna del LB), no la del
+    cliente real, en `UDIDAuthRequest`/`DeviceSession`/`AuthAuditLog`
+    (revisión adversarial -- mismo patrón de fondo que ya se corrigió para
+    HTTP). Solo se confía en `X-Forwarded-For` si la conexión llegó
+    realmente desde un proxy conocido (`TrustedProxyConfig.TRUSTED_PROXIES`);
+    si no, se usa el peer directo tal cual y el header se ignora por completo.
+    """
+    client = scope.get("client") or [None]
+    remote_addr = client[0] if client else None
+
+    if remote_addr not in TrustedProxyConfig.TRUSTED_PROXIES:
+        return remote_addr or ""
+
+    headers = dict(scope.get("headers", []))
+    xff = headers.get(b"x-forwarded-for")
+    if xff:
+        try:
+            return xff.decode(errors="ignore").split(",")[0].strip()
+        except Exception:
+            pass
+    return remote_addr or ""

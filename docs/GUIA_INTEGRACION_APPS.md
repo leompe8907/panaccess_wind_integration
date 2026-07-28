@@ -1,3 +1,5 @@
+> ⚠️ **Documento superado.** Ver `docs/GUIA_INTEGRACION_UNIFICADA.md` (2026-07-28) -- consolida este documento y `INTEGRACION_PAREO_TV_DISPOSITIVOS.md` en una sola fuente, organizada por plataforma, con el estado actualizado del prerrequisito de JWT (ya implementado en appVideo) y de los pendientes. Se conserva este archivo solo como referencia histórica.
+
 # Guía de integración backend ↔ apps (TV, mobile, web)
 
 Fecha: 2026-07-22

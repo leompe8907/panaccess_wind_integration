@@ -13,22 +13,25 @@ def generate_unique_subscriber_code(prefix='AUTO', max_attempts=10):
     """
     Genera un código único de suscriptor con formato AUTO + número secuencial.
     """
-    # Obtener el último número usado
-    last_code = ListOfSubscriber.objects.filter(
+    # Antes: `order_by('-code').first()` ordenaba los códigos como texto,
+    # no como número -- comparando texto, "AUTO9" queda "más grande" que
+    # "AUTO10" (compara carácter por carácter, y en la segunda posición
+    # "9" > "1"). Una vez que ya existen códigos de dos o más cifras, la
+    # siguiente generación podía volver a partir de un número más bajo del
+    # que realmente correspondía, desperdiciando intentos contra códigos
+    # ya usados (revisión adversarial). Ahora se calcula el máximo
+    # numérico real entre todos los códigos con este prefijo.
+    existing_suffixes = ListOfSubscriber.objects.filter(
         code__startswith=prefix
-    ).order_by('-code').first()
-    
-    if last_code:
-        # Extraer el número del último código
-        try:
-            last_number = int(last_code.code.replace(prefix, ''))
-            next_number = last_number + 1
-        except (ValueError, AttributeError):
-            # Si no se puede extraer el número, empezar desde 1
-            next_number = 1
-    else:
-        # Si no hay códigos previos, empezar desde 1
-        next_number = 1
+    ).values_list('code', flat=True)
+
+    last_number = 0
+    for code in existing_suffixes:
+        suffix = (code or '')[len(prefix):]
+        if suffix.isdigit():
+            last_number = max(last_number, int(suffix))
+
+    next_number = last_number + 1
     
     # Intentar generar un código único
     for attempt in range(max_attempts):

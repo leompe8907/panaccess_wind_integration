@@ -255,6 +255,18 @@ class UDIDAssociationSerializer(serializers.Serializer):
         except UDIDAuthRequest.DoesNotExist:
             raise serializers.ValidationError("UDID no encontrado")
 
+        # `attempts_count` cuenta acá -- el intento real de asociación --
+        # y ya no en la consulta de estado (`GET /wind/validate/`, ver
+        # `ValidateUDIDStatusView`). Antes se incrementaba en cada poll de
+        # estado, así que una TV/app haciendo polling normal cada pocos
+        # segundos podía agotar el cupo (`is_valid()`, `max_attempts=5`)
+        # sin que nadie intentara nada indebido -- ahora cuenta cada POST
+        # real a este endpoint (éxito o fallo, p.ej. `temp_token`
+        # incorrecto), que es lo que de verdad hay que limitar (revisión
+        # adversarial).
+        udid_request.attempts_count += 1
+        udid_request.save(update_fields=['attempts_count'])
+
         if not hmac.compare_digest(attrs['temp_token'] or "", udid_request.temp_token or ""):
             raise serializers.ValidationError("temp_token inválido para este UDID")
 

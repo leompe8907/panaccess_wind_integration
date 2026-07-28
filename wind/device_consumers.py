@@ -25,6 +25,7 @@ from wind.utils.websocket_utils import (
     check_websocket_limits,
     decrement_websocket_limits,
     check_token_bucket_lua,
+    get_client_ip_from_scope,
 )
 from wind.utils.ws_auth import resolve_user_from_jwt
 
@@ -189,7 +190,7 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         device_model = str(data.get("device_model") or "").strip()[:MAX_DEVICE_MODEL_LEN] or None
         existing_token = str(data.get("device_token") or "").strip()
 
-        client_ip = (self.scope.get("client") or [""])[0] or ""
+        client_ip = get_client_ip_from_scope(self.scope)
         user_agent = _get_header(self.scope, "user-agent")
 
         try:
@@ -227,6 +228,7 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
 
         await self._send_json({
             "type": "device_registered",
+            "id": session.pk,
             "device_token": self.device_token,
             "is_new": is_new,
         })
