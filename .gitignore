@@ -92,6 +92,14 @@ celerybeat.pid
 dump.rdb
 
 # =============================================================================
+# GeoIP (país/ciudad de "dispositivos vinculados", ver appConfig.GeoIPConfig)
+# =============================================================================
+# La base .mmdb (MaxMind GeoLite2 o DB-IP City Lite) es un binario de
+# ~100-130 MB que se reemplaza mensualmente -- nunca debe versionarse.
+wind/geoip/
+*.mmdb
+
+# =============================================================================
 # IDEs y editores
 # =============================================================================
 .idea/

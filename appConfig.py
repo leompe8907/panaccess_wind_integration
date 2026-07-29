@@ -1087,15 +1087,35 @@ class GeoIPConfig:
     informativo para que el usuario reconozca sus propios dispositivos en la
     lista, no se usa para ningún control de acceso ni decisión de seguridad.
 
-    Requiere una base local GeoLite2-City.mmdb (formato MaxMind DB) -- MaxMind
-    exige una cuenta gratuita + license key para descargarla, así que no se
-    puede empaquetar en este repo. Sin GEOIP_CITY_DB_PATH configurado, o si el
-    archivo no existe/no se puede leer, `wind/utils/geo_lookup.py` devuelve
-    país/ciudad vacíos sin romper ninguna respuesta -- la funcionalidad es
-    puramente opt-in.
+    Fuente primaria: base local .mmdb (GeoLite2-City de MaxMind, o DB-IP City
+    Lite -- mismo formato, mismo esquema de campos, ver
+    `wind/utils/geo_lookup.py`). Sin GEOIP_CITY_DB_PATH configurado, o si el
+    archivo no existe/no se puede leer, la resolución devuelve país/ciudad
+    vacíos sin romper ninguna respuesta -- la funcionalidad es puramente
+    opt-in.
+
+    Fuente de respaldo (opcional): ip-api.com Pro, solo se consulta cuando la
+    base local no encontró nada para esa IP (caso raro -- las bases
+    GeoLite2/DB-IP cubren casi todo el espacio de IPs anunciadas). Requiere
+    una key paga entregada por el cliente -- sin IP_API_KEY configurado, este
+    respaldo simplemente no se intenta.
     """
 
-    CITY_DB_PATH = _strip_env(os.getenv("GEOIP_CITY_DB_PATH"))
+    RAW_CITY_DB_PATH = _strip_env(os.getenv("GEOIP_CITY_DB_PATH"))
+    # Si se configuró como ruta relativa, se ancla a la raíz del proyecto
+    # (misma carpeta que este archivo) -- sin esto, el archivo solo se
+    # encuentra si el proceso arranca con el CWD exacto de la raíz del
+    # proyecto (cierto al correr `manage.py` a mano, no necesariamente cierto
+    # bajo systemd/un WSGI-ASGI server real, mismo motivo por el que
+    # `load_dotenv` de más arriba también se ancla explícitamente).
+    if RAW_CITY_DB_PATH and not os.path.isabs(RAW_CITY_DB_PATH):
+        CITY_DB_PATH = str(Path(__file__).resolve().parent / RAW_CITY_DB_PATH)
+    else:
+        CITY_DB_PATH = RAW_CITY_DB_PATH
+
+    IP_API_KEY = _strip_env(os.getenv("IP_API_KEY"))
+    IP_API_BASE_URL = _strip_env(os.getenv("IP_API_BASE_URL")) or "https://pro.ip-api.com/json"
+    IP_API_TIMEOUT_SECONDS = _env_float("GEOIP_IP_API_TIMEOUT_SECONDS", 2.5)
 
 
 class HealthCheckConfig:
