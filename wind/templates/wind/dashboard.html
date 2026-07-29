@@ -320,6 +320,14 @@
         var DEVICE_TOKEN_STORAGE_KEY = "wind_dashboard_device_token";
         var selfDeviceId = null;
         var deviceSessionRegisterStarted = false;
+        // Evita una doble reacción cuando el propio usuario se autorrevoca
+        // desde este mismo dashboard: la respuesta REST de
+        // submitDeviceRevocation() y el push `device_revoked` por el WS
+        // (que ahora queda abierto, ver registerThisDeviceSession()) pueden
+        // llegar casi al mismo tiempo para la misma acción -- ambos caminos
+        // hacen básicamente lo mismo (limpiar storage, logout, redirigir),
+        // pero solo uno debe ejecutarlo.
+        var sessionEndingInProgress = false;
         var closeConfirmInput = document.getElementById("close-confirm-code");
         var closeReasonInput = document.getElementById("close-reason");
         var closeDryRunInput = document.getElementById("close-dry-run");
@@ -611,7 +619,15 @@
             if (modelLabel) {
               html += '<p class="smartcard-meta" style="margin:0 0 5px 0; font-size:13px; color:#aaa;">' + escapeHtml(modelLabel) + '</p>';
             }
-            html += '<p style="margin:0; font-size:12px; color:#888;">Última conexión: ' + escapeHtml(formatDate(dev.last_seen_at)) + ' · IP: ' + escapeHtml(dev.client_ip) + '</p>';
+            // Ubicación aproximada por IP (MaxMind GeoLite2, ver
+            // wind/utils/geo_lookup.py) -- solo informativa, no siempre
+            // disponible (IP privada/VPN/base no configurada del lado del
+            // backend), por eso se arma condicionalmente en vez de asumir
+            // que ambos campos vienen siempre.
+            var locationParts = [dev.city, dev.country].filter(function (v) { return !!v; });
+            var locationLabel = locationParts.length ? locationParts.join(', ') : null;
+            html += '<p style="margin:0; font-size:12px; color:#888;">Última conexión: ' + escapeHtml(formatDate(dev.last_seen_at)) + ' · IP: ' + escapeHtml(dev.client_ip) +
+              (locationLabel ? ' · ' + escapeHtml(locationLabel) : '') + '</p>';
             html += '</div>';
             html += '<button type="button" class="app-btn danger" style="padding:6px 12px; font-size:13px;" data-revoke-id="' + dev.id + '">' +
               (isSelf ? 'Cerrar sesión aquí' : 'Desvincular') + '</button>';
@@ -638,10 +654,20 @@
          * `ws/device/` y mande `register_device` -- este portal nunca lo
          * hacía. Se conecta, registra, guarda el `device_token` devuelto
          * (localStorage, para refrescar el mismo registro en la próxima
-         * visita en vez de crear uno nuevo) y cierra -- a diferencia de
-         * appVideo, esta página no queda abierta como una app de uso
-         * continuo, así que no vale la pena mantener el socket vivo en
-         * segundo plano solo para recibir `device_revoked` en vivo.
+         * visita en vez de crear uno nuevo).
+         *
+         * A diferencia de una primera versión de esto, el socket YA NO se
+         * cierra después de registrarse: se detectó (probando en vivo) que
+         * si alguien revoca este mismo dispositivo desde otra pantalla
+         * (appVideo, u otra pestaña del propio dashboard), esta pestaña
+         * seguía mostrando la sesión como activa indefinidamente, porque
+         * ya no tenía ningún canal abierto para enterarse del
+         * `device_revoked` -- el mismo tipo de bug (push sin reacción real)
+         * que se corrigió en appVideo, ver `docs/GUIA_INTEGRACION_UNIFICADA.md`
+         * sección 4.4.a. El costo de mantener el socket vivo mientras la
+         * pestaña esté abierta es bajo (una conexión más, con su `ping`
+         * cada 30s) frente al riesgo de una sesión "zombie" que el usuario
+         * cree cerrada pero el navegador sigue mostrando.
          */
         function registerThisDeviceSession() {
           if (deviceSessionRegisterStarted) return;
@@ -693,9 +719,8 @@
                 localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, message.device_token || "");
               } catch (e) { /* noop */ }
               selfDeviceId = message.id != null ? String(message.id) : null;
-              // Ya quedó registrado -- no hace falta mantener la conexión
-              // abierta (ver nota de la función).
-              try { ws.close(); } catch (e) { /* noop */ }
+              // Ya no se cierra el socket acá -- se mantiene abierto para
+              // poder recibir `device_revoked` en vivo (ver nota de arriba).
               if (devicesLoaded) {
                 // Si la pestaña de dispositivos ya se había cargado antes de
                 // que terminara este registro, se refresca para que "este
@@ -703,6 +728,37 @@
                 // apretar "Actualizar" a mano.
                 loadDevices();
               }
+              return;
+            }
+
+            if (message.type === "device_list_changed") {
+              // Otro dispositivo de esta misma cuenta revocó uno o registró
+              // uno nuevo -- no afecta a este dispositivo (a diferencia de
+              // device_revoked, esto no cierra nada), solo refresca la
+              // pestaña de dispositivos si está abierta, para no depender
+              // de que alguien apriete "Actualizar" a mano.
+              if (devicesLoaded) {
+                loadDevices();
+              }
+              return;
+            }
+
+            if (message.type === "device_revoked") {
+              // Este mismo dispositivo (esta pestaña) fue desvinculado desde
+              // otra pantalla -- reaccionar igual que "Cerrar sesión aquí"
+              // en submitDeviceRevocation(): borrar el device_token local
+              // (ya no sirve), cerrar sesión de verdad (borra el JWT) y
+              // redirigir a login. No basta con limpiar storage y quedarse
+              // callado -- eso fue exactamente el bug que se reportó.
+              try { ws.close(); } catch (e) { /* noop */ }
+              if (sessionEndingInProgress) return;
+              sessionEndingInProgress = true;
+              try { localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY); } catch (e) { /* noop */ }
+              showDevicesMsg("Esta sesión fue cerrada desde otro dispositivo. Redirigiendo…", "success");
+              WindAuth.logout();
+              window.setTimeout(function () {
+                window.location.href = "/wind/login/?session=revoked";
+              }, 1500);
               return;
             }
 
@@ -786,6 +842,8 @@
               closeDeviceModal();
 
               if (isSelfRevocation) {
+                if (sessionEndingInProgress) return;
+                sessionEndingInProgress = true;
                 try { localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY); } catch (e) { /* noop */ }
                 showDevicesMsg("Sesión cerrada en este dispositivo. Redirigiendo…", "success");
                 WindAuth.logout();

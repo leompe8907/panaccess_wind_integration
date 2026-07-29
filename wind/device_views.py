@@ -16,9 +16,17 @@ from wind.models import DeviceSession
 from wind.services.device_session_service import revoke_device_session
 from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
 from wind.throttles import DeviceSessionThrottle
+from wind.utils.geo_lookup import resolve_ip_location
 
 
 def _serialize_device(session: DeviceSession) -> dict:
+    # country/city: ubicación aproximada resuelta desde client_ip (MaxMind
+    # GeoLite2, ver wind/utils/geo_lookup.py) -- solo informativo, para que
+    # el usuario reconozca sus propios dispositivos en la lista; nunca se usa
+    # para ningún control de acceso. Ambos quedan en None si GEOIP_CITY_DB_PATH
+    # no está configurado, la IP es privada/inválida, o no se encontró en la
+    # base -- nunca rompe esta respuesta.
+    location = resolve_ip_location(session.client_ip)
     return {
         "id": session.pk,
         "device_type": session.device_type,
@@ -26,6 +34,8 @@ def _serialize_device(session: DeviceSession) -> dict:
         "first_seen_at": session.first_seen_at,
         "last_seen_at": session.last_seen_at,
         "client_ip": session.client_ip,
+        "country": location["country"],
+        "city": location["city"],
         # device_token NUNCA se expone acá -- solo lo conoce el propio
         # dispositivo (lo recibió al registrarse por WebSocket) y el
         # backend; el dashboard revoca por `id`, no por token.

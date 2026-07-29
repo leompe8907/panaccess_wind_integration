@@ -1080,6 +1080,24 @@ class TrustedProxyConfig:
     TRUSTED_PROXIES = _csv("TRUSTED_PROXIES") or ["127.0.0.1", "::1"]
 
 
+class GeoIPConfig:
+    """
+    Resolución de país/ciudad a partir de la IP de un "dispositivo vinculado"
+    (sección 4 de docs/GUIA_INTEGRACION_UNIFICADA.md) -- solo un dato
+    informativo para que el usuario reconozca sus propios dispositivos en la
+    lista, no se usa para ningún control de acceso ni decisión de seguridad.
+
+    Requiere una base local GeoLite2-City.mmdb (formato MaxMind DB) -- MaxMind
+    exige una cuenta gratuita + license key para descargarla, así que no se
+    puede empaquetar en este repo. Sin GEOIP_CITY_DB_PATH configurado, o si el
+    archivo no existe/no se puede leer, `wind/utils/geo_lookup.py` devuelve
+    país/ciudad vacíos sin romper ninguna respuesta -- la funcionalidad es
+    puramente opt-in.
+    """
+
+    CITY_DB_PATH = _strip_env(os.getenv("GEOIP_CITY_DB_PATH"))
+
+
 class HealthCheckConfig:
     """
     Token opcional para habilitar el check profundo (PanAccess) en /health/.

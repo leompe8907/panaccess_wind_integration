@@ -138,6 +138,7 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         self.subscriber_code = None
         self.device_token = None
         self.group_name = None
+        self.subscriber_group_name = None
         self.device_fingerprint = None
         self.ping_task = None
 
@@ -153,6 +154,15 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         if not self.subscriber_code:
             await self.close(code=4004)
             return
+
+        # Grupo por CUENTA (no por dispositivo, a diferencia de
+        # `self.group_name` más abajo) -- se une acá, apenas se resuelve el
+        # subscriber_code, para que este dispositivo reciba
+        # `device_list_changed` aunque todavía no haya terminado de mandar
+        # su propio `register_device` (ver `notify_device_list_changed`,
+        # `device_session_service.py`).
+        self.subscriber_group_name = f"subscriber_devices_{self.subscriber_code}"
+        await self.channel_layer.group_add(self.subscriber_group_name, self.channel_name)
 
         self.device_fingerprint = await sync_to_async(generate_device_fingerprint)(self.scope)
         is_allowed, reason, retry_after = await sync_to_async(check_websocket_limits)(
@@ -233,6 +243,25 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
             "is_new": is_new,
         })
 
+        if is_new:
+            # Un dispositivo NUEVO se agregó a la lista de esta cuenta --
+            # avisar al resto de los dispositivos conectados (no a este
+            # mismo, ya recibió su propio `device_registered` arriba) para
+            # que refresquen su panel de "dispositivos vinculados" solos.
+            # Llamada directa (no via `device_session_service.py`) porque acá
+            # ya estamos en contexto async -- no hace falta pasar por
+            # `async_to_sync` como sí necesita el lado REST del revoke.
+            try:
+                await self.channel_layer.group_send(
+                    self.subscriber_group_name, {"type": "device.list_changed"}
+                )
+            except Exception:
+                logger.warning(
+                    "No se pudo notificar device_list_changed para subscriber_code=%s",
+                    self.subscriber_code,
+                    exc_info=True,
+                )
+
     async def device_revoked(self, event):
         """Handler para eventos de grupo (`device.revoked`, ver device_session_service.py)."""
         if self.done:
@@ -240,6 +269,20 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         await self._send_json({"type": "device_revoked", "reason": event.get("reason")})
         self.done = True
         await self.close()
+
+    async def device_list_changed(self, event):
+        """
+        Handler para eventos de grupo (`device.list_changed`, ver
+        `notify_device_list_changed` en `device_session_service.py` y el
+        broadcast de más arriba en `receive()`). A diferencia de
+        `device_revoked`, esto NO cierra la conexión ni implica que ESTE
+        dispositivo perdió acceso -- es solo un aviso de "la lista de
+        dispositivos de tu cuenta cambió, volvé a pedirla si la tenés
+        abierta".
+        """
+        if self.done:
+            return
+        await self._send_json({"type": "device_list_changed"})
 
     async def disconnect(self, code):
         await self._cleanup()
@@ -276,6 +319,11 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         if getattr(self, "group_name", None):
             try:
                 await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            except Exception:
+                pass
+        if getattr(self, "subscriber_group_name", None):
+            try:
+                await self.channel_layer.group_discard(self.subscriber_group_name, self.channel_name)
             except Exception:
                 pass
         if getattr(self, "ping_task", None) and not self.ping_task.done():

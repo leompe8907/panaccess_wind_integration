@@ -53,6 +53,45 @@ def notify_device_revoked(device_token: str, *, reason: str) -> None:
         )
 
 
+def notify_device_list_changed(subscriber_code: str) -> None:
+    """
+    Avisa (grupo `subscriber_devices_{subscriber_code}`, uno por CUENTA, no
+    por dispositivo) que la lista de "dispositivos vinculados" de este
+    suscriptor cambió -- a diferencia de `notify_device_revoked` (que solo
+    le llega al dispositivo puntual afectado, y le fuerza el logout), este
+    aviso les llega a TODOS los demás dispositivos conectados de la misma
+    cuenta, y no implica ninguna acción destructiva de su lado: es solo una
+    señal de "volvé a pedir `GET /wind/devices/` si tenés esa pantalla
+    abierta". Antes no existía ningún canal así -- si dos dispositivos de la
+    misma cuenta tenían el panel de "dispositivos vinculados" abierto a la
+    vez, revocar uno desde el otro no actualizaba la lista del que se quedó
+    con la sesión activa hasta que alguien apretara "Actualizar" a mano.
+
+    Mismo criterio "eventual consistency" que `notify_device_revoked`: si
+    nadie está conectado en este momento, no pasa nada más -- no hace falta,
+    el próximo `GET /wind/devices/` ya trae los datos al día de todos modos.
+    """
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"subscriber_devices_{subscriber_code}",
+                {"type": "device.list_changed"},
+            )
+        else:
+            logger.warning(
+                "Channel layer no disponible; no se notificó cambio de lista de "
+                "dispositivos para subscriber_code=%s",
+                subscriber_code,
+            )
+    except Exception:
+        logger.exception(
+            "Error notificando WebSocket de cambio de lista de dispositivos "
+            "para subscriber_code=%s",
+            subscriber_code,
+        )
+
+
 def revoke_device_session(
     *, subscriber_code: str, device_session_id: int, reason: str = "revoked_by_subscriber"
 ) -> dict:
@@ -83,6 +122,12 @@ def revoke_device_session(
             device_token = session.device_token
 
             transaction.on_commit(lambda: notify_device_revoked(device_token, reason=reason))
+            # Aviso aparte para el resto de los dispositivos de esta cuenta
+            # (no el que se acaba de revocar, ese ya recibe su propio
+            # `device_revoked` arriba) -- para que cualquier pantalla de
+            # "dispositivos vinculados" abierta en otro dispositivo se
+            # refresque sola, sin necesitar que alguien apriete "Actualizar".
+            transaction.on_commit(lambda: notify_device_list_changed(subscriber_code))
 
         return {"ok": True}
 
