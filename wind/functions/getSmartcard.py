@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta, timezone as dt_timezone
 
-from django.db import close_old_connections, transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from appConfig import PanaccessConfig, RedisConfig
@@ -671,18 +671,22 @@ def _process_subscriber_smartcard_sync(
     # Corre dentro de un ThreadPoolExecutor (ver compare_and_update_smartcards_
     # by_subscribers). Django abre una conexión de BD nueva por hilo la primera
     # vez que se usa el ORM ahí, pero como esos hilos no son el hilo principal
-    # de un request/tarea Celery, Django nunca la cierra sola al terminar --
-    # bajo sync sostenido con muchos abonados eso puede ir acumulando
-    # conexiones abiertas/inactivas en Postgres. close_old_connections() al
-    # terminar cada tarea del hilo libera la conexión si ya expiró
-    # (CONN_MAX_AGE) o quedó inutilizable, en vez de dejarla abierta indefinidamente.
+    # de un request/tarea Celery, nada dispara las señales request_started/
+    # request_finished que normalmente reactivan close_old_connections() y el
+    # health-check de CONN_HEALTH_CHECKS. close_old_connections() por sí sola
+    # NO alcanza acá: solo cierra conexiones más viejas que CONN_MAX_AGE (60s
+    # por defecto) o ya rotas -- un hilo de este pool puede vivir mucho menos
+    # que eso y aun así dejar la conexión abierta. Por eso se cierra siempre,
+    # sin condición, al terminar cada tarea del hilo (confirmado como causa de
+    # los agotamientos de pool "reserved for roles with the SUPERUSER" vistos
+    # en producción -- ver docs/GUIA_INTEGRACION_UNIFICADA.md).
     try:
         remote_list, truncated = _fetch_smartcards_for_subscriber(session_id, subscriber_code, limit)
         stats = _reconcile_subscriber_smartcards(subscriber_code, remote_list, truncated=truncated)
         stats["subscriber_code"] = subscriber_code
         return stats
     finally:
-        close_old_connections()
+        connection.close()
 
 
 def compare_and_update_smartcards_by_subscribers(session_id=None, limit=100):

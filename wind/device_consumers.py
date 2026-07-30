@@ -16,7 +16,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 
-from django.db import transaction
+from django.db import close_old_connections, transaction
 
 from wind.models import DeviceSession
 from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
@@ -302,13 +302,20 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
     async def _send_err(self, code: str, detail: str, close: bool = False):
         await self._send_json({"type": "error", "code": code, "detail": detail})
         if close:
-            await self.close(code=1011)
+            # 1011 es un código "reservado" del protocolo WS -- Daphne/
+            # autobahn rechazan que la aplicación lo pase explícitamente a
+            # self.close() y lanzan una excepción no controlada al intentar
+            # el cierre (visto repetidamente en producción como "Exception
+            # inside application"/"invalid close code 1011"). Los códigos de
+            # aplicación válidos son 1000 o el rango privado [3000, 4999] --
+            # se usa 4000 acá, igual que ya se usa 4001/4004 en connect().
+            await self.close(code=4000)
 
     async def _send_json(self, obj: dict):
         try:
             await self.send(text_data=json.dumps(obj, cls=DjangoJSONEncoder))
         except Exception:
-            await self.close(code=1011)
+            await self.close(code=4000)
 
     async def _cleanup(self):
         self.done = True
@@ -328,3 +335,10 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
                 pass
         if getattr(self, "ping_task", None) and not self.ping_task.done():
             self.ping_task.cancel()
+        # Channels no dispara request_started/request_finished, así que
+        # Django nunca reactiva por sí solo close_old_connections() ni el
+        # health-check de CONN_HEALTH_CHECKS para las conexiones que este
+        # consumer abrió vía sync_to_async (connect()/receive() tocan el ORM
+        # varias veces). Se cierra explícitamente al desconectar para no
+        # dejarlas abiertas indefinidamente en el hilo que las usó.
+        await sync_to_async(close_old_connections)()

@@ -120,39 +120,54 @@ class LogBuffer:
         self.last_flush = time.time()
 
         def write_to_db():
+            from django.db import connection
             from django.db.utils import OperationalError, DatabaseError
             from wind.utils.db_utils import is_connection_error, reconnect_database
 
             max_retries = 3
             retry_count = 0
 
-            while retry_count < max_retries:
-                try:
-                    with transaction.atomic():
-                        from wind.models import AuthAuditLog
-                        AuthAuditLog.objects.bulk_create([
-                            AuthAuditLog(**log_data) for log_data, _serialized in logs_to_write
-                        ], ignore_conflicts=True)
-                    logger.debug(f"LogBuffer: Wrote {buffer_size} logs to DB")
-                    _remove_from_durable_queue(logs_to_write)
-                    return
-                except (OperationalError, DatabaseError) as e:
-                    if is_connection_error(e):
-                        retry_count += 1
-                        logger.warning(f"LogBuffer: Conexión perdida (intento {retry_count}/{max_retries}). Reconectando...")
-                        reconnect_database()
-                        if retry_count < max_retries:
-                            time.sleep(2 * retry_count)
-                            continue
-                        else:
-                            logger.error("LogBuffer: No se pudo reconectar después de los intentos")
-                            return
-                    else:
-                        logger.error(f"LogBuffer: Error de BD: {e}", exc_info=True)
+            try:
+                while retry_count < max_retries:
+                    try:
+                        with transaction.atomic():
+                            from wind.models import AuthAuditLog
+                            AuthAuditLog.objects.bulk_create([
+                                AuthAuditLog(**log_data) for log_data, _serialized in logs_to_write
+                            ], ignore_conflicts=True)
+                        logger.debug(f"LogBuffer: Wrote {buffer_size} logs to DB")
+                        _remove_from_durable_queue(logs_to_write)
                         return
-                except Exception as e:
-                    logger.error(f"LogBuffer: Error escribiendo logs: {e}", exc_info=True)
-                    return
+                    except (OperationalError, DatabaseError) as e:
+                        if is_connection_error(e):
+                            retry_count += 1
+                            logger.warning(f"LogBuffer: Conexión perdida (intento {retry_count}/{max_retries}). Reconectando...")
+                            reconnect_database()
+                            if retry_count < max_retries:
+                                time.sleep(2 * retry_count)
+                                continue
+                            else:
+                                logger.error("LogBuffer: No se pudo reconectar después de los intentos")
+                                return
+                        else:
+                            logger.error(f"LogBuffer: Error de BD: {e}", exc_info=True)
+                            return
+                    except Exception as e:
+                        logger.error(f"LogBuffer: Error escribiendo logs: {e}", exc_info=True)
+                        return
+            finally:
+                # Este hilo se crea y muere en cada flush (cada
+                # flush_interval segundos, o antes si el buffer llega a
+                # batch_size) -- es efímero, no un worker de vida larga. Nada
+                # en su ciclo de vida dispara request_started/request_finished,
+                # así que Django nunca reactiva close_old_connections() ni el
+                # health-check para él (mismo problema de fondo que
+                # getSmartcard.py -- ver docs/GUIA_INTEGRACION_UNIFICADA.md).
+                # Sin este cierre explícito e incondicional, la conexión que
+                # este hilo abrió sigue contando contra max_connections hasta
+                # que el garbage collector la recoja -- bajo ráfagas de
+                # flushes eso se puede acumular más rápido de lo que se libera.
+                connection.close()
 
         write_thread = threading.Thread(target=write_to_db, daemon=True)
         write_thread.start()

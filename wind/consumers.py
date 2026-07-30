@@ -7,6 +7,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import close_old_connections
 
 import hmac
 
@@ -231,7 +232,13 @@ class AuthWaitWS(AsyncWebsocketConsumer):
     async def _send_err(self, code: str, detail: str, close: bool = False):
         await self._send_json({"type": "error", "code": code, "detail": detail})
         if close:
-            await self.close(code=1011)
+            # 1011 es un código "reservado" del protocolo WS -- Daphne/
+            # autobahn rechazan que la aplicación lo pase explícitamente a
+            # self.close() y lanzan una excepción no controlada al intentar
+            # el cierre (visto repetidamente en producción como "Exception
+            # inside application"/"invalid close code 1011"). Los códigos de
+            # aplicación válidos son 1000 o el rango privado [3000, 4999].
+            await self.close(code=4000)
 
     async def _send_json(self, obj: dict):
         try:
@@ -244,7 +251,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                     "detail": str(e),
                 }, cls=DjangoJSONEncoder))
             finally:
-                await self.close(code=1011)
+                await self.close(code=4000)
 
     async def _timeout_with_seconds(self, timeout_seconds: int):
         await asyncio.sleep(timeout_seconds)
@@ -334,3 +341,10 @@ class AuthWaitWS(AsyncWebsocketConsumer):
             task = getattr(self, tname, None)
             if task and not task.done():
                 task.cancel()
+
+        # Channels no dispara request_started/request_finished, así que
+        # Django nunca reactiva por sí solo close_old_connections() ni el
+        # health-check de CONN_HEALTH_CHECKS para las conexiones que este
+        # consumer abrió vía sync_to_async (authenticate_with_udid_service,
+        # el poll periódico, etc). Se cierra explícitamente al desconectar.
+        await sync_to_async(close_old_connections)()
