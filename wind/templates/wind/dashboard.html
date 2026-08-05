@@ -949,13 +949,8 @@
 
           setLoading(true);
 
-          fetch("/api/v1/profile/me/", { headers: WindAuth.authHeaders(false) })
+          WindAuth.fetchApi("/api/v1/profile/me/", { method: "GET" })
             .then(function (res) {
-              if (res.status === 401) {
-                WindAuth.logout();
-                window.location.href = "/wind/login/?session=expired";
-                throw new Error("Sesión expirada");
-              }
               return res.json().then(function (data) {
                 return { ok: res.ok, status: res.status, data: data };
               });
