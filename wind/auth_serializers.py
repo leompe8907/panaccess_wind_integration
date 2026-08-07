@@ -87,7 +87,7 @@ class PanAccessSocialLoginSerializer(SocialLoginSerializer):
                 login.save(request, connect=False)
             except IntegrityError as ex:
                 raise serializers.ValidationError(
-                    _('User is already registered with this e-mail address.'),
+                    _('Ya existe una cuenta registrada con este correo. Inicia sesión o recupera tu contraseña.'),
                 ) from ex
             self.post_signup(login, {})
             mark_portal_email_verified(login.user, login.user.email)
@@ -149,7 +149,7 @@ class PanAccessSocialLoginSerializer(SocialLoginSerializer):
                 token = client.get_access_token(code)
             except OAuth2Error as ex:
                 raise serializers.ValidationError(
-                    _('Failed to exchange code for access token'),
+                    _('No se pudo validar tu inicio de sesión con este proveedor. Intenta de nuevo.'),
                 ) from ex
             access_token = token['access_token']
             tokens_to_parse = {'access_token': access_token}
@@ -159,7 +159,7 @@ class PanAccessSocialLoginSerializer(SocialLoginSerializer):
                     tokens_to_parse[key] = token[key]
         else:
             raise serializers.ValidationError(
-                _('Incorrect input. access_token or code is required.'),
+                _('Falta información para completar el inicio de sesión social.'),
             )
 
         social_token = adapter.parse_token(tokens_to_parse)
@@ -177,7 +177,7 @@ class PanAccessSocialLoginSerializer(SocialLoginSerializer):
                 login = self.get_social_login(adapter, app, social_token, access_token)
             ret = complete_social_login(request, login)
         except HTTPError:
-            raise serializers.ValidationError(_('Incorrect value'))
+            raise serializers.ValidationError(_('No pudimos verificar tu cuenta con este proveedor. Intenta de nuevo.'))
 
         if isinstance(ret, HttpResponseBadRequest):
             raise serializers.ValidationError(ret.content)

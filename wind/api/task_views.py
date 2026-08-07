@@ -1,4 +1,5 @@
 """Estado de tareas Celery (staff)."""
+import logging
 import uuid
 
 from celery.result import AsyncResult
@@ -6,6 +7,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
@@ -36,5 +39,6 @@ def task_status_view(request, task_id):
         if result.successful():
             payload["result"] = result.result
         else:
-            payload["error"] = str(result.result)
+            logger.error("Tarea %s finalizó con error: %s", task_id, result.result)
+            payload["error"] = "La tarea finalizó con un error. Revisa los logs del servidor para más detalle."
     return Response(payload, status=status.HTTP_200_OK)

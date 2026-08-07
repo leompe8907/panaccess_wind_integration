@@ -13,6 +13,8 @@ from wind.services.password_reset import (
     confirm_password_reset,
     request_password_reset,
 )
+from wind.throttles import PasswordResetThrottle
+from wind.utils.exception_handlers import _formatear_espera
 
 User = get_user_model()
 
@@ -142,3 +144,36 @@ class PasswordResetAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("confirmPass", response.data["errors"])
+
+
+class PasswordResetThrottleMessageTestCase(APITestCase):
+    """
+    El mensaje de throttling por defecto de DRF se filtraba tal cual al
+    usuario ("Request was throttled... (throttled)"). Ahora
+    wind.utils.exception_handlers.custom_exception_handler lo reemplaza por
+    uno en español con el tiempo de espera en minutos.
+    """
+
+    def setUp(self):
+        self.forgot_url = reverse("password_forgot")
+
+    def test_formatear_espera_en_minutos(self):
+        self.assertEqual(_formatear_espera(1832), "31 minutos")
+        self.assertEqual(_formatear_espera(45), "1 minuto")
+        self.assertEqual(_formatear_espera(60), "1 minuto")
+        self.assertEqual(_formatear_espera(120), "2 minutos")
+
+    @patch.object(PasswordResetThrottle, "wait", return_value=1832)
+    @patch.object(PasswordResetThrottle, "allow_request", return_value=False)
+    def test_forgot_api_throttled_message_is_friendly(self, mock_allow, mock_wait):
+        response = self.client.post(
+            self.forgot_url,
+            data=json.dumps({"email": "someone@example.com"}),
+            content_type="application/json",
+            HTTP_HOST="testserver",
+        )
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["error_type"], "Throttled")
+        self.assertNotIn("throttled", response.data["message"].lower())
+        self.assertIn("31 minutos", response.data["message"])

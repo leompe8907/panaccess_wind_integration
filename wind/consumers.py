@@ -176,7 +176,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
                         raise
         except Exception as e:
             logger.error(f"Error suscribiendo WebSocket al grupo {self.group_name}: {e}", exc_info=True)
-            await self._send_err("channel_layer_unavailable", f"Error de conexión: {str(e)}", close=True)
+            await self._send_err("channel_layer_unavailable", "Error de conexión con el servidor. Intenta de nuevo.", close=True)
             return
 
         await self._send_json({
@@ -244,11 +244,12 @@ class AuthWaitWS(AsyncWebsocketConsumer):
         try:
             await self.send(text_data=json.dumps(obj, cls=DjangoJSONEncoder))
         except Exception as e:
+            logger.error(f"Error serializando mensaje WebSocket: {e}", exc_info=True)
             try:
                 await self.send(text_data=json.dumps({
                     "type": "error",
                     "code": "serialization_error",
-                    "detail": str(e),
+                    "detail": "Error interno del servidor. Intenta de nuevo más tarde.",
                 }, cls=DjangoJSONEncoder))
             finally:
                 await self.close(code=4000)

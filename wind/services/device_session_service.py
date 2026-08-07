@@ -113,10 +113,10 @@ def revoke_device_session(
                     pk=device_session_id, subscriber_code=subscriber_code,
                 )
             except DeviceSession.DoesNotExist:
-                return {"ok": False, "code": "not_found", "error": "Device not found"}
+                return {"ok": False, "code": "not_found", "error": "No se encontró el dispositivo."}
 
             if session.status != "active":
-                return {"ok": False, "code": "already_revoked", "error": "Device already revoked"}
+                return {"ok": False, "code": "already_revoked", "error": "Este dispositivo ya fue desvinculado."}
 
             session.revoke(reason=reason)
             device_token = session.device_token
@@ -132,11 +132,11 @@ def revoke_device_session(
         return {"ok": True}
 
     except Exception as e:
+        logger.error("Error interno en revoke_device_session (subscriber=%s, id=%s): %s", subscriber_code, device_session_id, e, exc_info=True)
         return {
             "ok": False,
             "code": "internal_error",
-            "error": "Internal server error",
-            "details": str(e),
+            "error": "Error interno del servidor. Intenta de nuevo más tarde.",
         }
 
 

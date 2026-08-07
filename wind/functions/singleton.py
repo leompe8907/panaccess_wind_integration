@@ -1,6 +1,8 @@
 """
 Diagnóstico del singleton PanAccess (solo staff, sin exponer session_id completo).
 """
+import logging
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
@@ -10,6 +12,8 @@ from appConfig import FeatureConfig
 from wind.throttles import SyncAdminThrottle
 from wind.services import get_panaccess
 from wind.exceptions import PanAccessException
+
+logger = logging.getLogger(__name__)
 
 
 def _panaccess_ops_http_enabled() -> bool:
@@ -56,7 +60,8 @@ def singleton(request):
         )
 
     except Exception as e:
+        logger.exception("Error inesperado en singleton view")
         return Response(
-            {"success": False, "error_type": "Exception", "message": f"Error inesperado: {str(e)}"},
+            {"success": False, "error_type": "Exception", "message": "Ocurrió un error inesperado. Revisa los logs del servidor para más detalle."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

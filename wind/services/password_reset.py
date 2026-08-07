@@ -208,7 +208,7 @@ def confirm_password_reset(token: str, new_pass: str) -> dict:
         return {
             "success": False,
             "error_type": "PanAccessException",
-            "message": str(e),
+            "message": "No se pudo restablecer la contraseña. Intenta de nuevo.",
         }
     except Exception:
         logger.exception("Error inesperado en confirm_password_reset")

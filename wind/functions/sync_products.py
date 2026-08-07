@@ -75,7 +75,7 @@ def sync_products_view(request):
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
         return Response(
-            {"success": False, "error_type": "Exception", "message": str(e)},
+            {"success": False, "error_type": "Exception", "message": "Ocurrió un error inesperado. Revisa los logs del servidor para más detalle."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -151,7 +151,7 @@ def test_call_list_products(request):
         return Response({
             'success': False,
             'error_type': 'Exception',
-            'message': str(e)
+            'message': 'Ocurrió un error inesperado. Revisa los logs del servidor para más detalle.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -192,5 +192,5 @@ def products_stats_view(request):
         return Response({
             'success': False,
             'error_type': 'Exception',
-            'message': str(e)
+            'message': 'Ocurrió un error inesperado. Revisa los logs del servidor para más detalle.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

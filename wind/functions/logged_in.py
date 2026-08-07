@@ -3,6 +3,8 @@ Vista para validar si un sessionId está vigente.
 
 Endpoint que prueba la función logged_in() y el método check_session() del cliente.
 """
+import logging
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAdminUser
 from wind.throttles import SyncAdminThrottle
@@ -19,6 +21,8 @@ from wind.exceptions import (
     PanAccessAPIError,
     PanAccessException
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _panaccess_ops_http_enabled() -> bool:
@@ -107,8 +111,9 @@ def logged_in_view(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     except Exception as e:
+        logger.exception("Error inesperado en logged_in view")
         return Response({
             'success': False,
             'error_type': 'Exception',
-            'message': f'Error inesperado: {str(e)}'
+            'message': 'Ocurrió un error inesperado. Revisa los logs del servidor para más detalle.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

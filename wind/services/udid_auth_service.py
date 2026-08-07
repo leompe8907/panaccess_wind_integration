@@ -63,7 +63,7 @@ def authenticate_with_udid_service(
     Retorna dict serializable a JSON.
     """
     if not udid:
-        return {"ok": False, "error": "UDID is required", "code": "missing_udid"}
+        return {"ok": False, "error": "Falta el identificador del dispositivo (UDID).", "code": "missing_udid"}
 
     try:
         with transaction.atomic():
@@ -71,7 +71,7 @@ def authenticate_with_udid_service(
             try:
                 req = UDIDAuthRequest.objects.select_for_update().get(udid=udid)
             except UDIDAuthRequest.DoesNotExist:
-                return {"ok": False, "error": "Invalid UDID", "code": "invalid_udid"}
+                return {"ok": False, "error": "El UDID no es válido.", "code": "invalid_udid"}
 
             # 1.5) temp_token obligatorio -- el udid por sí solo (8 hex,
             # ~4 mil millones de combinaciones) ya no alcanza como
@@ -79,7 +79,7 @@ def authenticate_with_udid_service(
             if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
                 return {
                     "ok": False,
-                    "error": "Invalid temp_token",
+                    "error": "El token temporal no es válido o ya expiró.",
                     "code": "invalid_temp_token",
                 }
 
@@ -97,12 +97,12 @@ def authenticate_with_udid_service(
                     user_agent=user_agent,
                     details={"status": "expired", "validation_successful": False},
                 )
-                return {"ok": False, "error": "UDID has expired", "code": "expired", "status": "expired"}
+                return {"ok": False, "error": "El identificador del dispositivo (UDID) expiró. Vuelve a intentar el emparejamiento.", "code": "expired", "status": "expired"}
 
             if req.status != "validated":
                 return {
                     "ok": False,
-                    "error": f"UDID not valid. Status: {req.status}",
+                    "error": f"El UDID no está validado. Estado: {req.status}",
                     "code": "not_validated",
                     "status": req.status,
                 }
@@ -110,7 +110,7 @@ def authenticate_with_udid_service(
             if not getattr(req, "subscriber_code", None):
                 return {
                     "ok": False,
-                    "error": "UDID validated but not associated to subscriber yet",
+                    "error": "El UDID está validado pero aún no se asoció a un suscriptor.",
                     "code": "not_associated",
                     "status": "validated",
                 }
@@ -140,7 +140,7 @@ def authenticate_with_udid_service(
             except SubscriberInfo.DoesNotExist:
                 return {
                     "ok": False,
-                    "error": "Subscriber info not found or mismatched SN",
+                    "error": "No se encontró información del suscriptor o la smartcard no coincide.",
                     "code": "subscriber_not_found",
                 }
 
@@ -174,11 +174,11 @@ def authenticate_with_udid_service(
                         json_serialize_credentials(credentials_payload), req.device_public_key
                     )
                 except Exception as e:
+                    logger.error("Fallo al cifrar credenciales (llave efímera) para udid=%s: %s", udid, e, exc_info=True)
                     return {
                         "ok": False,
-                        "error": "Encryption failed",
+                        "error": "No se pudo cifrar la respuesta de forma segura. Intenta de nuevo.",
                         "code": "encryption_failed",
-                        "details": str(e),
                     }
                 encryption_method = "Hybrid AES-256 + RSA-OAEP (llave efímera por pareo)"
             else:
@@ -202,7 +202,7 @@ def authenticate_with_udid_service(
                     if not app_credentials:
                         return {
                             "ok": False,
-                            "error": f"No valid app credentials available for app_type='{app_type}'",
+                            "error": f"No hay credenciales disponibles para app_type='{app_type}'.",
                             "code": "no_app_credentials",
                         }
 
@@ -211,11 +211,11 @@ def authenticate_with_udid_service(
                         json_serialize_credentials(credentials_payload), app_type
                     )
                 except Exception as e:
+                    logger.error("Fallo al cifrar credenciales (app_type=%s) para udid=%s: %s", app_type, udid, e, exc_info=True)
                     return {
                         "ok": False,
-                        "error": "Encryption failed",
+                        "error": "No se pudo cifrar la respuesta de forma segura. Intenta de nuevo.",
                         "code": "encryption_failed",
-                        "details": str(e),
                     }
                 encryption_method = "Hybrid AES-256 + RSA-OAEP"
 
@@ -295,7 +295,8 @@ def authenticate_with_udid_service(
             }
 
     except Exception as e:
-        return {"ok": False, "error": "Internal server error", "code": "internal_error", "details": str(e)}
+        logger.error("Error interno en authenticate_with_udid para udid=%s: %s", udid, e, exc_info=True)
+        return {"ok": False, "error": "Error interno del servidor. Intenta de nuevo más tarde.", "code": "internal_error"}
 
 
 def _notify_udid_validated(udid: str) -> None:
@@ -343,7 +344,7 @@ def associate_udid_after_social_login(
         return {
             "ok": False,
             "code": "missing_params",
-            "error": "udid and subscriber_code are required",
+            "error": "Faltan datos requeridos (udid y subscriber_code).",
         }
 
     # Rate limit por udid (1/min, mismo umbral que `ValidateAndAssociateUDIDView`
@@ -358,7 +359,7 @@ def associate_udid_after_social_login(
         return {
             "ok": False,
             "code": "rate_limited",
-            "error": "Too many attempts for this udid",
+            "error": "Demasiados intentos para este UDID. Intenta de nuevo en un momento.",
             "retry_after": retry_after,
         }
 
@@ -367,26 +368,26 @@ def associate_udid_after_social_login(
             try:
                 req = UDIDAuthRequest.objects.select_for_update().get(udid=udid)
             except UDIDAuthRequest.DoesNotExist:
-                return {"ok": False, "code": "invalid_udid", "error": "Invalid UDID"}
+                return {"ok": False, "code": "invalid_udid", "error": "El UDID no es válido."}
 
             if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
                 return {
                     "ok": False,
                     "code": "invalid_temp_token",
-                    "error": "Invalid temp_token",
+                    "error": "El token temporal no es válido o ya expiró.",
                 }
 
             if req.is_expired():
                 if req.status != "expired":
                     req.status = "expired"
                     req.save(update_fields=["status"])
-                return {"ok": False, "code": "expired", "error": "UDID has expired"}
+                return {"ok": False, "code": "expired", "error": "El identificador del dispositivo (UDID) expiró. Vuelve a intentar el emparejamiento."}
 
             if req.status != "pending":
                 return {
                     "ok": False,
                     "code": "not_pending",
-                    "error": f"UDID not pending. Status: {req.status}",
+                    "error": f"El UDID no está pendiente. Estado: {req.status}",
                     "status": req.status,
                 }
 
@@ -430,9 +431,9 @@ def associate_udid_after_social_login(
         return {"ok": True, "udid": udid, "subscriber_code": subscriber_code}
 
     except Exception as e:
+        logger.error("Error interno en associate_udid_after_social_login para udid=%s: %s", udid, e, exc_info=True)
         return {
             "ok": False,
             "code": "internal_error",
-            "error": "Internal server error",
-            "details": str(e),
+            "error": "Error interno del servidor. Intenta de nuevo más tarde.",
         }

@@ -483,7 +483,7 @@ def _create_subscriber_core(
         release_registration_locks(registration_locks)
         return Response({
             'success': False,
-            'message': 'Los parámetros proporcionados ya existen en la base de datos',
+            'message': 'Ya existe una cuenta con estos datos. Verifica el correo o documento e intenta de nuevo.',
             'error_type': 'DuplicateData',
             'errors': errors
         }, status=status.HTTP_400_BAD_REQUEST)
@@ -1143,7 +1143,7 @@ def _create_subscriber_core(
         return Response({
             'success': False,
             'error_type': 'PanAccessException',
-            'message': str(e)
+            'message': 'No pudimos completar tu registro en este momento. Intenta de nuevo en unos minutos.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
@@ -1152,7 +1152,7 @@ def _create_subscriber_core(
         return Response({
             'success': False,
             'error_type': 'Exception',
-            'message': str(e)
+            'message': 'No pudimos completar tu registro en este momento. Intenta de nuevo en unos minutos.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

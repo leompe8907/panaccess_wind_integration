@@ -167,7 +167,7 @@ class RequestUDIDManualView(APIView):
 
         except Exception as e:
             logger.error(f"RequestUDIDManualView: Error interno - ip={client_ip}, error={str(e)}", exc_info=True)
-            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Error interno del servidor. Intenta de nuevo más tarde."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def generate_unique_udid(self):
         while True:
@@ -364,15 +364,15 @@ class AuthenticateWithUDIDView(APIView):
         )
 
         if not udid:
-            return Response({"error": "UDID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Falta el identificador del dispositivo (UDID)."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not temp_token:
-            return Response({"error": "temp_token is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Falta el token temporal del pareo."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_app_type(app_type):
             return Response({
                 "error": (
-                    "Invalid app_type. Must be one of: "
+                    "Tipo de app inválido. Debe ser uno de: "
                     "web, lg, samsung, android, androidtv, amazon, iOS, iOStv"
                 )
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -470,7 +470,7 @@ class AuthenticateWithUDIDView(APIView):
                 }
                 http_status = status_by_code.get(code, status.HTTP_500_INTERNAL_SERVER_ERROR)
                 return Response(
-                    {"error": result.get("error", "Error"), "code": code},
+                    {"error": result.get("error", "Ocurrió un error."), "code": code},
                     status=http_status,
                 )
 
@@ -497,7 +497,7 @@ class AuthenticateWithUDIDView(APIView):
             if is_reconnection:
                 get_retry_info(udid, 'reconnection')
             logger.error(f"AuthenticateWithUDIDView: Error interno - error={str(e)}", exc_info=True)
-            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Error interno del servidor. Intenta de nuevo más tarde."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ValidateStatusUDIDView(APIView):
@@ -561,14 +561,14 @@ class ValidateStatusUDIDView(APIView):
                 user_agent=user_agent,
                 details={'error': 'UDID not found'}
             )
-            return Response({"error": "Invalid UDID"})
+            return Response({"error": "El UDID no es válido."})
 
         # temp_token obligatorio -- esta vista devuelve subscriber_code/sn
         # una vez validado el pareo; sin este chequeo, cualquiera que
         # enumerara/adivinara un udid de 8 caracteres podía leer a qué
         # suscriptor quedó asociado (ver auditoría).
         if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
-            return Response({"error": "Invalid temp_token"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "El token temporal no es válido o ya expiró."}, status=status.HTTP_403_FORBIDDEN)
 
         if req.status == 'revoked':
             log_audit_async(
@@ -580,7 +580,7 @@ class ValidateStatusUDIDView(APIView):
                 details={'error': 'UDID revoked'}
             )
             return Response({
-                "error": "UDID has been revoked",
+                "error": "Este UDID fue revocado.",
                 "status": "revoked"
             }, status=status.HTTP_202_ACCEPTED)
 
@@ -598,7 +598,7 @@ class ValidateStatusUDIDView(APIView):
                 details={'error': 'UDID expired'}
             )
             return Response({
-                "error": "UDID has expired",
+                "error": "El identificador del dispositivo (UDID) expiró. Vuelve a intentar el emparejamiento.",
                 "status": "expired"
             }, status=status.HTTP_410_GONE)
 
@@ -669,10 +669,10 @@ class DisassociateUDIDView(APIView):
         client_ip = get_client_ip(request)
 
         if not udid:
-            return Response({"error": "UDID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Falta el identificador del dispositivo (UDID)."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not temp_token:
-            return Response({"error": "temp_token is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Falta el token temporal del pareo."}, status=status.HTTP_400_BAD_REQUEST)
 
         client_token = get_client_token(request)
         if client_token:
@@ -685,12 +685,12 @@ class DisassociateUDIDView(APIView):
             )
             if not is_allowed:
                 return Response({
-                    "error": "Rate limit exceeded",
-                    "message": "Too many requests. Please retry later.",
+                    "error": "Demasiadas solicitudes",
+                    "message": "Demasiadas solicitudes. Intenta de nuevo más tarde.",
                     "retry_after": retry_after,
                     "remaining": remaining
                 }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        
+
         is_allowed, remaining, retry_after = check_udid_rate_limit(
             udid,
             max_requests=5,
@@ -698,8 +698,8 @@ class DisassociateUDIDView(APIView):
         )
         if not is_allowed:
             return Response({
-                "error": "Rate limit exceeded",
-                "message": "Too many disassociation attempts for this UDID. Please try again later.",
+                "error": "Demasiados intentos",
+                "message": "Demasiados intentos de desvinculación para este UDID. Intenta de nuevo más tarde.",
                 "retry_after": retry_after,
                 "remaining_requests": remaining
             }, status=status.HTTP_429_TOO_MANY_REQUESTS)
@@ -709,19 +709,19 @@ class DisassociateUDIDView(APIView):
                 try:
                     req = UDIDAuthRequest.objects.select_for_update().get(udid=udid)
                 except UDIDAuthRequest.DoesNotExist:
-                    return Response({"error": "UDID not found"}, status=status.HTTP_404_NOT_FOUND)
+                    return Response({"error": "No se encontró el UDID."}, status=status.HTTP_404_NOT_FOUND)
 
                 if not hmac.compare_digest(temp_token or "", req.temp_token or ""):
-                    return Response({"error": "Invalid temp_token"}, status=status.HTTP_403_FORBIDDEN)
+                    return Response({"error": "El token temporal no es válido o ya expiró."}, status=status.HTTP_403_FORBIDDEN)
 
                 if req.status not in ['validated', 'used', 'expired']:
                     return Response({
-                        "error": f"Cannot disassociate: UDID is in state '{req.status}'"
+                        "error": f"No se puede desvincular: el UDID está en estado '{req.status}'."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 if not req.sn:
                     return Response({
-                        "error": "No SN is currently associated with this UDID"
+                        "error": "No hay una smartcard asociada actualmente a este UDID."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 old_sn = req.sn
@@ -749,7 +749,7 @@ class DisassociateUDIDView(APIView):
                 )
 
                 return Response({
-                    "message": f"UDID {req.udid} was successfully disassociated",
+                    "message": f"El UDID {req.udid} fue desvinculado correctamente.",
                     "revoked_at": req.revoked_at,
                     "subscriber_code": req.subscriber_code,
                 }, status=status.HTTP_200_OK)
@@ -759,7 +759,7 @@ class DisassociateUDIDView(APIView):
             # (ver auditoría, mismo patrón ya corregido en change_password.py/
             # profile/views.py). El detalle completo queda en el log.
             logger.error(f"DisassociateUDIDView: Error interno - error={str(e)}", exc_info=True)
-            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Error interno del servidor. Intenta de nuevo más tarde."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def login_page_view(request):

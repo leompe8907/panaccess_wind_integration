@@ -171,6 +171,6 @@ def full_sync_view(request):
     except Exception as e:
         logger.exception("Error encolando full-sync")
         return Response(
-            {"success": False, "error_type": "Exception", "message": str(e)},
+            {"success": False, "error_type": "Exception", "message": "Ocurrió un error inesperado. Revisa los logs del servidor para más detalle."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

@@ -3,6 +3,8 @@ Diagnóstico de sesión PanAccess del singleton (cuenta de servicio).
 
 No exponer en /wind/login/ (portal de usuario). Ruta: /wind/ops/panaccess-session/
 """
+import logging
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
@@ -18,6 +20,8 @@ from wind.exceptions import (
     PanAccessAPIError,
     PanAccessException,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _panaccess_ops_http_enabled() -> bool:
@@ -96,7 +100,8 @@ def panaccess_session_status_view(request):
         )
 
     except Exception as e:
+        logger.exception("Error inesperado en panaccess_session_status_view")
         return Response(
-            {"success": False, "error_type": "Exception", "message": f"Error inesperado: {str(e)}"},
+            {"success": False, "error_type": "Exception", "message": "Ocurrió un error inesperado. Revisa los logs del servidor para más detalle."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
