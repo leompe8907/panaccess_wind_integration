@@ -147,9 +147,19 @@ def request_password_reset(email: str, reset_page_url: str) -> dict:
     """
     email_norm = normalize_email(email)
     registry = SubscriberEmailRegistry.objects.filter(email__iexact=email_norm).first()
+    subscriber_code = None
 
     if registry and registry.subscriber_code:
-        token = build_reset_token(registry.subscriber_code, email_norm)
+        subscriber_code = registry.subscriber_code
+    else:
+        # Fallback a ListOfSubscriber (usuarios sincronizados desde PanAccess/CRM sin registro local previo)
+        from wind.models import ListOfSubscriber
+        sub = ListOfSubscriber.objects.filter(emails__iexact=email_norm).exclude(status=ListOfSubscriber.STATUS_CLOSED).first()
+        if sub and sub.code:
+            subscriber_code = sub.code
+
+    if subscriber_code:
+        token = build_reset_token(subscriber_code, email_norm)
         separator = "&" if "?" in reset_page_url else "?"
         reset_link = f"{reset_page_url}{separator}t={token}"
         try:
