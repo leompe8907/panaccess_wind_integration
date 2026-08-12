@@ -7,9 +7,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from wind.api.profile.serializers import ProfilePasswordSerializer, ProfileCloseAccountSerializer
-from wind.exceptions import PanAccessException
+from wind.exceptions import (
+    PanAccessException,
+    PanAccessAPIError,
+    PanAccessConnectionError,
+    PanAccessTimeoutError,
+    PanAccessAuthenticationError,
+    PanAccessSessionError,
+    PanAccessRateLimitError,
+)
 from wind.permissions import IsOwnerSubscriber
 from wind.services.password_reset import reset_password_in_panaccess, sync_password_locally
+from wind.utils.password_policy import PASSWORD_POLICY_CODE
 from wind.services.subscriber_closure import close_subscriber_account
 from wind.services.subscriber_catalog import (
     build_subscriber_detail_payload,
@@ -56,13 +65,22 @@ def profile_me_view(request):
 @permission_classes([IsAuthenticated, IsOwnerSubscriber])
 @throttle_classes([ProfileThrottle])
 def profile_password_view(request):
-    """Cambia la contraseña PanAccess del propio suscriptor."""
+    """
+    Cambia la contraseña PanAccess del propio suscriptor.
+
+    Status codes (ver auditoría "BACKEND_CHANGE_PASSWORD_VALIDATION_ISSUE"):
+    400 si la contraseña no cumple la política (validada localmente en el
+    serializer, o rechazada por PanAccess) -- antes salía como 502
+    indistinguible de una falla real de conectividad. 502/503/504/429
+    quedan reservados para lo que sí es un problema de la integración con
+    PanAccess, no del valor que mandó el cliente.
+    """
     ser = ProfilePasswordSerializer(data=request.data)
     if not ser.is_valid():
-        return Response(
-            {"success": False, "errors": ser.errors},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        payload = {"success": False, "errors": ser.errors}
+        if "newPass" in ser.errors:
+            payload["code"] = PASSWORD_POLICY_CODE
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
     code = ser.validated_data["code"]
     new_pass = ser.validated_data["newPass"]
@@ -76,7 +94,47 @@ def profile_password_view(request):
                 "message": "Contraseña actualizada",
             }
         )
+    except PanAccessConnectionError as e:
+        # PanAccess no respondió -- esto sí es "intenta más tarde".
+        return Response(
+            {"success": False, "error_type": "PanAccessConnectionError", "code": "panaccess_unavailable", "message": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except PanAccessTimeoutError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessTimeoutError", "code": "panaccess_timeout", "message": str(e)},
+            status=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+    except (PanAccessAuthenticationError, PanAccessSessionError) as e:
+        # Problema de la sesión/credencial de servicio con PanAccess, no
+        # del usuario ni de la contraseña que mandó.
+        return Response(
+            {"success": False, "error_type": type(e).__name__, "code": "panaccess_integration_error", "message": str(e)},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except PanAccessRateLimitError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessRateLimitError", "code": "rate_limited", "message": str(e)},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+    except PanAccessAPIError as e:
+        # PanAccess respondió y rechazó el valor (típicamente la misma
+        # política de contraseña que ya se valida arriba, pero puede
+        # haber reglas de PanAccess que esta validación local no
+        # anticipe) -- es un error de input del cliente, no de servidor.
+        return Response(
+            {
+                "success": False,
+                "error_type": "PanAccessAPIError",
+                "code": "password_rejected_by_panaccess",
+                "panaccess_error_code": getattr(e, "error_code", None),
+                "message": str(e),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except PanAccessException as e:
+        # Base no prevista específicamente -- se mantiene 502 como antes
+        # (comportamiento sin cambios para lo que no se pudo clasificar).
         return Response(
             {"success": False, "error_type": "PanAccessException", "message": str(e)},
             status=status.HTTP_502_BAD_GATEWAY,

@@ -14,9 +14,18 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from wind.services.password_reset import reset_password_in_panaccess, sync_password_locally
-from wind.exceptions import PanAccessException
+from wind.exceptions import (
+    PanAccessException,
+    PanAccessAPIError,
+    PanAccessConnectionError,
+    PanAccessTimeoutError,
+    PanAccessAuthenticationError,
+    PanAccessSessionError,
+    PanAccessRateLimitError,
+)
 from wind.permissions import IsOwnerSubscriber
 from wind.throttles import ProfileThrottle
+from wind.utils.password_policy import PASSWORD_POLICY_CODE, validate_password_policy
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +56,24 @@ def change_password_view(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Validación local de política de contraseña -- ver
+    # wind/utils/password_policy.py y auditoría
+    # "BACKEND_CHANGE_PASSWORD_VALIDATION_ISSUE". Evita el round-trip a
+    # PanAccess para el caso común, y sobre todo evita que ese rechazo
+    # salga como 502 (antes indistinguible de una falla real de
+    # conectividad con PanAccess).
+    policy_error = validate_password_policy(new_pass)
+    if policy_error:
+        return Response(
+            {
+                "success": False,
+                "error_type": "ValidationError",
+                "code": PASSWORD_POLICY_CODE,
+                "message": policy_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
         reset_password_in_panaccess(code, new_pass)
         email = getattr(request.user, "email", "") or ""
@@ -59,9 +86,47 @@ def change_password_view(request):
             status=status.HTTP_200_OK,
         )
 
+    except PanAccessConnectionError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessConnectionError", "code": "panaccess_unavailable", "message": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except PanAccessTimeoutError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessTimeoutError", "code": "panaccess_timeout", "message": str(e)},
+            status=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+
+    except (PanAccessAuthenticationError, PanAccessSessionError) as e:
+        return Response(
+            {"success": False, "error_type": type(e).__name__, "code": "panaccess_integration_error", "message": str(e)},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except PanAccessRateLimitError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessRateLimitError", "code": "rate_limited", "message": str(e)},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    except PanAccessAPIError as e:
+        # PanAccess respondió y rechazó el valor -- error de input del
+        # cliente (400), no de servidor. Ver mismo criterio en
+        # wind/api/profile/views.py::profile_password_view.
+        return Response(
+            {
+                "success": False,
+                "error_type": "PanAccessAPIError",
+                "code": "password_rejected_by_panaccess",
+                "panaccess_error_code": getattr(e, "error_code", None),
+                "message": str(e),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     except PanAccessException as e:
-        # 502, no 500: el fallo es de la dependencia externa (PanAccess),
-        # no de este servicio -- mismo criterio que profile/views.py.
+        # Base no prevista específicamente -- se mantiene 502 como antes.
         return Response(
             {"success": False, "error_type": "PanAccessException", "message": str(e)},
             status=status.HTTP_502_BAD_GATEWAY,

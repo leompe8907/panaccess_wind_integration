@@ -152,9 +152,26 @@ La solución no es repetir el parche en cada pantalla, sino centralizarlo: mover
 
 ### 5.1 Cambiar contraseña
 
-`POST /api/v1/profile/password/` (JWT), body `{"code": "<subscriber_code>", "newPass": "..."}` → `{"success": true, "message": "Contraseña actualizada"}` (o 400/502).
+`POST /api/v1/profile/password/` (JWT), body `{"code": "<subscriber_code>", "newPass": "..."}` → `{"success": true, "message": "Contraseña actualizada"}`.
 
-**Efecto colateral automático:** invalida todos los JWT ya emitidos y revoca **todos** los `DeviceSession` de la cuenta -- incluida la propia sesión que hizo el cambio. Tras un cambio exitoso, la app debe volver a loguearse (JWT nuevo) y volver a registrar el dispositivo (sección 4.1).
+**Política de contraseña (`newPass`):** entre 8 y 255 caracteres, al menos una letra mayúscula, al menos un número, y solo caracteres `a-z`, `A-Z`, `0-9`, `-`, `_` y especiales `! @ # $ % ^ & * ( ) + = [ ] { } ; : ' " , . < > / ? ~ ` | \`. El cliente debería validar esto localmente antes de llamar al endpoint para evitar el round-trip en el caso obvio.
+
+**Nota sobre los caracteres especiales:** el charset base (`a-z`, `A-Z`, `0-9`, `-`, `_`) está confirmado porque es literalmente lo que devuelve PanAccess en su mensaje de error. Los caracteres especiales se agregaron a la validación local del backend, pero todavía no está confirmado que PanAccess los acepte también -- si PanAccess los rechaza, la respuesta es 400 con `code=password_rejected_by_panaccess` (ver tabla abajo), no un error. Tratar como pendiente de confirmar hasta correr `deploy/test_password_policy_probe.py` con un caracter especial.
+
+**Errores:** el body de error siempre incluye `"success": false` y `"message"` (texto legible); cuando corresponde, además incluye un campo `"code"` estable para no depender de parsear `message`:
+
+| Status | `code` | Significado |
+|---|---|---|
+| 400 | `password_policy_violation` | `newPass` no cumple la política de arriba (detectado localmente, sin llamar a PanAccess). |
+| 400 | `password_rejected_by_panaccess` | PanAccess respondió y rechazó la contraseña por una regla no cubierta por la validación local. Incluye además `"panaccess_error_code"` (puede ser `null`). |
+| 429 | `rate_limited` | Demasiados intentos; reintentar más tarde. |
+| 502 | `panaccess_integration_error` | Problema de la sesión/credencial de servicio con PanAccess -- no es culpa del valor enviado. |
+| 503 | `panaccess_unavailable` | PanAccess no respondió (conectividad). |
+| 504 | `panaccess_timeout` | PanAccess tardó demasiado en responder. |
+
+Antes de este fix, cualquiera de estos casos (incluida la violación de política) se devolvía como 502 sin `code`, indistinguible de una falla real de PanAccess -- si el cliente ya tenía lógica especial para 502, debe actualizarla para tratar 400 con `code=password_policy_violation`/`password_rejected_by_panaccess` como error de input corregible, no como "reintentar más tarde".
+
+**Efecto colateral automático (solo en éxito):** invalida todos los JWT ya emitidos y revoca **todos** los `DeviceSession` de la cuenta -- incluida la propia sesión que hizo el cambio. Tras un cambio exitoso, la app debe volver a loguearse (JWT nuevo) y volver a registrar el dispositivo (sección 4.1).
 
 ### 5.2 Contraseña olvidada
 

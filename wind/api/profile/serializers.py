@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from wind.models import ListOfProducts
 from wind.serializers import ListOfProductsSerializer
+from wind.utils.password_policy import validate_password_policy
 
 User = get_user_model()
 
@@ -41,6 +42,17 @@ class ProfileMeSerializer(serializers.ModelSerializer):
 class ProfilePasswordSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=100)
     newPass = serializers.CharField(max_length=255, write_only=True)
+
+    def validate_newPass(self, value):
+        # Rechaza acá (400, con este campo puntual en ser.errors) lo que
+        # sabemos de antemano que PanAccess va a rechazar -- evita el
+        # round-trip y, sobre todo, evita que ese rechazo salga como 502
+        # (ver wind/utils/password_policy.py y la vista que usa este
+        # serializer para el código estable que se agrega en la respuesta).
+        error = validate_password_policy(value)
+        if error:
+            raise serializers.ValidationError(error)
+        return value
 
 
 class ProfileCloseAccountSerializer(serializers.Serializer):
