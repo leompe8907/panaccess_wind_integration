@@ -44,7 +44,10 @@ class PasswordResetServiceTestCase(APITestCase):
         mock_task.delay.assert_called_once()
         args = mock_task.delay.call_args[0]
         self.assertEqual(args[0], self.email)
-        self.assertIn("t=", args[1])
+        # args[1]=subject, args[2]=text_body, args[3]=html_body (ver
+        # wind/services/password_reset_email.py::enqueue_password_reset_email)
+        self.assertIn("t=", args[2])
+        self.assertIn("t=", args[3])
 
     @patch("wind.tasks.send_password_reset_email_task")
     def test_request_password_reset_unregistered_email(self, mock_task):

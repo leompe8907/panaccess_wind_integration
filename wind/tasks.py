@@ -1062,9 +1062,16 @@ def send_password_changed_email_task(self, email, subject, text_body, html_body)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def send_password_reset_email_task(self, email: str, reset_link: str):
+def send_password_reset_email_task(self, email, subject, text_body, html_body):
     """
-    Envía el correo con enlace de recuperación de contraseña.
+    Envía el correo con enlace de recuperación de contraseña (ver
+    wind/services/password_reset_email.py y
+    wind/services/password_reset.py::request_password_reset).
+
+    Firma genérica (self, email, subject, text_body, html_body), igual que
+    send_welcome_credentials_email_task/send_password_changed_email_task --
+    antes tenía cuerpos armados a mano con strings en línea (sin diseño);
+    ahora el contenido llega ya renderizado desde una plantilla.
 
     Reintenta ante fallas transitorias de SMTP (antes no reintentaba nunca
     -- un hiccup momentáneo del servidor de correo perdía el email de
@@ -1074,25 +1081,11 @@ def send_password_reset_email_task(self, email: str, reset_link: str):
     from django.conf import settings
     from django.core.mail import send_mail
 
-    subject = "Restablecer contraseña - Wind"
-    body = (
-        "Hola,\n\n"
-        "Recibimos una solicitud para restablecer la contraseña de tu cuenta Wind.\n"
-        f"Usa este enlace (válido 60 minutos):\n\n{reset_link}\n\n"
-        "Si no solicitaste este cambio, ignora este correo.\n"
-    )
-    html_body = (
-        "<p>Hola,</p>"
-        "<p>Recibimos una solicitud para restablecer la contraseña de tu cuenta Wind.</p>"
-        f'<p><a href="{reset_link}">Restablecer contraseña</a></p>'
-        "<p>El enlace expira en 60 minutos.</p>"
-        "<p>Si no solicitaste este cambio, ignora este correo.</p>"
-    )
     logger.info("Enviando email de recuperación de contraseña a %s", email)
     try:
         send_mail(
             subject=subject,
-            message=body,
+            message=text_body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
             fail_silently=False,

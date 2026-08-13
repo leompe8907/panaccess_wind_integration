@@ -877,6 +877,21 @@ class EmailConfig:
         _strip_env(os.getenv("EMAIL_PORTAL_LOGIN_URL"))
         or "https://backend.wind.do/wind/login/"
     )
+    PASSWORD_RESET_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_PASSWORD_RESET_SUBJECT"))
+        or "Restablecer contraseña — WindTV"
+    )
+    # Banner (fotos + logo WindTV) del correo de "olvidé mi contraseña" --
+    # es un <img> real, no un CSS background-image: así escala igual en
+    # todos los clientes de correo (incluido Outlook de escritorio, que no
+    # soporta background-size). Necesita ser una URL absoluta (el correo se
+    # manda desde una tarea de Celery sin request activo, STATIC_URL puede
+    # ser relativo). Por defecto asume que el mismo backend sirve /static/;
+    # sobreescribir con CDN_STATIC_URL/env si aplica.
+    PASSWORD_RESET_BANNER_IMAGE_URL = (
+        _strip_env(os.getenv("EMAIL_PASSWORD_RESET_BANNER_URL"))
+        or "https://backend.wind.do/static/wind/images/password_reset_banner.jpg"
+    )
     SUPPORT_ADDRESS = _strip_env(os.getenv("EMAIL_SUPPORT_ADDRESS")) or "info@wind.do"
     # A dónde avisar cuando un cierre de cuenta agota los reintentos
     # automáticos (retry_partial_closures_task). Por defecto, el mismo

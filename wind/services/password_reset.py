@@ -188,9 +188,13 @@ def request_password_reset(email: str, reset_page_url: str) -> dict:
         separator = "&" if "?" in reset_page_url else "?"
         reset_link = f"{reset_page_url}{separator}t={token}"
         try:
-            from wind.tasks import send_password_reset_email_task
+            from wind.services.password_reset_email import enqueue_password_reset_email
 
-            send_password_reset_email_task.delay(email_norm, reset_link)
+            enqueue_password_reset_email(
+                email=email_norm,
+                reset_link=reset_link,
+                subscriber_code=subscriber_code,
+            )
         except Exception:
             logger.exception("No se pudo encolar email de recuperación para %s", email_norm)
     else:
