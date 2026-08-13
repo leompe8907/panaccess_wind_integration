@@ -163,6 +163,13 @@ body.app-body::before {
   color: rgba(179, 227, 255, 0.5);
 }
 
+.field-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .app-field input:focus {
   outline: none;
   border-color: #4ac7d7;

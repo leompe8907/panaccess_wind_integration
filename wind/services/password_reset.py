@@ -14,7 +14,15 @@ import logging
 from django.contrib.auth import get_user_model
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 
-from wind.exceptions import PanAccessException
+from wind.exceptions import (
+    PanAccessException,
+    PanAccessAPIError,
+    PanAccessConnectionError,
+    PanAccessTimeoutError,
+    PanAccessAuthenticationError,
+    PanAccessSessionError,
+    PanAccessRateLimitError,
+)
 from wind.models import PasswordResetTokenUse, SubscriberEmailRegistry, SubscriberLoginInfo
 from wind.services import get_panaccess
 from wind.services.device_session_service import revoke_all_device_sessions_for_subscriber
@@ -140,6 +148,23 @@ def sync_password_locally(subscriber_code: str, email: str, new_pass: str) -> No
     # ningún login social/portal asociado).
     revoke_all_device_sessions_for_subscriber(subscriber_code, reason="password_changed")
 
+    # Aviso por correo de "contraseña actualizada" -- cubre los tres
+    # flujos que llaman a esta función (cambio autenticado, endpoint
+    # legacy, y confirmación de "olvidé mi contraseña"). No debe poder
+    # romper el cambio de contraseña si el envío falla (ver
+    # enqueue_password_changed_email, que ya se traga sus propias
+    # excepciones).
+    try:
+        from wind.services.password_changed_email import enqueue_password_changed_email
+
+        enqueue_password_changed_email(
+            email=normalize_email(email),
+            first_name=getattr(user, "first_name", "") if user else "",
+            last_name=getattr(user, "last_name", "") if user else "",
+        )
+    except Exception:
+        logger.warning("No se pudo encolar el aviso de contraseña actualizada para %s", email, exc_info=True)
+
 
 def request_password_reset(email: str, reset_page_url: str) -> dict:
     """
@@ -213,8 +238,62 @@ def confirm_password_reset(token: str, new_pass: str) -> dict:
         reset_password_in_panaccess(subscriber_code, new_pass)
         sync_password_locally(subscriber_code, email, new_pass)
         mark_reset_token_used(token)
+    except PanAccessConnectionError as e:
+        # PanAccess no respondió -- esto sí es "intenta más tarde", a
+        # diferencia de un rechazo por política (ver PanAccessAPIError
+        # abajo). Mismo criterio que profile_password_view.
+        logger.error("PanAccess sin conexión en confirm_password_reset: %s", e)
+        return {
+            "success": False,
+            "error_type": "PanAccessConnectionError",
+            "code": "panaccess_unavailable",
+            "message": str(e),
+        }
+    except PanAccessTimeoutError as e:
+        logger.error("Timeout de PanAccess en confirm_password_reset: %s", e)
+        return {
+            "success": False,
+            "error_type": "PanAccessTimeoutError",
+            "code": "panaccess_timeout",
+            "message": str(e),
+        }
+    except (PanAccessAuthenticationError, PanAccessSessionError) as e:
+        # Problema de la sesión/credencial de servicio con PanAccess, no
+        # del usuario ni de la contraseña que mandó.
+        logger.error("Error de sesión/credencial PanAccess en confirm_password_reset: %s", e)
+        return {
+            "success": False,
+            "error_type": type(e).__name__,
+            "code": "panaccess_integration_error",
+            "message": str(e),
+        }
+    except PanAccessRateLimitError as e:
+        logger.warning("Rate limit de PanAccess en confirm_password_reset: %s", e)
+        return {
+            "success": False,
+            "error_type": "PanAccessRateLimitError",
+            "code": "rate_limited",
+            "message": str(e),
+        }
+    except PanAccessAPIError as e:
+        # PanAccess respondió y rechazó el valor (p. ej. la misma política
+        # de contraseña que ya se valida en el serializer, pero puede
+        # haber alguna regla que esa validación local no anticipe) --
+        # error de input del cliente (400), no de servidor. Antes esto
+        # caía en el except PanAccessException genérico de abajo y salía
+        # como 502 con un mensaje aplanado que descartaba el motivo real.
+        logger.error("PanAccess rechazó la contraseña en confirm_password_reset: %s", e)
+        return {
+            "success": False,
+            "error_type": "PanAccessAPIError",
+            "code": "password_rejected_by_panaccess",
+            "panaccess_error_code": getattr(e, "error_code", None),
+            "message": str(e),
+        }
     except PanAccessException as e:
-        logger.error("Error PanAccess en confirm_password_reset: %s", e)
+        # Base no prevista específicamente -- se mantiene el mensaje
+        # genérico de antes (no exponer detalle interno no clasificado).
+        logger.error("Error PanAccess no clasificado en confirm_password_reset: %s", e)
         return {
             "success": False,
             "error_type": "PanAccessException",

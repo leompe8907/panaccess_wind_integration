@@ -70,10 +70,12 @@ def password_reset_confirm_view(request):
 
     ser = ResetPasswordConfirmSerializer(data=request.data)
     if not ser.is_valid():
-        return Response(
-            {"success": False, "errors": ser.errors},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        payload = {"success": False, "errors": ser.errors}
+        if "newPass" in ser.errors:
+            from wind.utils.password_policy import PASSWORD_POLICY_CODE
+
+            payload["code"] = PASSWORD_POLICY_CODE
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
     result = confirm_password_reset(
         ser.validated_data["token"],
@@ -81,8 +83,21 @@ def password_reset_confirm_view(request):
     )
     if not result.get("success"):
         error_type = result.get("error_type", "")
-        if error_type in ("TokenExpired", "TokenUsed", "InvalidToken"):
+        # Status codes (ver auditoría "BACKEND_CHANGE_PASSWORD_VALIDATION_ISSUE"):
+        # 400 para lo que el cliente puede corregir (token inválido o
+        # contraseña rechazada), 502/503/504/429 para lo que sí es un
+        # problema real de la integración con PanAccess. Mismo criterio
+        # que profile_password_view/change_password_view.
+        if error_type in ("TokenExpired", "TokenUsed", "InvalidToken", "PanAccessAPIError"):
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        if error_type == "PanAccessConnectionError":
+            return Response(result, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        if error_type == "PanAccessTimeoutError":
+            return Response(result, status=status.HTTP_504_GATEWAY_TIMEOUT)
+        if error_type in ("PanAccessAuthenticationError", "PanAccessSessionError"):
+            return Response(result, status=status.HTTP_502_BAD_GATEWAY)
+        if error_type == "PanAccessRateLimitError":
+            return Response(result, status=status.HTTP_429_TOO_MANY_REQUESTS)
         if error_type == "PanAccessException":
             return Response(result, status=status.HTTP_502_BAD_GATEWAY)
         return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

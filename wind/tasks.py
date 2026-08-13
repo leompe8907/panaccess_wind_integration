@@ -1032,6 +1032,36 @@ def send_welcome_credentials_email_task(self, email, subject, text_body, html_bo
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_password_changed_email_task(self, email, subject, text_body, html_body):
+    """
+    Envía el aviso de "contraseña actualizada" tras un cambio exitoso (ver
+    wind/services/password_changed_email.py y
+    wind/services/password_reset.py::sync_password_locally).
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    logger.info("Enviando correo de contraseña actualizada a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Correo de contraseña actualizada enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as exc:
+        logger.exception("Error al enviar correo de contraseña actualizada a %s", email)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_password_reset_email_task(self, email: str, reset_link: str):
     """
     Envía el correo con enlace de recuperación de contraseña.

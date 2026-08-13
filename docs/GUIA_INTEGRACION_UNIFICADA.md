@@ -175,7 +175,23 @@ Antes de este fix, cualquiera de estos casos (incluida la violación de polític
 
 ### 5.2 Contraseña olvidada
 
-`POST /api/auth/password/forgot/` (`email`, `recaptcha_token`) → siempre 200 genérico. `POST /api/auth/password/reset-confirm/` (`token`, `newPass`, `confirmPass`) → 200 si aplicó, 400 si el token es inválido/expirado/usado. Mismo efecto colateral que 5.1.
+`POST /api/auth/password/forgot/` (`email`, `recaptcha_token`) → siempre 200 genérico. `POST /api/auth/password/reset-confirm/` (`token`, `newPass`, `confirmPass`) → 200 si aplicó.
+
+`newPass` sigue la misma política de contraseña de la sección 5.1 (incluida la validación local), y los errores siguen el mismo contrato de `code`/status:
+
+| Status | `code` | Significado |
+|---|---|---|
+| 400 | `password_policy_violation` | `newPass` no cumple la política (validado localmente). |
+| 400 | `password_rejected_by_panaccess` | PanAccess rechazó la contraseña por una regla no cubierta localmente. Incluye `"panaccess_error_code"`. |
+| 400 | -- (`error_type`: `TokenExpired`/`TokenUsed`/`InvalidToken`) | El enlace es inválido, expiró o ya se usó. |
+| 429 | `rate_limited` | Demasiados intentos. |
+| 502 | `panaccess_integration_error` | Problema de sesión/credencial de servicio con PanAccess. |
+| 503 | `panaccess_unavailable` | PanAccess no respondió. |
+| 504 | `panaccess_timeout` | PanAccess tardó demasiado. |
+
+Antes de este fix, un rechazo por política de contraseña en este flujo salía como 502 con un mensaje genérico que descartaba el motivo real (peor que 5.1, que al menos devolvía el texto de PanAccess) -- si el cliente tiene lógica especial para ese caso, actualizarla igual que en 5.1.
+
+Mismo efecto colateral que 5.1 (solo en éxito).
 
 ### 5.3 Cerrar cuenta
 

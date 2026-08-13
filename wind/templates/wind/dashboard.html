@@ -134,9 +134,14 @@
                     name="newPass"
                     type="password"
                     autocomplete="new-password"
-                    minlength="4"
+                    minlength="8"
+                    maxlength="255"
                     required
                   />
+                  <p class="field-hint">
+                    Entre 8 y 255 caracteres, con al menos una mayúscula y un número.
+                    También puedes usar símbolos como ! @ # $ % ^ &amp; * ( ) + = - _ [ ] { } ; : ' " , . &lt; &gt; / ? ~ ` |
+                  </p>
                 </div>
                 <div class="app-field">
                   <label for="confirm-password">Confirmar contraseña</label>
@@ -144,7 +149,8 @@
                     id="confirm-password"
                     type="password"
                     autocomplete="new-password"
-                    minlength="4"
+                    minlength="8"
+                    maxlength="255"
                     required
                   />
                 </div>
@@ -277,6 +283,30 @@
 
     <script src="{% static 'wind/js/auth-store.js' %}"></script>
     <script>
+      // Política de contraseña -- debe mantenerse sincronizada con
+      // wind/utils/password_policy.py (backend). Es solo un atajo para dar
+      // feedback inmediato antes del round-trip; el backend sigue siendo
+      // la fuente de verdad y valida esto mismo de nuevo.
+      var PASSWORD_ALLOWED_CHARS_RE = /^[A-Za-z0-9_!@#$%^&*()+=\[\]{};:'",.<>\/?~`|\\-]+$/;
+      var PASSWORD_HAS_UPPER_RE = /[A-Z]/;
+      var PASSWORD_HAS_DIGIT_RE = /[0-9]/;
+
+      function validatePasswordPolicy(password) {
+        if (!password || password.length < 8 || password.length > 255) {
+          return "La contraseña debe tener entre 8 y 255 caracteres.";
+        }
+        if (!PASSWORD_ALLOWED_CHARS_RE.test(password)) {
+          return "La contraseña tiene caracteres no permitidos.";
+        }
+        if (!PASSWORD_HAS_UPPER_RE.test(password)) {
+          return "La contraseña debe incluir al menos una letra mayúscula.";
+        }
+        if (!PASSWORD_HAS_DIGIT_RE.test(password)) {
+          return "La contraseña debe incluir al menos un número.";
+        }
+        return null;
+      }
+
       (function () {
         var greetingEl = document.getElementById("user-greeting");
         var statusEl = document.getElementById("account-status");
@@ -996,8 +1026,9 @@
             var newPass = newPasswordInput ? newPasswordInput.value : "";
             var confirmPass = confirmPasswordInput ? confirmPasswordInput.value : "";
 
-            if (!newPass || newPass.length < 4) {
-              showPasswordMsg("La contraseña debe tener al menos 4 caracteres.", "error");
+            var policyError = validatePasswordPolicy(newPass);
+            if (policyError) {
+              showPasswordMsg(policyError, "error");
               return;
             }
             if (newPass !== confirmPass) {

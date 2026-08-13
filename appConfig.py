@@ -865,6 +865,18 @@ class EmailConfig:
         _strip_env(os.getenv("EMAIL_WELCOME_SUBJECT"))
         or "Bienvenido a WindTV — tus datos de acceso"
     )
+    PASSWORD_CHANGED_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_PASSWORD_CHANGED_SUBJECT"))
+        or "Tu contraseña de WindTV fue actualizada"
+    )
+    # Link al login del portal para el botón del correo de "contraseña
+    # actualizada" -- se manda desde una tarea de Celery sin request activo,
+    # así que no se puede usar request.build_absolute_uri() como en
+    # request_password_reset(); necesita una URL absoluta configurada.
+    PORTAL_LOGIN_URL = (
+        _strip_env(os.getenv("EMAIL_PORTAL_LOGIN_URL"))
+        or "https://backend.wind.do/wind/login/"
+    )
     SUPPORT_ADDRESS = _strip_env(os.getenv("EMAIL_SUPPORT_ADDRESS")) or "info@wind.do"
     # A dónde avisar cuando un cierre de cuenta agota los reintentos
     # automáticos (retry_partial_closures_task). Por defecto, el mismo
