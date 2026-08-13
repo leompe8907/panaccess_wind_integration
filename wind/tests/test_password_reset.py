@@ -6,7 +6,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from wind.models import SubscriberEmailRegistry, SubscriberLoginInfo
+from wind.models import ListOfSubscriber, SubscriberEmailRegistry, SubscriberLoginInfo
 from wind.services.password_reset import (
     GENERIC_FORGOT_MESSAGE,
     build_reset_token,
@@ -70,6 +70,41 @@ class PasswordResetServiceTestCase(APITestCase):
 
         self.login_info.refresh_from_db()
         self.assertTrue(self.login_info.check_password(new_pass))
+
+    @patch("wind.services.password_reset.reset_password_in_panaccess")
+    @patch("wind.services.password_reset.mark_reset_token_used")
+    def test_confirm_password_reset_listofsubscriber_fallback(self, mock_mark_used, mock_panaccess_reset):
+        """
+        Regresión: cuentas resueltas solo por el fallback a ListOfSubscriber
+        (sin fila en SubscriberEmailRegistry -- p. ej. sincronizadas desde
+        PanAccess/CRM, nunca registradas localmente) generan un token válido
+        en request_password_reset(), pero confirm_password_reset() lo
+        rechazaba siempre como "InvalidToken" porque solo validaba contra
+        SubscriberEmailRegistry. Confirmado en producción con una cuenta
+        real antes de este fix.
+        """
+        code = "WND0200"
+        email = "solo.listofsubscriber@example.com"
+        ListOfSubscriber.objects.create(id=code, code=code, emails=email, status=ListOfSubscriber.STATUS_ACTIVE)
+        SubscriberLoginInfo.objects.create(subscriberCode=code, login1=99002, login2="fallbackuser")
+
+        token = build_reset_token(code, email)
+        result = confirm_password_reset(token, "NewSecurePass99!")
+
+        self.assertTrue(result["success"], result)
+        mock_panaccess_reset.assert_called_once_with(code, "NewSecurePass99!")
+
+    def test_confirm_password_reset_closed_listofsubscriber_rejected(self):
+        """Una cuenta cerrada resuelta solo por ListOfSubscriber sigue rechazada."""
+        code = "WND0201"
+        email = "cerrado@example.com"
+        ListOfSubscriber.objects.create(id=code, code=code, emails=email, status=ListOfSubscriber.STATUS_CLOSED)
+
+        token = build_reset_token(code, email)
+        result = confirm_password_reset(token, "NewSecurePass99!")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error_type"], "InvalidToken")
 
     def test_confirm_password_reset_invalid_token(self):
         result = confirm_password_reset("invalid-token", "NewSecurePass99!")

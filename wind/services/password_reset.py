@@ -232,11 +232,29 @@ def confirm_password_reset(token: str, new_pass: str) -> dict:
         email__iexact=email,
     ).first()
     if not registry:
-        return {
-            "success": False,
-            "error_type": "InvalidToken",
-            "message": "Enlace inválido o incompleto.",
-        }
+        # `request_password_reset` resuelve la cuenta por dos caminos:
+        # `SubscriberEmailRegistry`, o si no hay fila ahí, `ListOfSubscriber`
+        # (cuentas sincronizadas desde PanAccess/CRM que nunca pasaron por
+        # registro local -- ver esa función más arriba). El token se firma
+        # igual en ambos casos, pero acá solo se validaba contra
+        # `SubscriberEmailRegistry`: cualquier cuenta resuelta por el
+        # fallback quedaba con un token que firma correcto pero que esta
+        # función siempre rechazaba como "inválido", sin importar que el
+        # enlace estuviera perfecto y a tiempo (bug real, confirmado en
+        # producción -- subscriber_code sin fila en SubscriberEmailRegistry
+        # pero activo en ListOfSubscriber). Mismo fallback acá para que
+        # ambas funciones acepten exactamente las mismas cuentas.
+        from wind.models import ListOfSubscriber
+
+        sub = ListOfSubscriber.objects.filter(
+            code=subscriber_code, emails__iexact=email,
+        ).exclude(status=ListOfSubscriber.STATUS_CLOSED).first()
+        if not sub:
+            return {
+                "success": False,
+                "error_type": "InvalidToken",
+                "message": "Enlace inválido o incompleto.",
+            }
 
     try:
         reset_password_in_panaccess(subscriber_code, new_pass)
