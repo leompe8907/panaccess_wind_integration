@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Iniciar sesión | Wind</title>
     <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=6" />
+    {% if show_social_login %}
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    {% endif %}
   </head>
   <body class="split-body">
     <div class="split-shell">
@@ -41,12 +43,15 @@
             <p class="split-links">
               <a class="app-link" href="{% url 'forgot_password' %}">¿Olvidaste tu contraseña?</a>
             </p>
+            {% if show_register_link %}
             <p class="split-links">
               ¿No tienes cuenta?
               <a class="app-link" href="{% url 'register_web' %}">Regístrate</a>
             </p>
+            {% endif %}
           </form>
 
+          {% if show_social_login %}
           <div class="split-divider">o continúa con</div>
 
           <div class="split-social">
@@ -55,6 +60,7 @@
               Iniciar sesión con Facebook
             </button>
           </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -124,6 +130,7 @@
         }
       });
 
+      {% if show_social_login %}
       let googleInitialized = false;
 
       function onGoogleCredential(response) {
@@ -212,7 +219,10 @@
         }
         FB.login(onFacebookLoginResponse, { scope: "email,public_profile" });
       });
+      {% endif %}
     </script>
+    {% if show_social_login %}
     <script async defer crossorigin="anonymous" src="https://connect.facebook.net/es_ES/sdk.js"></script>
+    {% endif %}
   </body>
 </html>

@@ -1107,6 +1107,21 @@ class TrustedProxyConfig:
     TRUSTED_PROXIES = _csv("TRUSTED_PROXIES") or ["127.0.0.1", "::1"]
 
 
+class LoginPageConfig:
+    """
+    Qué mostrar en `wind/login.html` (el portal propio del backend, distinto
+    de appVideo -- ese tiene su propio flag por marca en `brands.js`).
+
+    Opt-out vía env: por defecto ambos están visibles (comportamiento
+    histórico sin cambios); poner en "false" para ocultar el enlace de
+    registro o el bloque de login social (Google/Facebook) sin tocar el
+    template ni desplegar código nuevo.
+    """
+
+    SHOW_REGISTER_LINK = _env_bool("LOGIN_SHOW_REGISTER_LINK", True)
+    SHOW_SOCIAL_LOGIN = _env_bool("LOGIN_SHOW_SOCIAL_LOGIN", True)
+
+
 class GeoIPConfig:
     """
     Resolución de país/ciudad a partir de la IP de un "dispositivo vinculado"
