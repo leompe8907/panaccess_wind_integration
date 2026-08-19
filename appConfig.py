@@ -1136,8 +1136,8 @@ class LoginPageConfig:
     template ni desplegar código nuevo.
     """
 
-    SHOW_REGISTER_LINK = _env_bool("LOGIN_SHOW_REGISTER_LINK", True)
-    SHOW_SOCIAL_LOGIN = _env_bool("LOGIN_SHOW_SOCIAL_LOGIN", True)
+    SHOW_REGISTER_LINK = _env_bool("LOGIN_SHOW_REGISTER_LINK", False)
+    SHOW_SOCIAL_LOGIN = _env_bool("LOGIN_SHOW_SOCIAL_LOGIN", False)
 
 
 class GeoIPConfig:

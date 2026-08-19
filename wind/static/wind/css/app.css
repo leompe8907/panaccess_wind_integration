@@ -176,6 +176,57 @@ body.app-body::before {
   box-shadow: 0 0 0 4px rgba(74, 199, 215, 0.25);
 }
 
+.app-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.app-input-wrap input {
+  padding-right: 42px;
+}
+
+.app-toggle-visibility {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.app-toggle-visibility:hover,
+.app-toggle-visibility:focus-visible {
+  color: var(--text);
+  outline: none;
+}
+
+.app-toggle-visibility svg {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.app-toggle-visibility .icon-eye-off {
+  display: none;
+}
+
+.app-toggle-visibility.is-visible .icon-eye {
+  display: none;
+}
+
+.app-toggle-visibility.is-visible .icon-eye-off {
+  display: block;
+}
+
 .app-btn {
   appearance: none;
   border: 1px solid rgba(74, 199, 215, 0.3);
