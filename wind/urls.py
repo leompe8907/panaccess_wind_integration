@@ -23,6 +23,7 @@ from wind.views import (
     subscriber_test_view,
     login_facebook_test_view,
     register_view,
+    go_windtv_view,
     credentials_view,
     forgot_password_view,
     reset_password_view,
@@ -57,6 +58,7 @@ urlpatterns = [
     
     # Registro web (formulario usable)
     path('register/', register_view, name='register_web'),
+    path('go/windtv/', go_windtv_view, name='go_windtv'),
     # Página para mostrar credenciales recién creadas (token firmado)
     path('credentials/', credentials_view, name='credentials_web'),
     path('forgot-password/', forgot_password_view, name='forgot_password'),

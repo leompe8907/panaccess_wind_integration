@@ -869,13 +869,17 @@ class EmailConfig:
         _strip_env(os.getenv("EMAIL_PASSWORD_CHANGED_SUBJECT"))
         or "Tu contraseña de WindTV fue actualizada"
     )
-    # Link al login del portal para el botón del correo de "contraseña
-    # actualizada" -- se manda desde una tarea de Celery sin request activo,
-    # así que no se puede usar request.build_absolute_uri() como en
-    # request_password_reset(); necesita una URL absoluta configurada.
+    # Link del botón "Ir a WindTV" del correo de "contraseña actualizada" --
+    # se manda desde una tarea de Celery sin request activo, así que no se
+    # puede usar request.build_absolute_uri() como en request_password_reset();
+    # necesita una URL absoluta configurada.
+    # Apunta al redirector inteligente (wind.views.go_windtv_view) y NO
+    # directo al login del backend -- así el botón lleva a cada usuario a
+    # donde corresponde (web -> windtv.wind.do, Android -> abre/instala la
+    # app, iOS -> web mientras la app no esté publicada).
     PORTAL_LOGIN_URL = (
         _strip_env(os.getenv("EMAIL_PORTAL_LOGIN_URL"))
-        or "https://backend.wind.do/wind/login/"
+        or "https://backend.wind.do/wind/go/windtv/"
     )
     PASSWORD_RESET_SUBJECT = (
         _strip_env(os.getenv("EMAIL_PASSWORD_RESET_SUBJECT"))
@@ -902,6 +906,20 @@ class EmailConfig:
     GOOGLE_PLAY_URL = _strip_env(os.getenv("WIND_APP_GOOGLE_PLAY_URL")) or ""
     APP_STORE_URL = _strip_env(os.getenv("WIND_APP_APP_STORE_URL")) or ""
     SOCIAL_PASSWORD_MESSAGE = "Cuenta social no usa contraseña."
+
+    # Destino final para el redirector inteligente /go/windtv/ (ver
+    # wind.views.go_windtv_view): a dónde va el usuario en web o en iOS
+    # (la app de iOS todavía no está publicada -- mientras tanto se trata
+    # igual que web).
+    WINDTV_WEB_URL = _strip_env(os.getenv("WINDTV_WEB_URL")) or "https://windtv.wind.do/"
+    # applicationId real del build de producción (app/build.gradle, flavor
+    # wind_mobile) -- confirmado por el equipo de Android. OJO: es distinto
+    # del package usado en WIND_APP_GOOGLE_PLAY_URL de momento
+    # (com.wind.windtv) -- pendiente de aclarar cuál es el correcto para el
+    # botón de Google Play de welcome_credentials/credentials.html.
+    WINDTV_ANDROID_PACKAGE = (
+        _strip_env(os.getenv("WINDTV_ANDROID_PACKAGE")) or "com.wind.android.streaming"
+    )
 
     @classmethod
     def account_verification(cls, *, debug: bool) -> str:

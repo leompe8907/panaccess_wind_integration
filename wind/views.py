@@ -2,11 +2,13 @@ import logging
 import secrets
 from datetime import timedelta
 import base64
+from urllib.parse import quote
 
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import render
+from django.http import HttpResponseRedirect
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from asgiref.sync import async_to_sync
@@ -822,6 +824,44 @@ def register_view(request):
     Se renderiza en el mismo origen para evitar CORS.
     """
     return render(request, 'wind/register.html', {'debug': bool(settings.DEBUG)})
+
+
+def go_windtv_view(request):
+    """
+    Redirector inteligente "Ir a WindTV" (botón de correos como
+    password_changed.html, ver EmailConfig.PORTAL_LOGIN_URL):
+
+    - Android: intenta abrir la app instalada (com.wind.android.streaming,
+      confirmado por el equipo de Android) vía Intent URL apuntando a su
+      launcher; si no está instalada, Chrome cae automáticamente al
+      `browser_fallback_url` (ficha de Play Store).
+    - iOS: la app todavía no está publicada (en desarrollo) -- se trata
+      igual que web por ahora. Cuando lance, agregar aquí el mismo patrón
+      con Bundle ID (com.windtelecom.windtv, ya confirmado) + App Store ID
+      + Universal Link/scheme una vez el equipo de iOS los defina.
+    - Cualquier otro caso (desktop, etc.): directo a la web de WindTV.
+
+    No requiere sesión ni parámetros -- es un simple router por
+    User-Agent, pensado para ponerse detrás de un solo link estable
+    (`/wind/go/windtv/`) que no cambia aunque cambien las URLs de destino.
+    """
+    ua = request.META.get("HTTP_USER_AGENT", "").lower()
+
+    if "android" in ua:
+        package = EmailConfig.WINDTV_ANDROID_PACKAGE
+        play_store_url = f"https://play.google.com/store/apps/details?id={package}"
+        intent_url = (
+            "intent://#Intent;"
+            "action=android.intent.action.MAIN;"
+            "category=android.intent.category.LAUNCHER;"
+            f"package={package};"
+            f"S.browser_fallback_url={quote(play_store_url, safe='')};"
+            "end"
+        )
+        return HttpResponseRedirect(intent_url)
+
+    # iOS (sin app publicada todavía) y cualquier otra plataforma -> web.
+    return HttpResponseRedirect(EmailConfig.WINDTV_WEB_URL)
 
 
 def _credentials_page_context(**extra):
