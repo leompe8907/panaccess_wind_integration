@@ -648,6 +648,25 @@ class CeleryConfig:
     PROVISIONING_RETRY_MINUTES = max(5, _env_int("CELERY_PROVISIONING_RETRY_MINUTES", 15))
     PROVISIONING_RETRY_MAX_ATTEMPTS = max(1, _env_int("CELERY_PROVISIONING_RETRY_MAX_ATTEMPTS", 8))
 
+    # --- App "telemetry" (canales más vistos) ---------------------------
+    # Cola propia para no competir con el pipeline de sincronización de
+    # suscriptores/smartcards -- un pico de eventos de telemetría no debe
+    # retrasar esa sync, ni al revés.
+    TELEMETRY_QUEUE = _strip_env(os.getenv("CELERY_TELEMETRY_QUEUE")) or "telemetry"
+
+    TELEMETRY_INGEST_ENABLED = _env_bool("CELERY_TELEMETRY_INGEST_ENABLED", True)
+    TELEMETRY_INGEST_MINUTES = max(1, _env_int("CELERY_TELEMETRY_INGEST_MINUTES", 10))
+    TELEMETRY_INGEST_LOCK_TIMEOUT = max(
+        60, _env_int("CELERY_TELEMETRY_INGEST_LOCK_TIMEOUT", 600)
+    )
+
+    TELEMETRY_AGGREGATE_ENABLED = _env_bool("CELERY_TELEMETRY_AGGREGATE_ENABLED", True)
+    TELEMETRY_AGGREGATE_MINUTES = max(5, _env_int("CELERY_TELEMETRY_AGGREGATE_MINUTES", 60))
+    TELEMETRY_AGGREGATE_LOCK_TIMEOUT = max(
+        60, _env_int("CELERY_TELEMETRY_AGGREGATE_LOCK_TIMEOUT", 900)
+    )
+    TELEMETRY_AGGREGATE_DAYS_BACK = max(0, _env_int("CELERY_TELEMETRY_AGGREGATE_DAYS_BACK", 2))
+
 
 # ---------------------------------------------------------------------------
 # Caché

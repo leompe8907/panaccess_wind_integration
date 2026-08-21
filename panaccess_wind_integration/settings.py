@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'wind',
+    'telemetry',
     'channels',  # Django Channels
     'allauth',
     'allauth.account',
@@ -390,6 +391,12 @@ _PIPELINE_QUEUE = CeleryConfig.SYNC_PIPELINE_QUEUE
 _FULL_SYNC_QUEUE = CeleryConfig.FULL_SYNC_QUEUE
 _SYNC_QUEUE = CeleryConfig.SYNC_QUEUE  # alias legacy
 _COMPARE_SUBSCRIBERS_QUEUE = CeleryConfig.COMPARE_SUBSCRIBERS_QUEUE
+# Cola propia de la app "telemetry" -- un pico de eventos OTT no debe
+# retrasar la sync de suscriptores/smartcards, ni al revés. Necesita su
+# propio worker en el deploy (ver deploy/systemd), igual que
+# compare_reconcile: sin ruta explícita, una tarea cae en la cola
+# default de Celery, que en este deploy no tiene worker escuchándola.
+_TELEMETRY_QUEUE = CeleryConfig.TELEMETRY_QUEUE
 
 CELERY_TASK_ROUTES = {
     'wind.tasks.periodic_sync_pipeline_task': {'queue': _PIPELINE_QUEUE},
@@ -412,6 +419,8 @@ CELERY_TASK_ROUTES = {
     'wind.tasks.send_welcome_credentials_email_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.send_password_reset_email_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.send_verification_email_task': {'queue': _PIPELINE_QUEUE},
+    'telemetry.tasks.ingest_ott_telemetry_task': {'queue': _TELEMETRY_QUEUE},
+    'telemetry.tasks.aggregate_ott_channels_task': {'queue': _TELEMETRY_QUEUE},
 }
 
 _SYNC_MINUTES = CeleryConfig.SYNC_MINUTES
@@ -522,6 +531,34 @@ if CeleryConfig.PROVISIONING_RETRY_ENABLED:
         "options": {
             "queue": _PIPELINE_QUEUE,
             "expires": CeleryConfig.PROVISIONING_RETRY_MINUTES * 60,
+        },
+    }
+
+# --- App "telemetry" (canales más vistos) -----------------------------
+if CeleryConfig.TELEMETRY_INGEST_ENABLED:
+    CELERY_BEAT_SCHEDULE["telemetry-ingest-ott"] = {
+        "task": "telemetry.tasks.ingest_ott_telemetry_task",
+        "schedule": timedelta(minutes=CeleryConfig.TELEMETRY_INGEST_MINUTES),
+        "options": {
+            "queue": _TELEMETRY_QUEUE,
+            "soft_time_limit": CeleryConfig.TELEMETRY_INGEST_LOCK_TIMEOUT,
+            "time_limit": CeleryConfig.TELEMETRY_INGEST_LOCK_TIMEOUT + 60,
+            # Si el worker estuvo caído y el mensaje quedó encolado más
+            # que el propio intervalo, mejor descartarlo -- la próxima
+            # corrida normal ya trae lo que falta (es incremental).
+            "expires": CeleryConfig.TELEMETRY_INGEST_MINUTES * 60,
+        },
+    }
+
+if CeleryConfig.TELEMETRY_AGGREGATE_ENABLED:
+    CELERY_BEAT_SCHEDULE["telemetry-aggregate-ott"] = {
+        "task": "telemetry.tasks.aggregate_ott_channels_task",
+        "schedule": timedelta(minutes=CeleryConfig.TELEMETRY_AGGREGATE_MINUTES),
+        "options": {
+            "queue": _TELEMETRY_QUEUE,
+            "soft_time_limit": CeleryConfig.TELEMETRY_AGGREGATE_LOCK_TIMEOUT,
+            "time_limit": CeleryConfig.TELEMETRY_AGGREGATE_LOCK_TIMEOUT + 60,
+            "expires": CeleryConfig.TELEMETRY_AGGREGATE_MINUTES * 60,
         },
     }
 
