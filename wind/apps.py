@@ -12,6 +12,10 @@ _SKIP_PANACCESS_INIT_COMMANDS = frozenset({
     'check', 'showmigrations', 'sqlmigrate', 'createsuperuser',
     'loaddata', 'dumpdata', 'flush',
     'check_deploy', 'check_redis', 'check_database', 'sentry_test',
+    # rotate_secrets: no toca PanAccess para nada -- y es justo el tipo de
+    # comando que se corre en medio de un incidente, donde un login
+    # bloqueante de ~46s (5 reintentos) es lo último que hace falta.
+    'rotate_secrets',
 })
 
 

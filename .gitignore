@@ -74,6 +74,10 @@ staticfiles/
 .env.*
 !.env.example
 
+# Staging temporal de `manage.py rotate_secrets` (contiene secretos nuevos en
+# claro entre --generate y --apply) -- ver docs/ROTACION_SECRETOS_COMPROMETIDOS_2026-08-25.md.
+.secrets_rotation_pending.json
+
 # =============================================================================
 # Logs del proyecto
 # =============================================================================
