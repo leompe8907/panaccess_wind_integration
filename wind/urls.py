@@ -13,7 +13,6 @@ from wind.functions import (
     smartcards_stats_view,
     create_subscriber_view,
     validate_subscriber_email_view,
-    change_password_view,
     full_sync_view,
 )
 from wind.views import (
@@ -90,8 +89,11 @@ urlpatterns = [
     # Validar si el email del suscriptor ya existe
     path('validate-subscriber-email/', validate_subscriber_email_view, name='validate_subscriber_email'),
 
-    # Cambio de contraseña (PanAccess)
-    path('change-password/', change_password_view, name='change_password'),
+    # NOTA (2026-08-25): se dio de baja 'change-password/' (legacy, duplicado
+    # de /api/v1/profile/password/, ningún template interno lo usaba -- ver
+    # docs/LIMPIEZA_RUTAS_AUTH_NATIVAS_2026-08-25.md). La función
+    # change_password_view sigue existiendo en wind/functions/change_password.py
+    # por si hace falta consultarla, solo se quitó la ruta.
 
     # Sincronización global (todas las tablas)
     path('full-sync/', full_sync_view, name='full_sync'),

@@ -5,14 +5,17 @@ from rest_framework.views import APIView
 from telemetry.services.top_channels import (
     DEFAULT_LIMIT,
     DEFAULT_WINDOW_DAYS,
-    get_top_channels_global,
+    build_top_channels_bouquet,
 )
 
 
 class TopChannelsGlobalView(APIView):
     """
     GET /api/v1/telemetry/top-channels/  -- ranking global de "canales
-    más vistos" (mismo resultado para todos los suscriptores).
+    más vistos" (mismo resultado para todos los suscriptores), entregado
+    con la misma forma que un bouquet real de PanAccess (bouquetId, name,
+    customData) para que appVideo lo renderice con el mismo componente que
+    usa para bouquets reales.
 
     Lee de caché (ver telemetry/services/top_channels.py); no hace
     ningún cálculo pesado en el request en operación normal.
@@ -21,12 +24,6 @@ class TopChannelsGlobalView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        top_channels = get_top_channels_global(
-            window_days=DEFAULT_WINDOW_DAYS, limit=DEFAULT_LIMIT
-        )
         return Response(
-            {
-                "window_days": DEFAULT_WINDOW_DAYS,
-                "channels": top_channels,
-            }
+            build_top_channels_bouquet(window_days=DEFAULT_WINDOW_DAYS, limit=DEFAULT_LIMIT)
         )

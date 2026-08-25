@@ -12,6 +12,7 @@ que se le pone al caché es solo un resguardo (si la tarea periódica
 alguna vez dejara de correr, preferible que el dato desaparezca a que
 quede sirviendo algo eternamente viejo sin que nadie lo note).
 """
+import json
 import logging
 from datetime import timedelta
 from typing import Any, Dict, List
@@ -20,6 +21,7 @@ from django.core.cache import cache
 from django.db.models import Sum
 from django.utils import timezone
 
+from appConfig import MostWatchedChannelsConfig
 from telemetry.models import TelemetryChannelDailyAgg, TelemetryOttChannelName
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,12 @@ CACHE_TTL_SECONDS = 6 * 60 * 60
 
 DEFAULT_WINDOW_DAYS = 7
 DEFAULT_LIMIT = 10  # confirmado con el cliente: top 10 a nivel general
+
+# El ranking se entrega como si fuera un bouquet más de PanAccess (ver
+# "Documentación configuración de bouquets" del cliente) -- bouquetId/name
+# fijos en código; el card_design sí es configurable (ver appConfig).
+TOP_CHANNELS_BOUQUET_ID = "most-watched"
+TOP_CHANNELS_BOUQUET_NAME = "Más vistos"
 
 
 def compute_top_channels_global(
@@ -63,16 +71,49 @@ def compute_top_channels_global(
         )
     )
 
+    # total_duration_seconds/total_views solo se usan arriba para ordenar --
+    # appVideo nunca los lee (cruza únicamente por channel_id), así que no
+    # se exponen en la respuesta.
     return [
         {
             "rank": i + 1,
             "channel_id": row["channel_id"],
             "name": names.get(row["channel_id"]),
-            "total_duration_seconds": row["total_duration_seconds"] or 0,
-            "total_views": row["total_views"] or 0,
         }
         for i, row in enumerate(rows)
     ]
+
+
+def _build_top_channels_custom_data() -> str:
+    """
+    `customData` del "bouquet" de más vistos, con la misma forma que
+    documentó el cliente para bouquets reales de PanAccess (layouts.mobile /
+    layouts.tv). Mismo diseño en mobile y tv -- solo card_design es
+    configurable por env (`MostWatchedChannelsConfig`, ver appConfig.py).
+    """
+    layout = {
+        "type": "horizontal_grid",
+        "rows": 1,
+        "card_design": MostWatchedChannelsConfig.TOP_CHANNELS_CARD_DESIGN,
+        "logo_index": "1",
+    }
+    return json.dumps({"layouts": {"mobile": layout, "tv": layout}})
+
+
+def build_top_channels_bouquet(
+    window_days: int = DEFAULT_WINDOW_DAYS, limit: int = DEFAULT_LIMIT
+) -> Dict[str, Any]:
+    """
+    Envuelve el ranking (lectura desde caché, ver `get_top_channels_global`)
+    con la forma de un bouquet de PanAccess -- lo que efectivamente devuelve
+    el endpoint a las apps.
+    """
+    return {
+        "bouquetId": TOP_CHANNELS_BOUQUET_ID,
+        "name": TOP_CHANNELS_BOUQUET_NAME,
+        "customData": _build_top_channels_custom_data(),
+        "channels": get_top_channels_global(window_days=window_days, limit=limit),
+    }
 
 
 def refresh_top_channels_cache(

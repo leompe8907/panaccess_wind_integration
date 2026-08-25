@@ -893,13 +893,9 @@ Requieren `PANACCESS_OPS_HTTP_ENABLED=true` (default: false).
 
 ---
 
-### 9.11 Cambio de contraseña (legacy)
+### 9.11 Cambio de contraseña (legacy) -- dado de baja
 
-| Método | Ruta | Permiso | Nota |
-|--------|------|---------|------|
-| POST | `/wind/change-password/` | 🔐 🛡️ | Preferir `/api/v1/profile/password/` |
-
-Body: `{ "code": "AUTO42", "newPass": "nueva" }` → llama `resetSubscriberPassword` en PanAccess.
+**Estado (2026-08-25): removido.** `POST /wind/change-password/` ya no está montado en `wind/urls.py` -- era un duplicado de `/api/v1/profile/password/` (que sigue siendo el camino real, ver 9.x arriba) sin ningún template interno que lo usara. Ver `docs/LIMPIEZA_RUTAS_AUTH_NATIVAS_2026-08-25.md`.
 
 ---
 

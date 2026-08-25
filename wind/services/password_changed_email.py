@@ -1,8 +1,11 @@
 """
 Correo de notificación cuando se cambia la contraseña (cualquiera de los
-tres flujos: profile/password/, change-password/ legacy, o confirmación de
-"olvidé mi contraseña" -- todos terminan en sync_password_locally(), que es
-quien llama a enqueue_password_changed_email()).
+dos flujos vigentes: profile/password/, o confirmación de "olvidé mi
+contraseña" -- todos terminan en sync_password_locally(), que es quien
+llama a enqueue_password_changed_email()).
+
+(El tercer flujo legacy, change-password/, se dio de baja el 2026-08-25 --
+ver docs/LIMPIEZA_RUTAS_AUTH_NATIVAS_2026-08-25.md.)
 
 Mismo patrón que wind/services/welcome_email.py: contexto -> render ->
 tarea de Celery (no bloquea el cambio de contraseña si el envío falla).

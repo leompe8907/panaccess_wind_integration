@@ -668,6 +668,25 @@ class CeleryConfig:
     TELEMETRY_AGGREGATE_DAYS_BACK = max(0, _env_int("CELERY_TELEMETRY_AGGREGATE_DAYS_BACK", 2))
 
 
+class MostWatchedChannelsConfig:
+    """
+    Cómo se presenta el ranking de "canales más vistos" al llegar a las apps
+    (ver telemetry/services/top_channels.py) -- se entrega con la misma
+    forma de `customData` que un bouquet real de PanAccess (layouts.mobile /
+    layouts.tv con type/rows/card_design/logo_index), para que appVideo lo
+    renderice con el mismo componente que usa para bouquets reales.
+
+    Solo `card_design` es configurable por env hoy: es la única pieza que el
+    cliente todavía puede pedir cambiar sin que haga falta un deploy de
+    código (bouquetId/name/tipo de grilla quedan fijos en el código).
+    """
+
+    TOP_CHANNELS_CARD_DESIGN = (
+        _strip_env(os.getenv("TELEMETRY_TOP_CHANNELS_CARD_DESIGN"))
+        or "service_layout_event_and_logo"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Caché
 # ---------------------------------------------------------------------------
