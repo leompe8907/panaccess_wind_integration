@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
@@ -27,10 +28,56 @@ from wind.services.subscriber_catalog import (
 )
 from wind.throttles import ProfileThrottle
 
-from appConfig import FeatureConfig
+from appConfig import FeatureConfig, ProfilePasswordLockoutConfig
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# Bloqueo tras intentos fallidos de "contraseña actual" (Alto #6, ver
+# docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md). Mismo patrón
+# cache-based que el lockout de login (wind/services/subscriber_auth.py),
+# pero por subscriber_code -- ya validado por IsOwnerSubscriber antes de
+# llegar a la vista, así que no hace falta normalizar texto libre.
+_PROFILE_PWD_LOCKOUT_PREFIX = "wind:profile_pwd_lockout:"
+_PROFILE_PWD_FAILCOUNT_PREFIX = "wind:profile_pwd_failcount:"
+
+
+def _is_profile_password_locked(subscriber_code: str) -> bool:
+    if not subscriber_code:
+        return False
+    return bool(cache.get(f"{_PROFILE_PWD_LOCKOUT_PREFIX}{subscriber_code}"))
+
+
+def _register_failed_old_password(subscriber_code: str) -> None:
+    if not subscriber_code:
+        return
+    key = f"{_PROFILE_PWD_FAILCOUNT_PREFIX}{subscriber_code}"
+    try:
+        attempts = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=ProfilePasswordLockoutConfig.WINDOW_SECONDS)
+        attempts = 1
+
+    if attempts >= ProfilePasswordLockoutConfig.MAX_ATTEMPTS:
+        cache.set(
+            f"{_PROFILE_PWD_LOCKOUT_PREFIX}{subscriber_code}",
+            True,
+            timeout=ProfilePasswordLockoutConfig.LOCKOUT_SECONDS,
+        )
+        cache.delete(key)
+        logger.warning(
+            "Cambio de contraseña bloqueado temporalmente tras %s intentos "
+            "fallidos de 'contraseña actual': %s",
+            attempts,
+            subscriber_code,
+        )
+
+
+def _clear_failed_old_password(subscriber_code: str) -> None:
+    if not subscriber_code:
+        return
+    cache.delete(f"{_PROFILE_PWD_FAILCOUNT_PREFIX}{subscriber_code}")
+    cache.delete(f"{_PROFILE_PWD_LOCKOUT_PREFIX}{subscriber_code}")
 
 
 @api_view(["GET"])
@@ -74,6 +121,16 @@ def profile_password_view(request):
     indistinguible de una falla real de conectividad. 502/503/504/429
     quedan reservados para lo que sí es un problema de la integración con
     PanAccess, no del valor que mandó el cliente.
+
+    Verificación de "contraseña actual" (Alto #6, fase 1 del rollout -- ver
+    docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md): `oldPass` es
+    opcional por ahora. Si viene, se verifica contra la contraseña actual
+    real (reutilizando `verify_panaccess_credentials`, el mismo camino que
+    usa el login) antes de aplicar el cambio -- protege contra un JWT
+    robado/filtrado que, sin esto, alcanzaba solo por sí mismo para tomar
+    la cuenta. Si no viene, se deja pasar igual que antes (compatibilidad
+    con clientes que todavía no mandan el campo nuevo) pero se deja un log
+    de advertencia para medir la migración antes de volverlo obligatorio.
     """
     ser = ProfilePasswordSerializer(data=request.data)
     if not ser.is_valid():
@@ -84,6 +141,47 @@ def profile_password_view(request):
 
     code = ser.validated_data["code"]
     new_pass = ser.validated_data["newPass"]
+    old_pass = ser.validated_data.get("oldPass")
+
+    if ProfilePasswordLockoutConfig.ENABLED and _is_profile_password_locked(code):
+        logger.warning(
+            "Cambio de contraseña rechazado para %s: bloqueado temporalmente "
+            "por intentos fallidos de 'contraseña actual'",
+            code,
+        )
+        return Response(
+            {
+                "success": False,
+                "code": "old_password_locked",
+                "message": "Demasiados intentos fallidos. Intenta de nuevo más tarde.",
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    if old_pass:
+        from wind.services.subscriber_auth import verify_panaccess_credentials
+
+        record = verify_panaccess_credentials(code, old_pass)
+        if not record:
+            if ProfilePasswordLockoutConfig.ENABLED:
+                _register_failed_old_password(code)
+            return Response(
+                {
+                    "success": False,
+                    "code": "old_password_incorrect",
+                    "message": "La contraseña actual no es correcta.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if ProfilePasswordLockoutConfig.ENABLED:
+            _clear_failed_old_password(code)
+    else:
+        logger.warning(
+            "DEPRECATION: cambio de contraseña sin oldPass para %s -- ver "
+            "docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md "
+            "(fase 1 del rollout, todavía opcional)",
+            code,
+        )
 
     try:
         reset_password_in_panaccess(code, new_pass)

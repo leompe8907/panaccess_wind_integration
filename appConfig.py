@@ -1040,6 +1040,22 @@ class AuthLockoutConfig:
 
 
 # ---------------------------------------------------------------------------
+# Bloqueo tras intentos fallidos de "contraseña actual" al cambiarla (Alto
+# #6, ver docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md)
+# ---------------------------------------------------------------------------
+# Mismo patrón cache-based que AuthLockoutConfig (login), pero por
+# subscriber_code (ya validado por IsOwnerSubscriber antes de llegar acá, no
+# hace falta normalizar texto libre). Umbral igual de conservador que login
+# por defecto -- ajustable por separado porque acá el atacante ya necesita
+# un JWT válido (barrera más alta que el login anónimo).
+class ProfilePasswordLockoutConfig:
+    ENABLED = _env_bool("PROFILE_PASSWORD_LOCKOUT_ENABLED", True)
+    MAX_ATTEMPTS = max(1, _env_int("PROFILE_PASSWORD_LOCKOUT_MAX_ATTEMPTS", 5))
+    WINDOW_SECONDS = max(60, _env_int("PROFILE_PASSWORD_LOCKOUT_WINDOW_SECONDS", 300))
+    LOCKOUT_SECONDS = max(60, _env_int("PROFILE_PASSWORD_LOCKOUT_DURATION_SECONDS", 900))
+
+
+# ---------------------------------------------------------------------------
 # Login social
 # ---------------------------------------------------------------------------
 
