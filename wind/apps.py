@@ -16,6 +16,9 @@ _SKIP_PANACCESS_INIT_COMMANDS = frozenset({
     # comando que se corre en medio de un incidente, donde un login
     # bloqueante de ~46s (5 reintentos) es lo último que hace falta.
     'rotate_secrets',
+    # reencrypt_credentials: idem -- solo lee/escribe la base local, no
+    # necesita el singleton de PanAccess para nada.
+    'reencrypt_credentials',
 })
 
 

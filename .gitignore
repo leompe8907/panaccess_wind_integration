@@ -78,6 +78,11 @@ staticfiles/
 # claro entre --generate y --apply) -- ver docs/ROTACION_SECRETOS_COMPROMETIDOS_2026-08-25.md.
 .secrets_rotation_pending.json
 
+# Staging temporal de `manage.py reencrypt_credentials` (contiene passwords/PIN
+# de suscriptores en texto plano entre --generate y --apply -- ver docstring
+# del comando). Nunca debe versionarse.
+.reencrypt_credentials_pending.json
+
 # =============================================================================
 # Logs del proyecto
 # =============================================================================

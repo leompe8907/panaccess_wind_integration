@@ -1,8 +1,8 @@
 # Rotación de secretos comprometidos (SECRET_KEY / ENCRYPTION_KEY / DB_PASSWORD)
 
-Fecha: 2026-08-25
+Fecha: 2026-08-25 (herramienta) / 2026-08-26 (ejecución real en producción)
 Referencia: `docs/AUDITORIA_CONSOLIDADA_2026-08-24.md`, hallazgo Urgente #2
-Estado: **Herramienta lista (`manage.py rotate_secrets`). Ejecución en el servidor real: pendiente.**
+Estado: **RESUELTO.** Los 3 valores están rotados en producción. Ver "Ejecución real (2026-08-26)" más abajo para el detalle completo, incluido un incidente breve durante el proceso.
 
 ## De qué se trata
 
@@ -72,6 +72,96 @@ python manage.py rotate_secrets --status
 5. Reiniciar Daphne (las 8 instancias, `deploy/manage_daphne.sh`) y los workers de Celery.
 6. Avisar al equipo: todos los usuarios (web y apps) van a perder sesión por el `SECRET_KEY` nuevo -- es esperado, no un bug.
 7. Guardar los 3 valores nuevos en el gestor de contraseñas/vault que use el equipo para credenciales de infraestructura -- **no** por correo, no en un documento suelto (ver la conversación que dio origen a esta herramienta: es el mismo tipo de riesgo que se está resolviendo).
+
+## Hallazgo importante durante la ejecución real: ENCRYPTION_KEY no es como los otros dos
+
+`SECRET_KEY` y `DB_PASSWORD` son secretos de **verificación** -- se usan para
+firmar/comprobar algo en el momento (una sesión, una conexión a la base).
+Rotarlos no vuelve ilegible nada que ya estuviera guardado, solo cambia qué
+valor hace falta de ahí en adelante. Se rotaron sin ningún efecto colateral,
+como estaba previsto.
+
+`ENCRYPTION_KEY` es distinta: es una llave de **cifrado simétrico** (Fernet).
+Se usa para guardar disfrazados (cifrados) tres campos que ya tenían datos
+reales de suscriptores:
+
+- `SubscriberLoginInfo.password_hash`
+- `SubscriberInfo.password_hash`
+- `SubscriberInfo.pin_hash`
+
+Cambiar `ENCRYPTION_KEY` sin más deja indescifrable (con la llave nueva)
+todo lo que ya estaba cifrado con la vieja -- no es un problema de
+"invalidar sesiones", es un problema de **datos que se vuelven ilegibles**.
+Se confirmó con una consulta directa a producción: 60 filas de
+`SubscriberLoginInfo.password_hash` tenían datos reales cifrados (0 en
+`SubscriberInfo.password_hash`/`pin_hash`, así que el PIN y el pareo de TV
+nunca estuvieron en riesgo).
+
+El efecto práctico de dejar la llave nueva activa sin re-encriptar antes:
+para esos 60 usuarios, el *login con la contraseña correcta* seguía
+funcionando bien (porque usa el password ya cacheado en Django, un
+mecanismo aparte que no depende de esta llave), pero un intento con la
+contraseña **incorrecta** para cualquiera de esos 60 usuarios caía en un
+camino de respaldo que sí intenta abrir el dato cifrado viejo -- y en vez de
+responder "contraseña incorrecta" normal, tiraba un error de servidor
+(500), porque el intento de descifrado explota antes de llegar a comparar
+nada. No era una brecha de seguridad (nunca dejaba entrar sin la clave
+correcta), pero sí un comportamiento roto y silencioso, difícil de notar
+con pruebas manuales de uso normal.
+
+## Herramienta nueva: `reencrypt_credentials`
+
+Para poder rotar `ENCRYPTION_KEY` sin perder esos datos, se agregó
+`wind/management/commands/reencrypt_credentials.py`, con el mismo patrón de
+dos pasos que `rotate_secrets`:
+
+```bash
+# 1) Descifra todo con la llave activa (vieja), genera una llave nueva,
+#    y deja todo en staging -- no toca la base ni el .env todavía.
+python manage.py reencrypt_credentials --generate
+
+# 2) Simula la migración completa sin escribir nada, para confirmar antes.
+python manage.py reencrypt_credentials --apply --dry-run
+
+# 3) Aplica de verdad: re-encripta cada fila con la llave nueva y la
+#    verifica (round-trip) antes de guardar.
+python manage.py reencrypt_credentials --apply
+
+# En cualquier momento, ver si hay una migración generada pendiente.
+python manage.py reencrypt_credentials --status
+```
+
+Detalles de seguridad del comando:
+
+- El staging (`.reencrypt_credentials_pending.json`, permisos 600,
+  gitignored) contiene los valores en texto plano temporalmente -- es
+  inevitable, hace falta el texto plano para poder re-cifrarlo con la
+  llave nueva. Se borra automáticamente si `--apply` termina sin fallos.
+- `--apply` exige que la `ENCRYPTION_KEY` activa en ese momento sea
+  exactamente la misma que estaba activa cuando se corrió `--generate` --
+  si no coincide, se niega a correr (evita que cada fila falle por usar la
+  llave equivocada, sin forma de distinguir eso de una fila corrupta de
+  verdad).
+- Cada fila se verifica con un round-trip (cifra con la nueva, descifra de
+  vuelta, compara) antes de guardarse -- si algo no cuadra, esa fila
+  específica se reporta como fallida y no se toca, sin frenar el resto.
+- Fue agregado a `_SKIP_PANACCESS_INIT_COMMANDS` en `wind/apps.py`, mismo
+  motivo que `rotate_secrets`.
+
+## Ejecución real (2026-08-26)
+
+Orden real seguido en el servidor de producción:
+
+1. `rotate_secrets --generate` → `ALTER USER` en Postgres real → `rotate_secrets --apply --db-password-already-changed`. `SECRET_KEY` y `DB_PASSWORD` quedaron rotados sin incidentes.
+2. Se aplicó también `ENCRYPTION_KEY` nueva en el mismo paso (antes de tener `reencrypt_credentials` armado) -- esto expuso el problema de arriba en producción real (no solo en teoría).
+3. **Incidente corto:** al revertir manualmente `ENCRYPTION_KEY` al valor viejo (editando `.env` a mano, sin pasar por el comando), una edición dejó la línea `ENCRYPTION_KEY=` vacía. Django valida esa variable al arrancar (`appConfig.py:849`), así que 5 de las 8 instancias Daphne quedaron en loop de reinicio fallido (`OSError: Faltan variables de entorno: ENCRYPTION_KEY`) durante unos minutos. Se detectó con `journalctl -u panaccess-wind@8000.service`, se corrigió completando el valor correcto, y las 8 instancias volvieron a `active (running)`. `/health/`/`/ready/` no lo hubieran mostrado (no prueban esa variable específica) -- el `journalctl` fue lo que lo confirmó.
+4. Con `ENCRYPTION_KEY` vieja restaurada y confirmada (`git show bc6b9ff^:.env`, la misma llave que estaba filtrada), se corrió `reencrypt_credentials --generate` → `--apply --dry-run` → `--apply`, migrando las 60 filas reales sin fallos. El comando borró el staging automáticamente al terminar sin fallos (comportamiento esperado) -- la `ENCRYPTION_KEY` nueva que había generado solo quedó impresa una vez en la terminal.
+5. **Segundo incidente corto:** esa impresión en pantalla se perdió (no se guardó en ningún archivo aparte del staging ya borrado). Se intentó recuperarla del scroll de la terminal y de `tmux capture-pane` sin éxito (no había sesión `tmux`). Se verificó con una prueba de descifrado directa (`Fernet(candidate).decrypt(...)`) que ni la llave vieja ni una llave guardada de un intento anterior coincidían con lo que había quedado escrito en los 60 registros -- es decir, esos 60 valores de `password_hash` quedaron cifrados con una llave que ya no existe en ningún lado.
+6. **Resolución final:** en vez de seguir buscando la llave perdida, se limpiaron esos 60 registros (`SubscriberLoginInfo.objects...update(password_hash=None)`) -- un estado ya soportado de forma segura por el código (`check_password()`/`get_password()` no intentan descifrar si el campo está vacío, es el mismo caso que un suscriptor que nunca inició sesión). Esto no afecta el acceso real de esos 60 suscriptores -- es solo un caché local interno, no su contraseña real en PanAccess; el caché se vuelve a poblar solo, de forma transparente, la próxima vez que ese suscriptor inicie sesión por el camino de respaldo. Con el campo ya vacío, no quedaba ningún dato dependiendo de ninguna llave vieja, así que se generó una `ENCRYPTION_KEY` final nueva (independiente, sin necesidad de migrar nada) y se aplicó directo en `.env`. `/health/`/`/ready/` quedaron en verde con las 8 instancias activas.
+
+Resultado final: los 3 valores filtrados en git (`SECRET_KEY`, `ENCRYPTION_KEY`, `DB_PASSWORD`) ya no tienen ningún efecto sobre el sistema en producción. Los 60 registros de `password_hash` no se migraron con sus valores originales (esa llave intermedia se perdió), pero quedaron en un estado limpio y seguro, sin ningún riesgo de error -- no hizo falta pedirle a ningún suscriptor que resetee su contraseña.
+
+**Lección para la próxima vez que se use `reencrypt_credentials` (o cualquier comando que imprima un secreto una sola vez):** copiar el valor impreso a un archivo aparte (o al vault) inmediatamente, antes de correr cualquier otro comando en esa misma terminal -- no confiar en el scroll/buffer de la terminal como respaldo.
 
 ## Qué queda explícitamente afuera de este cambio
 
