@@ -129,15 +129,21 @@
               <form id="password-form" class="app-form password-form" novalidate>
                 <div class="app-field">
                   <label for="new-password">Nueva contraseña</label>
-                  <input
-                    id="new-password"
-                    name="newPass"
-                    type="password"
-                    autocomplete="new-password"
-                    minlength="8"
-                    maxlength="255"
-                    required
-                  />
+                  <div class="app-input-wrap">
+                    <input
+                      id="new-password"
+                      name="newPass"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="8"
+                      maxlength="255"
+                      required
+                    />
+                    <button type="button" class="app-toggle-visibility" data-toggle-for="new-password" aria-label="Mostrar contraseña" aria-pressed="false">
+                      <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a17.6 17.6 0 0 1-2.16 3.19m-3.22 2.62A9.12 9.12 0 0 1 12 20c-7 0-11-8-11-8a17.6 17.6 0 0 1 4.22-5.94M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                    </button>
+                  </div>
                   <p class="field-hint">
                     Entre 8 y 255 caracteres, con al menos una mayúscula y un número.
                     También puedes usar símbolos como ! @ # $ % ^ &amp; * ( ) + = - _ [ ] { } ; : ' " , . &lt; &gt; / ? ~ ` |
@@ -145,14 +151,20 @@
                 </div>
                 <div class="app-field">
                   <label for="confirm-password">Confirmar contraseña</label>
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    autocomplete="new-password"
-                    minlength="8"
-                    maxlength="255"
-                    required
-                  />
+                  <div class="app-input-wrap">
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="8"
+                      maxlength="255"
+                      required
+                    />
+                    <button type="button" class="app-toggle-visibility" data-toggle-for="confirm-password" aria-label="Mostrar contraseña" aria-pressed="false">
+                      <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a17.6 17.6 0 0 1-2.16 3.19m-3.22 2.62A9.12 9.12 0 0 1 12 20c-7 0-11-8-11-8a17.6 17.6 0 0 1 4.22-5.94M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <p id="password-msg" class="app-alert" role="status"></p>
                 <button type="submit" class="app-btn primary" id="btn-password-submit">
@@ -282,6 +294,7 @@
     </div>
 
     <script src="{% static 'wind/js/auth-store.js' %}"></script>
+    <script src="{% static 'wind/js/password-toggle.js' %}"></script>
     <script>
       // Política de contraseña -- debe mantenerse sincronizada con
       // wind/utils/password_policy.py (backend). Es solo un atajo para dar
