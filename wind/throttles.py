@@ -60,6 +60,20 @@ class SocialLoginThrottle(AnonRateThrottle):
     scope = "social_login"
 
 
+class LoginThrottle(AnonRateThrottle):
+    """
+    Login manual (/api/auth/login/) -- antes sin throttle propio, caía en
+    el límite genérico anónimo (60/minute), el mismo que cualquier
+    navegación normal del sitio. Cada intento fallido puede además disparar
+    hasta 40 llamadas reales a PanAccess (ver `_discover_login_by_login1`,
+    wind/services/subscriber_auth.py) -- con 60/min de margen, un ataque de
+    fuerza bruta desde una sola IP podía traducirse en miles de llamadas
+    por minuto al proveedor externo. Ver hallazgo Alto #5.
+    """
+
+    scope = "login"
+
+
 class DeviceSessionThrottle(UserRateThrottle):
     """
     Listar/revocar dispositivos vinculados (Fase 3) — antes sin throttle

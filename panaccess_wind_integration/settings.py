@@ -184,6 +184,7 @@ REST_FRAMEWORK = {
         'password_reset': ThrottleConfig.PASSWORD_RESET,
         'social_login': ThrottleConfig.SOCIAL_LOGIN,
         'device_session': ThrottleConfig.DEVICE_SESSION,
+        'login': ThrottleConfig.LOGIN,
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,

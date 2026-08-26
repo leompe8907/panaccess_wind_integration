@@ -761,6 +761,14 @@ class PanaccessConfig:
     LOGIN_INFO_PAGE_LIMIT = _env_int("PANACCESS_LOGIN_INFO_PAGE_LIMIT", 1000)
     LOGIN_INFO_DB_CHUNK = _env_int("PANACCESS_LOGIN_INFO_DB_CHUNK", 1000)
     LOGIN_DISCOVERY_MAX_CALLS = _env_int("PANACCESS_LOGIN_DISCOVERY_MAX_CALLS", 40)
+    # Cuánto tiempo se recuerda en caché (Redis) que un login1 numérico NO
+    # se encontró (o no coincidió la contraseña) en el último descubrimiento,
+    # para no repetir hasta LOGIN_DISCOVERY_MAX_CALLS llamadas reales a
+    # PanAccess en cada reintento contra el mismo número (Alto #5, Fase 2 --
+    # ver docs/OPTIMIZACION_LATENCIA_LOGIN_2026-08-26.md).
+    LOGIN_DISCOVERY_MISS_CACHE_SECONDS = max(
+        0, _env_int("PANACCESS_LOGIN_DISCOVERY_MISS_CACHE_SECONDS", 300)
+    )
 
     SMARTCARD_SUBSCRIBER_MAX_PAGES = _env_int("PANACCESS_SMARTCARD_SUBSCRIBER_MAX_PAGES", 5)
     SMARTCARD_PAGE_LIMIT = _env_int("PANACCESS_SMARTCARD_PAGE_LIMIT", 1000)
@@ -1001,11 +1009,34 @@ class ThrottleConfig:
     # password_reset porque es una acción legítima de uso frecuente (ver
     # auditoría).
     SOCIAL_LOGIN = _strip_env(os.getenv("DRF_THROTTLE_SOCIAL_LOGIN")) or "20/minute"
+    # Login manual (/api/auth/login/): antes sin scope propio, caía en el
+    # límite genérico anónimo (60/minute) -- cada intento fallido puede
+    # amplificar hasta 40 llamadas reales a PanAccess (Alto #5).
+    LOGIN = _strip_env(os.getenv("DRF_THROTTLE_LOGIN")) or "10/minute"
     # Listar/revocar dispositivos vinculados (Fase 3): antes sin scope
     # propio, caía en el límite genérico de usuario (600/minute) -- pensado
     # para navegación normal, no para una acción de escritura que además
     # dispara un broadcast por WebSocket en cada llamada (segunda auditoría).
     DEVICE_SESSION = _strip_env(os.getenv("DRF_THROTTLE_DEVICE_SESSION")) or "60/minute"
+
+
+# ---------------------------------------------------------------------------
+# Bloqueo de cuenta tras intentos fallidos de login (Alto #5, Fase 3)
+# ---------------------------------------------------------------------------
+# NOTA: el plan original consideraba reutilizar SubscriberInfo.is_locked()/
+# lock_account() (wind/models.py), pero ese modelo es el perfil de
+# smartcard/activación -- no se popula ni se consulta en ningún punto del
+# login manual (SubscriberLoginInfo es el modelo real usado por
+# authenticate_portal_user/verify_panaccess_credentials). Wirearlo ahí habría
+# dejado el bloqueo sin efecto para la mayoría de las cuentas. Se implementa
+# en su lugar sobre caché (Redis, mismo backend que Fase 2), por identificador
+# de login normalizado -- sin migración, sin tocar la tabla de credenciales
+# cifradas, y fácil de resetear a mano en producción si hace falta.
+class AuthLockoutConfig:
+    ENABLED = _env_bool("LOGIN_LOCKOUT_ENABLED", True)
+    MAX_ATTEMPTS = max(1, _env_int("LOGIN_LOCKOUT_MAX_ATTEMPTS", 5))
+    WINDOW_SECONDS = max(60, _env_int("LOGIN_LOCKOUT_WINDOW_SECONDS", 300))
+    LOCKOUT_SECONDS = max(60, _env_int("LOGIN_LOCKOUT_DURATION_SECONDS", 900))
 
 
 # ---------------------------------------------------------------------------

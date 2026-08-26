@@ -119,6 +119,13 @@ class ListOfSubscriber(models.Model):
             # UPPER(emails) = UPPER(...) y NO puede usar el índice plano de
             # 'emails' -- sin esto, cada login hacía un scan completo.
             models.Index(Upper('emails'), name='wind_lof_sub_emails_upper'),
+            # Mismo problema, columna distinta: resolve_subscriber_code()
+            # (wind/services/subscriber_auth.py, camino más caliente del
+            # login) hace code__iexact cuando el match exacto no encuentra
+            # nada -- sin este índice funcional, esa segunda consulta
+            # también hacía scan completo en cada intento de login (Alto #5,
+            # optimización de latencia reportada 2026-08-26).
+            models.Index(Upper('code'), name='wind_lof_sub_code_upper'),
         ]
 
     def __str__(self):
@@ -219,6 +226,15 @@ class SubscriberLoginInfo(models.Model):
     additionalLogins = models.JSONField(null=True, blank=True)
     password_hash = models.CharField(max_length=255, null=True, blank=True)
     licenses = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            # find_login_record() (wind/services/subscriber_auth.py) filtra
+            # login2__iexact -- el db_index=True de arriba es un btree plano,
+            # no sirve para UPPER(login2)=UPPER(...) (Alto #5, optimización
+            # de latencia de login, 2026-08-26).
+            models.Index(Upper('login2'), name='wind_sli_login2_upper'),
+        ]
 
     def __str__(self):
         return f"Login Info - Subscriber: {self.subscriberCode or 'N/A'}"
@@ -375,8 +391,14 @@ class SubscriberEmailRegistry(models.Model):
             models.Index(fields=['document']),
             models.Index(fields=['trial_used']),
             models.Index(fields=['account_closed_at']),
+            # resolve_subscriber_code()/ensure_subscriber_portal_email_verified()
+            # (wind/services/subscriber_auth.py) filtran email__iexact en el
+            # camino de login -- el índice plano de arriba no sirve para
+            # UPPER(email)=UPPER(...) (Alto #5, optimización de latencia,
+            # 2026-08-26).
+            models.Index(Upper('email'), name='wind_ser_email_upper'),
         ]
-    
+
     def __str__(self):
         return f"{self.email} -> {self.subscriber_code or 'N/A'}"
 

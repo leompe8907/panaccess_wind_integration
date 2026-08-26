@@ -5,8 +5,9 @@ import hmac
 import logging
 
 from django.contrib.auth import authenticate, get_user_model
+from django.core.cache import cache
 
-from appConfig import PanaccessConfig
+from appConfig import AuthLockoutConfig, PanaccessConfig
 
 from wind.functions.getSubscriber import CallListExtendedSubscribers
 from wind.functions.getSubscriberLoginInfo import fetch_login_info_for_subscriber
@@ -114,13 +115,32 @@ def fetch_and_find_login_record(login: str) -> SubscriberLoginInfo | None:
     return find_login_record(login)
 
 
+_DISCOVERY_MISS_CACHE_PREFIX = "wind:login1_discovery_miss:"
+
+
 def _discover_login_by_login1(login_int: int, password: str) -> SubscriberLoginInfo | None:
     """
     Busca en PanAccess el suscriptor cuyo login1 coincide (cuando no está en BD local).
     Limitado por PANACCESS_LOGIN_DISCOVERY_MAX_CALLS para no saturar la API.
+
+    Fase 2 (Alto #5, ver docs/OPTIMIZACION_LATENCIA_LOGIN_2026-08-26.md): si
+    un descubrimiento termina sin encontrar nada (login1 inexistente, o
+    existente pero con contraseña incorrecta), se recuerda el "miss" en
+    caché un rato corto para no repetir hasta LOGIN_DISCOVERY_MAX_CALLS
+    llamadas reales a PanAccess en cada reintento contra el mismo número.
+    Si el suscriptor SÍ existe y la contraseña coincide, `try_codes` ya deja
+    el registro guardado localmente (fetch_login_info_for_subscriber), así
+    que un reintento correcto inmediatamente después nunca vuelve a llegar
+    hasta acá -- lo intercepta `find_login_record()` en
+    `verify_panaccess_credentials()`. No se cachea la contraseña, solo el
+    hecho de que la búsqueda no dio resultado.
     """
     max_calls = PanaccessConfig.LOGIN_DISCOVERY_MAX_CALLS
     if max_calls <= 0:
+        return None
+
+    miss_cache_key = f"{_DISCOVERY_MISS_CACHE_PREFIX}{login_int}"
+    if cache.get(miss_cache_key):
         return None
 
     calls = 0
@@ -140,47 +160,53 @@ def _discover_login_by_login1(login_int: int, password: str) -> SubscriberLoginI
                 return record
         return None
 
-    local_codes = ListOfSubscriber.objects.exclude(code="").values_list("code", flat=True)
-    found = try_codes(local_codes)
-    if found:
-        return found
-
-    offset = 0
-    page_size = 50
-    while calls < max_calls:
-        try:
-            answer = CallListExtendedSubscribers(offset=offset, limit=page_size)
-        except Exception as exc:
-            logger.warning("Descubrimiento login1: error listando suscriptores: %s", exc)
-            break
-
-        rows = answer.get("extendedSubscriberEntries") or answer.get("rows") or []
-        if not rows:
-            break
-
-        for row in rows:
-            unique_login = row.get("uniqueLogin")
-            if unique_login is not None and int(unique_login) == login_int:
-                code = row.get("subscriberCode") or row.get("code")
-                if code:
-                    found = try_codes([code])
-                    if found:
-                        return found
-
-        codes = [
-            row.get("subscriberCode") or row.get("code")
-            for row in rows
-            if row.get("subscriberCode") or row.get("code")
-        ]
-        found = try_codes(codes)
+    def run_discovery():
+        local_codes = ListOfSubscriber.objects.exclude(code="").values_list("code", flat=True)
+        found = try_codes(local_codes)
         if found:
             return found
 
-        if len(rows) < page_size:
-            break
-        offset += page_size
+        offset = 0
+        page_size = 50
+        while calls < max_calls:
+            try:
+                answer = CallListExtendedSubscribers(offset=offset, limit=page_size)
+            except Exception as exc:
+                logger.warning("Descubrimiento login1: error listando suscriptores: %s", exc)
+                break
 
-    return None
+            rows = answer.get("extendedSubscriberEntries") or answer.get("rows") or []
+            if not rows:
+                break
+
+            for row in rows:
+                unique_login = row.get("uniqueLogin")
+                if unique_login is not None and int(unique_login) == login_int:
+                    code = row.get("subscriberCode") or row.get("code")
+                    if code:
+                        found = try_codes([code])
+                        if found:
+                            return found
+
+            codes = [
+                row.get("subscriberCode") or row.get("code")
+                for row in rows
+                if row.get("subscriberCode") or row.get("code")
+            ]
+            found = try_codes(codes)
+            if found:
+                return found
+
+            if len(rows) < page_size:
+                break
+            offset += page_size
+
+        return None
+
+    result = run_discovery()
+    if result is None and PanaccessConfig.LOGIN_DISCOVERY_MISS_CACHE_SECONDS > 0:
+        cache.set(miss_cache_key, True, timeout=PanaccessConfig.LOGIN_DISCOVERY_MISS_CACHE_SECONDS)
+    return result
 
 
 def verify_panaccess_credentials(login: str, password: str) -> SubscriberLoginInfo | None:
@@ -245,15 +271,26 @@ def mark_portal_email_verified(user: User, email: str) -> None:
         email_address.save(update_fields=updated_fields)
 
 
-def ensure_subscriber_portal_email_verified(user: User, login: str = "") -> None:
-    """Marca el email verificado si el usuario está vinculado a un abonado PanAccess."""
+def ensure_subscriber_portal_email_verified(
+    user: User, login: str = "", *, subscriber_code: str | None = None
+) -> None:
+    """
+    Marca el email verificado si el usuario está vinculado a un abonado PanAccess.
+
+    `subscriber_code`: si el caller ya resolvió el código (ej.
+    `authenticate_portal_user`, que ya llama `resolve_subscriber_code(login)`
+    un poco antes), se pasa acá para no repetir la misma resolución dos
+    veces en el mismo request -- optimización de latencia de login (Alto
+    #5, ver docs/OPTIMIZACION_LATENCIA_LOGIN_2026-08-26.md). Si no se pasa,
+    se resuelve igual que antes (compatibilidad con otros callers).
+    """
     email = (user.email or login or "").strip().lower()
     if not email:
         return
 
     is_subscriber = (
         SubscriberEmailRegistry.objects.filter(email__iexact=email).exists()
-        or bool(resolve_subscriber_code(login or email))
+        or bool(subscriber_code if subscriber_code is not None else resolve_subscriber_code(login or email))
     )
     if is_subscriber:
         mark_portal_email_verified(user, email)
@@ -320,10 +357,94 @@ def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
     return user
 
 
+_LOGIN_LOCKOUT_PREFIX = "wind:login_lockout:"
+_LOGIN_FAILCOUNT_PREFIX = "wind:login_failcount:"
+
+
+def _lockout_identifier(login: str) -> str:
+    return (login or "").strip().lower()
+
+
+def _is_login_locked(identifier: str) -> bool:
+    if not identifier:
+        return False
+    return bool(cache.get(f"{_LOGIN_LOCKOUT_PREFIX}{identifier}"))
+
+
+def _register_failed_login(identifier: str) -> None:
+    """Suma un intento fallido y bloquea temporalmente si se supera el umbral."""
+    if not identifier:
+        return
+    key = f"{_LOGIN_FAILCOUNT_PREFIX}{identifier}"
+    try:
+        attempts = cache.incr(key)
+    except ValueError:
+        # La clave no existía o expiró -- arranca el contador con TTL de la
+        # ventana de conteo (no de bloqueo).
+        cache.set(key, 1, timeout=AuthLockoutConfig.WINDOW_SECONDS)
+        attempts = 1
+
+    if attempts >= AuthLockoutConfig.MAX_ATTEMPTS:
+        cache.set(
+            f"{_LOGIN_LOCKOUT_PREFIX}{identifier}",
+            True,
+            timeout=AuthLockoutConfig.LOCKOUT_SECONDS,
+        )
+        cache.delete(key)
+        logger.warning(
+            "Login bloqueado temporalmente tras %s intentos fallidos: %s",
+            attempts,
+            identifier,
+        )
+
+
+def _clear_failed_logins(identifier: str) -> None:
+    if not identifier:
+        return
+    cache.delete(f"{_LOGIN_FAILCOUNT_PREFIX}{identifier}")
+    cache.delete(f"{_LOGIN_LOCKOUT_PREFIX}{identifier}")
+
+
 def authenticate_portal_user(login: str, password: str):
     """
     Autentica por usuario Django (email/username) o credenciales PanAccess (texto libre).
     Retorna User o None.
+
+    Envoltorio delgado sobre `_authenticate_portal_user_core` que agrega
+    bloqueo temporal de cuenta tras varios intentos fallidos seguidos (Alto
+    #5, Fase 3 -- ver docs/OPTIMIZACION_LATENCIA_LOGIN_2026-08-26.md).
+
+    El contador y el bloqueo viven en caché (Redis), por identificador de
+    login normalizado (texto tal cual lo tipeó el usuario: email, código,
+    login1 o login2) -- no en `SubscriberInfo.failed_login_attempts`/
+    `locked_until`, que existían pero pertenecen al perfil de
+    smartcard/activación y nunca se consultan ni se actualizan en este flujo
+    de login (serían un bloqueo sin efecto real). Un login bloqueado no
+    intenta ninguna autenticación (ni siquiera contra la BD local),
+    respondiendo de inmediato.
+    """
+    identifier = _lockout_identifier(login)
+    if AuthLockoutConfig.ENABLED and _is_login_locked(identifier):
+        logger.warning(
+            "Login rechazado para %s: bloqueado temporalmente por intentos fallidos",
+            login,
+        )
+        return None
+
+    user = _authenticate_portal_user_core(login, password)
+
+    if AuthLockoutConfig.ENABLED:
+        if user:
+            _clear_failed_logins(identifier)
+        else:
+            _register_failed_login(identifier)
+
+    return user
+
+
+def _authenticate_portal_user_core(login: str, password: str):
+    """
+    Lógica real de autenticación (antes el cuerpo de `authenticate_portal_user`).
 
     Nota (auditoría, sección 17/21): el camino por credenciales PanAccess
     (`verify_panaccess_credentials`) puede encontrar la contraseña cacheada
@@ -343,11 +464,15 @@ def authenticate_portal_user(login: str, password: str):
         # sigue activo y el abonado vinculado resulta estar cerrado (ej. se
         # cerró la cuenta por otro medio sin desactivar este User todavía),
         # se bloquea igual acá.
-        if is_subscriber_closed_locally(resolve_subscriber_code(login)):
+        # Se resuelve UNA sola vez y se reutiliza en ensure_subscriber_
+        # portal_email_verified() -- antes se resolvía dos veces seguidas
+        # con el mismo `login` (Alto #5, optimización de latencia de login).
+        subscriber_code = resolve_subscriber_code(login)
+        if is_subscriber_closed_locally(subscriber_code):
             logger.warning("Login rechazado para %s: abonado cerrado localmente", login)
             return None
         user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
-        ensure_subscriber_portal_email_verified(user, login)
+        ensure_subscriber_portal_email_verified(user, login, subscriber_code=subscriber_code)
         return user
 
     if "@" in login:
@@ -355,11 +480,12 @@ def authenticate_portal_user(login: str, password: str):
         if by_email:
             user = authenticate(username=by_email.get_username(), password=password)
             if user:
-                if is_subscriber_closed_locally(resolve_subscriber_code(login)):
+                subscriber_code = resolve_subscriber_code(login)
+                if is_subscriber_closed_locally(subscriber_code):
                     logger.warning("Login rechazado para %s: abonado cerrado localmente", login)
                     return None
                 user.backend = getattr(user, "backend", "django.contrib.auth.backends.ModelBackend")
-                ensure_subscriber_portal_email_verified(user, login)
+                ensure_subscriber_portal_email_verified(user, login, subscriber_code=subscriber_code)
                 return user
 
     login_record = verify_panaccess_credentials(login, password)
@@ -374,7 +500,12 @@ def authenticate_portal_user(login: str, password: str):
             return None
         user = get_or_create_portal_user(login_record)
         user.backend = "django.contrib.auth.backends.ModelBackend"
-        ensure_subscriber_portal_email_verified(user, login)
+        # subscriber_code ya se conoce (login_record.subscriberCode) -- se
+        # evita una tercera resolución redundante de resolve_subscriber_code()
+        # en el mismo request (Alto #5, optimización de latencia de login).
+        ensure_subscriber_portal_email_verified(
+            user, login, subscriber_code=login_record.subscriberCode
+        )
         return user
 
     return None

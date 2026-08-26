@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-26
 Referencia: `docs/AUDITORIA_CONSOLIDADA_2026-08-24.md`, hallazgo Alto #4
-Estado: **Implementado. Pendiente de verificación end-to-end en un entorno con base de datos real** (este entorno de trabajo no tiene acceso a Postgres -- ver "Verificación hecha" más abajo).
+Estado: **Implementado y verificado end-to-end contra la base de datos real de producción** (ver "Verificación hecha" más abajo).
 
 ## De qué se trata
 
@@ -45,4 +45,4 @@ Se decidió mandar el mismo aviso en los dos caminos (manual y automático), sin
 - `python3 -m py_compile` sobre los 5 archivos modificados/creados -- sin errores.
 - `python manage.py check` -- "System check identified no issues".
 - `manage.py shell`: se importaron todos los módulos tocados sin error de import circular, y se renderizaron las plantillas nuevas con un contexto de prueba (texto y HTML generados correctamente).
-- **No se pudo probar contra una base de datos real** -- este entorno de trabajo no tiene conexión a Postgres (`connection to server at "localhost" ... Connection refused`). Antes de confiar en esto en producción, conviene correr una sincronización de prueba (o invocar `_delete_local_subscribers_not_in_remote` a mano con un código de prueba) contra un entorno con base de datos real, y confirmar que el correo efectivamente llega y que `devices_revoked` refleja conteos correctos.
+- **Verificación end-to-end contra producción (2026-08-26, post-deploy)**: se creó un suscriptor sintético (`TEST_ALTO4_BORRAR`, código inventado, sin relación con ningún abonado real) con un `UDIDAuthRequest` y una `DeviceSession` activos, y se invocó `_delete_local_subscribers_not_in_remote({...}, remote_codes=set())` directo por `manage.py shell`, simulando que el suscriptor desapareció de PanAccess. Resultado confirmado: `devices_revoked: {'udid': 1, 'device_sessions': 1}`, `deleted: 1`, y tras la corrida los conteos de UDID/DeviceSession activos volvieron a `0` y el suscriptor dejó de existir localmente. El correo de "cuenta cerrada" llegó correctamente (probado dos veces: una vez directo vía `enqueue_account_closed_email`, y otra como parte de esta misma corrida de `_delete_local_subscribers_not_in_remote`).

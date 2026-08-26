@@ -7,6 +7,7 @@ from dj_rest_auth.jwt_auth import get_refresh_view
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from wind.views_health import health_view, ready_view
+from wind.throttles import LoginThrottle
 
 urlpatterns = [
     path('health/', health_view, name='health'),
@@ -37,7 +38,9 @@ urlpatterns = [
     # Tampoco se incluye dj_rest_auth.registration.urls -- el registro real
     # es wind/register/ (create_subscriber_view), no un User de Django suelto.
     # Ver docs/LIMPIEZA_RUTAS_AUTH_NATIVAS_2026-08-25.md.
-    path('api/auth/login/', LoginView.as_view(), name='rest_login'),
+    # throttle_classes propio (Alto #5): antes heredaba el límite genérico
+    # anónimo (60/min), ver wind/throttles.py::LoginThrottle.
+    path('api/auth/login/', LoginView.as_view(throttle_classes=[LoginThrottle]), name='rest_login'),
     path('api/auth/logout/', LogoutView.as_view(), name='rest_logout'),
     path('api/auth/user/', UserDetailsView.as_view(), name='rest_user_details'),
     path('api/auth/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
