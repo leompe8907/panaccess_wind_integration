@@ -1084,6 +1084,37 @@ class FeatureConfig:
     # "license_block_added"/"contacts_added"/"assigned_smartcards" de forma
     # síncrona -- coordinar con el equipo de frontend antes de activarlo.
     CREATE_SUBSCRIBER_ASYNC_ENRICHMENT = _env_bool("CREATE_SUBSCRIBER_ASYNC_ENRICHMENT", False)
+    # Modo de aprovisionamiento del registro público (ver hallazgo Alto #3,
+    # docs/AUDITORIA_CONSOLIDADA_2026-08-24.md, y
+    # docs/APROVISIONAMIENTO_HIBRIDO_SUSCRIPTOR_2026-08-26.md):
+    #   - "sync"   (default): comportamiento actual, sin cambios -- los 10
+    #     pasos se intentan todos en el mismo request.
+    #   - "async": el viejo CREATE_SUBSCRIBER_ASYNC_ENRICHMENT=true -- solo
+    #     addSubscriber corre sync, el resto SIEMPRE va a background. La
+    #     respuesta nunca incluye token/credentials_url/etc.
+    #   - "hybrid": intenta los 10 pasos sync, pero con un presupuesto de
+    #     tiempo total (CREATE_SUBSCRIBER_SYNC_BUDGET_SECONDS). Si PanAccess
+    #     anda normal, la respuesta es idéntica a "sync" (con
+    #     token/credentials_url/etc.) sin ningún cambio de contrato. Si se
+    #     agota el presupuesto a mitad de camino, corta ahí, manda el resto
+    #     a la misma tarea de background que usa "async"
+    #     (finish_subscriber_provisioning_task, ya es idempotente/segura de
+    #     reintentar -- ver su docstring), y responde con
+    #     provisioning_status="partial" en vez de los campos que falten.
+    # Se resuelve leyendo CREATE_SUBSCRIBER_PROVISIONING_MODE si está
+    # seteada; si no, cae al flag viejo (CREATE_SUBSCRIBER_ASYNC_ENRICHMENT)
+    # para no romper despliegues existentes que ya lo usen.
+    CREATE_SUBSCRIBER_PROVISIONING_MODE = (
+        _strip_env(os.getenv("CREATE_SUBSCRIBER_PROVISIONING_MODE"))
+        or ("async" if CREATE_SUBSCRIBER_ASYNC_ENRICHMENT else "sync")
+    ).strip().lower()
+    if CREATE_SUBSCRIBER_PROVISIONING_MODE not in ("sync", "async", "hybrid"):
+        CREATE_SUBSCRIBER_PROVISIONING_MODE = "sync"
+    # Presupuesto de tiempo total (segundos) para el modo "hybrid" -- ver
+    # arriba. Sin efecto en modo "sync"/"async".
+    CREATE_SUBSCRIBER_SYNC_BUDGET_SECONDS = max(
+        1, _env_int("CREATE_SUBSCRIBER_SYNC_BUDGET_SECONDS", 8)
+    )
     CLOSE_SUBSCRIBER_HTTP_ENABLED = _env_bool("CLOSE_SUBSCRIBER_HTTP_ENABLED", False)
     CLOSE_SUBSCRIBER_DASHBOARD_ENABLED = _env_bool("CLOSE_SUBSCRIBER_DASHBOARD_ENABLED", True)
     # Por defecto OFF: login social (Google/Facebook) sigue auto-registrando

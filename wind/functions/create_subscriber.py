@@ -3,6 +3,7 @@ Vista para crear nuevos suscriptores en PanAccess.
 """
 import logging
 import base64
+import time
 
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
@@ -587,17 +588,41 @@ def _create_subscriber_core(
             else:
                 logger.info(f"Registro de documento actualizado: {subscriber_code} -> {_mask_email(email_normalized)}")
 
-        if FeatureConfig.CREATE_SUBSCRIBER_ASYNC_ENRICHMENT:
-            # Modo async (opt-in, ver appConfig.FeatureConfig): el resto del
-            # registro encadenaba 6-9 llamadas síncronas más a PanAccess
-            # (búsqueda en catálogo, contactos, license block, producto de
-            # prueba) dentro del mismo request público -- eso retenía un
-            # worker todo ese tiempo. Con el flag activado, solo se hace
-            # addSubscriber sync (ya ocurrió arriba) y se responde de una
-            # vez; finish_subscriber_provisioning_task hace el resto en
-            # background. OJO: en este modo la respuesta ya NO incluye
-            # "token"/"credentials_url"/"license_block_added"/
-            # "contacts_added"/"assigned_smartcards" de forma síncrona.
+        # Modo de aprovisionamiento (ver appConfig.FeatureConfig y
+        # docs/APROVISIONAMIENTO_HIBRIDO_SUSCRIPTOR_2026-08-26.md):
+        #   - "sync" (default): todo lo de abajo corre en este mismo
+        #     request, como siempre.
+        #   - "async": el resto se manda directo a background, sin
+        #     intentarlo sync -- comportamiento del viejo
+        #     CREATE_SUBSCRIBER_ASYNC_ENRICHMENT=true.
+        #   - "hybrid": se intenta todo sync, pero con un presupuesto de
+        #     tiempo total. Si se agota a mitad de camino, se corta y se
+        #     manda el resto a la misma tarea de background.
+        provisioning_mode = FeatureConfig.CREATE_SUBSCRIBER_PROVISIONING_MODE
+        sync_deadline = (
+            time.monotonic() + FeatureConfig.CREATE_SUBSCRIBER_SYNC_BUDGET_SECONDS
+            if provisioning_mode == "hybrid"
+            else None
+        )
+
+        def _handoff_to_background(reason: str):
+            """
+            Encola el resto del aprovisionamiento (contactos, license block,
+            producto de prueba) en `finish_subscriber_provisioning_task` --
+            la misma tarea que ya usa el modo "async" y la reconciliación
+            periódica. Es segura de llamar aunque algunos pasos ya se hayan
+            intentado sync antes de cortar (modo "hybrid" quedándose sin
+            presupuesto a mitad de camino): PanAccess trata los pasos ya
+            hechos como "ya existe"/no-op, no duplica nada (ver docstring de
+            finish_subscriber_provisioning_task).
+
+            OJO: a partir de acá la respuesta YA NO incluye
+            "token"/"credentials_url"/"license_block_added"/
+            "contacts_added"/"assigned_smartcards" de forma síncrona --
+            coordinar con el equipo de frontend el campo
+            "provisioning_status": "partial" antes de activar "async" o
+            "hybrid" en producción.
+            """
             from wind.tasks import finish_subscriber_provisioning_task
 
             finish_subscriber_provisioning_task.delay(
@@ -620,13 +645,15 @@ def _create_subscriber_core(
                 is_social_account=is_social_account,
             )
             logger.info(
-                "[Async] Aprovisionamiento adicional de %s encolado en background "
-                "(CREATE_SUBSCRIBER_ASYNC_ENRICHMENT=true)",
+                "[Provisioning] Resto del aprovisionamiento de %s encolado en "
+                "background (modo=%s, motivo=%s)",
                 subscriber_code,
+                provisioning_mode,
+                reason,
             )
             # El lock de registro ya cumplió su función (uniqueness escrita
-            # + trial reservado si aplica); el resto lo hace la tarea async
-            # sin necesidad de mantenerlo tomado.
+            # + trial reservado si aplica); el resto lo hace la tarea en
+            # background sin necesidad de mantenerlo tomado.
             release_registration_locks(registration_locks)
             return Response({
                 "success": True,
@@ -638,7 +665,14 @@ def _create_subscriber_core(
                 "subscriber_code": subscriber_code,
                 "alternative_login": email_normalized,
                 "provisioning": "async",
+                "provisioning_status": "partial",
             }, status=status.HTTP_201_CREATED)
+
+        if provisioning_mode == "async":
+            return _handoff_to_background("async_mode")
+
+        if sync_deadline is not None and time.monotonic() >= sync_deadline:
+            return _handoff_to_background("budget_exceeded_before_lookup")
 
         subscriber_data_for_db = None
         smartcards_list = None
@@ -812,11 +846,14 @@ def _create_subscriber_core(
         # la rama sync/async, para que queden protegidos por el lock de
         # registro (ver auditoría, sección 16).
 
+        if sync_deadline is not None and time.monotonic() >= sync_deadline:
+            return _handoff_to_background("budget_exceeded_before_contacts")
+
         contacts_added = []
         contacts_errors = []
         email_validated = False
         email_validation_error = None
-        
+
         email_contact_response = None
         try:
             logger.info(f"Agregando email {_mask_email(email_normalized)} al suscriptor {subscriber_code}")
@@ -923,9 +960,12 @@ def _create_subscriber_core(
             if email_validated is False and 'email' in {c.get('type') for c in contacts_added}:
                 response_data['message'] += '. El email no pudo validarse en PanAccess (ver logs ValidateContact).'
         
+        if sync_deadline is not None and time.monotonic() >= sync_deadline:
+            return _handoff_to_background("budget_exceeded_before_license_block")
+
         license_block_success = False
         license_block_error = None
-        
+
         try:
             logger.info(f"[LicenseBlock] Llamando addLicenseBlockToSubscriber para suscriptor: {subscriber_code}")
             license_params = {
