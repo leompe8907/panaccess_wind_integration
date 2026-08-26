@@ -241,7 +241,18 @@ def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
     """Elimina suscriptores locales y credenciales que no existen en PanAccess.
 
     Conserva filas con status closed / pending_closure (tombstone de cierre de cuenta).
+
+    Alto #4 (auditoría): antes este camino borraba los datos locales sin
+    revocar UDIDAuthRequest/DeviceSession, dejando dispositivos vinculados
+    que podían seguir autenticando indefinidamente. Ahora, antes de borrar,
+    se captura el email/nombre de cada suscriptor (para el aviso por
+    correo) y se revocan sus dispositivos -- mismo mecanismo que ya usa el
+    cierre de cuenta manual (wind.services.subscriber_closure).
     """
+    from wind.services.subscriber_closure import _revoke_udid_requests
+    from wind.services.device_session_service import revoke_all_device_sessions_for_subscriber
+    from wind.services.account_closed_email import enqueue_account_closed_email
+
     missing_remotely = local_codes - remote_codes
     preserved_codes = set(
         ListOfSubscriber.objects.filter(
@@ -255,6 +266,7 @@ def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
     codes_to_delete = missing_remotely - preserved_codes
     total_deleted = 0
     credentials_deleted = {}
+    devices_revoked = {"udid": 0, "device_sessions": 0}
 
     if preserved_codes:
         logger.info(
@@ -265,6 +277,39 @@ def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
         )
 
     if codes_to_delete:
+        # Capturar datos de contacto ANTES de borrar -- con
+        # preserve_registry=False (delete_subscriber_credentials), el
+        # SubscriberEmailRegistry y la fila de ListOfSubscriber se borran
+        # como parte de esta operación, así que después no habría de dónde
+        # sacar el email para avisar.
+        contact_by_code = {
+            row["code"]: (row.get("emails") or "", row.get("firstName") or "", row.get("lastName") or "")
+            for row in ListOfSubscriber.objects.filter(code__in=codes_to_delete).values(
+                "code", "emails", "firstName", "lastName"
+            )
+        }
+        registry_email_by_code = {
+            row["subscriber_code"]: row["email"]
+            for row in SubscriberEmailRegistry.objects.filter(
+                subscriber_code__in=codes_to_delete
+            ).values("subscriber_code", "email")
+            if row.get("email")
+        }
+
+        for code in codes_to_delete:
+            try:
+                udid_count = _revoke_udid_requests(code)
+                devices_revoked["udid"] += udid_count or 0
+            except Exception:
+                logger.exception("Error revocando UDIDAuthRequest de %s (sync delete)", code)
+            try:
+                ds_count = revoke_all_device_sessions_for_subscriber(
+                    code, reason="subscriber_deleted_sync"
+                )
+                devices_revoked["device_sessions"] += ds_count or 0
+            except Exception:
+                logger.exception("Error revocando DeviceSession de %s (sync delete)", code)
+
         try:
             credentials_deleted = delete_subscriber_credentials(codes_to_delete)
             total_deleted = ListOfSubscriber.objects.filter(code__in=codes_to_delete).delete()[0]
@@ -276,11 +321,26 @@ def _delete_local_subscribers_not_in_remote(local_codes, remote_codes):
         except Exception as e:
             logger.error("Error de eliminación: %s", e)
 
+        # Aviso por correo (hallazgo Alto #4) -- se manda igual aunque el
+        # borrado local haya fallado parcialmente arriba (el suscriptor ya
+        # desapareció de PanAccess de todos modos), pero nunca debe poder
+        # interrumpir el resto del pipeline de sync si falla.
+        for code in codes_to_delete:
+            email = registry_email_by_code.get(code) or (contact_by_code.get(code, ("", "", ""))[0])
+            _, first_name, last_name = contact_by_code.get(code, ("", "", ""))
+            try:
+                enqueue_account_closed_email(
+                    email=email, first_name=first_name, last_name=last_name
+                )
+            except Exception:
+                logger.exception("No se pudo encolar correo de cuenta cerrada para %s (sync delete)", code)
+
     return {
         "deleted": total_deleted,
         "codes_to_delete_count": len(codes_to_delete),
         "preserved_closed": len(preserved_codes),
         "credentials_deleted": credentials_deleted,
+        "devices_revoked": devices_revoked,
     }
 
 
@@ -333,13 +393,21 @@ def delete_subscriber_operational_data(subscriber_codes, *, preserve_registry: b
             'subscriber_info': 0
         }
 
-    login_info_deleted = SubscriberLoginInfo.objects.filter(subscriberCode__in=codes_list).delete()[0]
-    email_registry_deleted = 0
-    document_registry_deleted = 0
-    if not preserve_registry:
-        email_registry_deleted = SubscriberEmailRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
-        document_registry_deleted = SubscriberDocumentRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
-    subscriber_info_deleted = SubscriberInfo.objects.filter(subscriber_code__in=codes_list).delete()[0]
+    # Alto #4 (auditoría): antes eran 4 .delete() sueltos, sin
+    # transaction.atomic() -- si fallaba a mitad de camino (ej. borra
+    # SubscriberLoginInfo pero SubscriberInfo lanza una excepción), el
+    # suscriptor quedaba en un estado intermedio inconsistente. Envolverlo
+    # acá (en vez de en cada caller) cubre a los dos callers reales
+    # (close_subscriber_account y _delete_local_subscribers_not_in_remote)
+    # de una sola vez.
+    with transaction.atomic():
+        login_info_deleted = SubscriberLoginInfo.objects.filter(subscriberCode__in=codes_list).delete()[0]
+        email_registry_deleted = 0
+        document_registry_deleted = 0
+        if not preserve_registry:
+            email_registry_deleted = SubscriberEmailRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
+            document_registry_deleted = SubscriberDocumentRegistry.objects.filter(subscriber_code__in=codes_list).delete()[0]
+        subscriber_info_deleted = SubscriberInfo.objects.filter(subscriber_code__in=codes_list).delete()[0]
 
     return {
         'login_info': login_info_deleted,

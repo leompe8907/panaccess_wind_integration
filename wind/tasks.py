@@ -1062,6 +1062,36 @@ def send_password_changed_email_task(self, email, subject, text_body, html_body)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_account_closed_email_task(self, email, subject, text_body, html_body):
+    """
+    Envía el aviso de "cuenta cerrada" tras un cierre exitoso (ver
+    wind/services/account_closed_email.py, wind/services/subscriber_closure.py
+    y wind/functions/getSubscriber.py::_delete_local_subscribers_not_in_remote).
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    logger.info("Enviando correo de cuenta cerrada a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Correo de cuenta cerrada enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as exc:
+        logger.exception("Error al enviar correo de cuenta cerrada a %s", email)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_password_reset_email_task(self, email, subject, text_body, html_body):
     """
     Envía el correo con enlace de recuperación de contraseña (ver

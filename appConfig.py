@@ -907,6 +907,13 @@ class EmailConfig:
         _strip_env(os.getenv("EMAIL_PASSWORD_CHANGED_SUBJECT"))
         or "Tu contraseña de WindTV fue actualizada"
     )
+    # Aviso de cierre de cuenta (ver hallazgo Alto #4 y
+    # wind/services/account_closed_email.py) -- se manda tanto en el cierre
+    # manual/API como en el borrado automático por sincronización.
+    ACCOUNT_CLOSED_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_ACCOUNT_CLOSED_SUBJECT"))
+        or "Tu cuenta de WindTV fue cerrada"
+    )
     # Link del botón "Ir a WindTV" del correo de "contraseña actualizada" --
     # se manda desde una tarea de Celery sin request activo, así que no se
     # puede usar request.build_absolute_uri() como en request_password_reset();

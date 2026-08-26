@@ -1,0 +1,19 @@
+WIND TV
+═══════════════════════════════════════
+
+Tu cuenta de WindTV fue cerrada
+
+Hola {{ full_name }}, te confirmamos que tu cuenta de WindTV quedó cerrada
+correctamente.
+
+Cerramos la sesión en todos tus dispositivos vinculados y ya no vas a poder
+acceder al servicio con estas credenciales. Si en algún momento quieres
+volver, puedes registrarte de nuevo cuando quieras.
+
+¿No solicitaste el cierre de esta cuenta? Contáctanos de inmediato a
+{{ support_email }} o al {{ support_phone }}.
+
+───────────────────────────────────────
+WIND — Conecta tu vida.
+
+Si tienes alguna duda, sugerencia, queja o necesitas asistencia escríbenos a {{ support_email }} o llámanos al {{ support_phone }} sin costo alguno.

@@ -275,6 +275,23 @@ def close_subscriber_account(
     local_result["udid_revoked"] = udid_revoked_count
     local_result["device_sessions_revoked"] = device_sessions_revoked_count
 
+    # Aviso por correo (hallazgo Alto #4) -- solo en el cierre real y
+    # completo (no en "already_closed", ni en dry_run, ni en el caso
+    # parcial de arriba, que ya retornó antes de llegar acá). No debe poder
+    # tumbar el cierre si el envío falla -- ver enqueue_account_closed_email.
+    try:
+        from wind.services.account_closed_email import enqueue_account_closed_email
+
+        enqueue_account_closed_email(
+            email=subscriber.emails or "",
+            first_name=subscriber.firstName or "",
+            last_name=subscriber.lastName or "",
+        )
+    except Exception:
+        logger.exception(
+            "No se pudo encolar el correo de cuenta cerrada para %s", subscriber_code
+        )
+
     log_status = SubscriberClosureLog.STATUS_COMPLETED
     closure_log = SubscriberClosureLog.objects.create(
         subscriber_code=subscriber_code,
