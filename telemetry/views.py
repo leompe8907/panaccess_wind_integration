@@ -19,6 +19,15 @@ class TopChannelsGlobalView(APIView):
 
     Lee de caché (ver telemetry/services/top_channels.py); no hace
     ningún cálculo pesado en el request en operación normal.
+
+    GUARDARRAÍL (auditoría, Medio #12): `IsAuthenticated` a secas es
+    correcto HOY porque el ranking es global -- el mismo resultado para
+    cualquier suscriptor autenticado, sin dato sensible ni específico de
+    cuenta. Si en el futuro este endpoint (o `build_top_channels_bouquet`)
+    empieza a devolver algo filtrado por suscriptor, región, o cualquier
+    dato más granular, hay que agregar acá el chequeo de autorización
+    correspondiente -- no asumir que `IsAuthenticated` sigue alcanzando
+    solo porque alcanzaba para el caso global.
     """
 
     permission_classes = [IsAuthenticated]

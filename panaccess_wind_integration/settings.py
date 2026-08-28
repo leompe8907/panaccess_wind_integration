@@ -535,6 +535,16 @@ if CeleryConfig.PROVISIONING_RETRY_ENABLED:
         },
     }
 
+if CeleryConfig.DEVICE_SESSION_IDLE_EXPIRY_ENABLED:
+    CELERY_BEAT_SCHEDULE["expire-idle-device-sessions"] = {
+        "task": "wind.tasks.expire_idle_device_sessions_task",
+        "schedule": timedelta(minutes=CeleryConfig.DEVICE_SESSION_CLEANUP_MINUTES),
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": CeleryConfig.DEVICE_SESSION_CLEANUP_MINUTES * 60,
+        },
+    }
+
 # --- App "telemetry" (canales más vistos) -----------------------------
 if CeleryConfig.TELEMETRY_INGEST_ENABLED:
     CELERY_BEAT_SCHEDULE["telemetry-ingest-ott"] = {

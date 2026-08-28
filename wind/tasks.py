@@ -890,6 +890,39 @@ def recover_pending_audit_logs_task(self):
     return {"success": True, **result}
 
 
+@shared_task(bind=True)
+def expire_idle_device_sessions_task(self):
+    """
+    Revoca automáticamente los `DeviceSession` ("dispositivos vinculados",
+    ver Bajo #28 de la auditoría) sin actividad reciente.
+
+    Sin esto, un `device_token` queda `active` para siempre salvo que el
+    usuario lo revoque a mano o cambie su contraseña -- un dispositivo
+    perdido/vendido/olvidado sigue siendo válido para `/ws/device/`
+    indefinidamente. `device_consumers.py` ya rechaza cualquier
+    reconexión con `status != "active"` (`device_token_invalid`), así que
+    alcanza con marcar `revoked` acá -- no hace falta tocar el consumer.
+
+    Bulk update (una sola query, sin traer filas a Python) -- a esta
+    escala no hace falta iterar ni loguear caso por caso.
+    """
+    from django.utils import timezone
+
+    from appConfig import CeleryConfig
+    from wind.models import DeviceSession
+
+    if not CeleryConfig.DEVICE_SESSION_IDLE_EXPIRY_ENABLED:
+        return {"success": True, "skipped": True, "message": "DEVICE_SESSION_IDLE_EXPIRY_ENABLED=false"}
+
+    cutoff = timezone.now() - timezone.timedelta(days=CeleryConfig.DEVICE_SESSION_IDLE_EXPIRY_DAYS)
+    updated = DeviceSession.objects.filter(
+        status="active",
+        last_seen_at__lt=cutoff,
+    ).update(status="revoked", revoked_at=timezone.now(), revoked_reason="idle_timeout")
+
+    return {"success": True, "revoked": updated, "cutoff": cutoff.isoformat()}
+
+
 def _alert_provisioning_exhausted(subscriber_code: str, attempts: int, to_address: str) -> None:
     if not to_address:
         return

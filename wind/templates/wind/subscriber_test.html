@@ -109,6 +109,18 @@
           return String(v);
         }
 
+        // XSS (auditoría, Medio #9): campos del suscriptor (comment,
+        // address, firstName, etc.) se insertaban con innerHTML sin
+        // escapar -- si alguno contenía HTML/script, se ejecutaba en esta
+        // página. Mismo escapeHtml() que ya usa dashboard.html.
+        function escapeHtml(text) {
+          return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
         function renderFields(sub) {
           var keys = [
             "code",
@@ -144,7 +156,7 @@
               '<div class="test-row"><div class="test-key">' +
               k +
               '</div><div class="test-val">' +
-              renderValue(val) +
+              escapeHtml(renderValue(val)) +
               "</div></div>";
           }
           fieldsEl.innerHTML = html;

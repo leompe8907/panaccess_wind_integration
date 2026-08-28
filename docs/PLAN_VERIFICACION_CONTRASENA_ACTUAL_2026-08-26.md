@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-26
 Referencia: `docs/AUDITORIA_CONSOLIDADA_2026-08-24.md`, hallazgo Alto #6
-Estado: **Plan, sin implementar todavía.**
+Estado: **Fase 1 y Fase 2 implementadas y verificadas.** Ver `docs/VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md` (fase 1, `oldPass` opcional) y `docs/VERIFICACION_CONTRASENA_ACTUAL_FASE2_2026-08-28.md` (fase 2, `oldPass` obligatorio -- este plan queda como referencia histórica del diseño original).
 
 ## Alcance corregido (recapitulando)
 

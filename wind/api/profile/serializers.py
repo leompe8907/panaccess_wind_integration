@@ -41,13 +41,12 @@ class ProfileMeSerializer(serializers.ModelSerializer):
 
 class ProfilePasswordSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=100)
-    # Opcional por ahora -- fase 1 del rollout de Alto #6 (ver
-    # docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md). Se vuelve
-    # obligatorio (required=True) una vez confirmado que Web/Android/iOS ya
-    # lo mandan en producción. Mientras tanto, si no viene, la vista deja
-    # pasar el cambio igual que antes (sin verificar la contraseña actual)
-    # pero deja un log de advertencia para poder medir la migración.
-    oldPass = serializers.CharField(max_length=255, write_only=True, required=False, allow_blank=False)
+    # Obligatorio desde fase 2 del rollout de Alto #6 (ver
+    # docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md y
+    # docs/VERIFICACION_CONTRASENA_ACTUAL_FASE2_2026-08-28.md). Web,
+    # Android e iOS ya lo mandan en producción -- si falta, se rechaza acá
+    # mismo con 400 antes de llegar a la vista.
+    oldPass = serializers.CharField(max_length=255, write_only=True, allow_blank=False)
     newPass = serializers.CharField(max_length=255, write_only=True)
 
     def validate_newPass(self, value):

@@ -648,6 +648,19 @@ class CeleryConfig:
     PROVISIONING_RETRY_MINUTES = max(5, _env_int("CELERY_PROVISIONING_RETRY_MINUTES", 15))
     PROVISIONING_RETRY_MAX_ATTEMPTS = max(1, _env_int("CELERY_PROVISIONING_RETRY_MAX_ATTEMPTS", 8))
 
+    # Expiración por inactividad de "dispositivos vinculados" (`DeviceSession`,
+    # ver Bajo #28 de la auditoría) -- sin esto, un `device_token` queda
+    # `active` para siempre salvo revocación manual o cambio de contraseña;
+    # un dispositivo perdido/vendido/olvidado sigue siendo válido
+    # indefinidamente. Corre de fondo y marca `revoked` (razón
+    # `idle_timeout`) toda sesión sin actividad (`last_seen_at`) más vieja
+    # que el umbral -- `device_consumers.py` ya rechaza cualquier
+    # reconexión con `status != "active"`, así que no hace falta tocar el
+    # consumer.
+    DEVICE_SESSION_IDLE_EXPIRY_ENABLED = _env_bool("CELERY_DEVICE_SESSION_IDLE_EXPIRY_ENABLED", True)
+    DEVICE_SESSION_IDLE_EXPIRY_DAYS = max(1, _env_int("DEVICE_SESSION_IDLE_EXPIRY_DAYS", 183))
+    DEVICE_SESSION_CLEANUP_MINUTES = max(60, _env_int("CELERY_DEVICE_SESSION_CLEANUP_MINUTES", 1440))
+
     # --- App "telemetry" (canales más vistos) ---------------------------
     # Cola propia para no competir con el pipeline de sincronización de
     # suscriptores/smartcards -- un pico de eventos de telemetría no debe

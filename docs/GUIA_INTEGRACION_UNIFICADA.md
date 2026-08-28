@@ -152,7 +152,9 @@ La solución no es repetir el parche en cada pantalla, sino centralizarlo: mover
 
 ### 5.1 Cambiar contraseña
 
-`POST /api/v1/profile/password/` (JWT), body `{"code": "<subscriber_code>", "newPass": "..."}` → `{"success": true, "message": "Contraseña actualizada"}`.
+`POST /api/v1/profile/password/` (JWT), body `{"code": "<subscriber_code>", "oldPass": "...", "newPass": "..."}` → `{"success": true, "message": "Contraseña actualizada"}`.
+
+**`oldPass` es obligatorio desde 2026-08-28 (cambio de contrato, actualizar si tu integración quedó armada antes de esa fecha).** Es la contraseña actual del suscriptor; el backend la verifica contra PanAccess antes de aplicar el cambio. Motivo: sin esto, un JWT robado/filtrado alcanzaba por sí solo para cambiar la contraseña (y de paso expulsar al dueño real de la cuenta, ya que el cambio revoca todas las demás sesiones -- ver más abajo). Si tu pantalla de cambio de contraseña no le pide la contraseña actual al usuario todavía, hay que agregar ese campo antes de llamar a este endpoint -- sin él, el backend rechaza el request con 400 de validación (`oldPass` faltante), no deja pasar el cambio.
 
 **Política de contraseña (`newPass`):** entre 8 y 255 caracteres, al menos una letra mayúscula, al menos un número, y solo caracteres `a-z`, `A-Z`, `0-9`, `-`, `_` y especiales `! @ # $ % ^ & * ( ) + = [ ] { } ; : ' " , . < > / ? ~ ` | \`. El cliente debería validar esto localmente antes de llamar al endpoint para evitar el round-trip en el caso obvio.
 
@@ -162,14 +164,16 @@ La solución no es repetir el parche en cada pantalla, sino centralizarlo: mover
 
 | Status | `code` | Significado |
 |---|---|---|
+| 400 | `old_password_incorrect` | `oldPass` no coincide con la contraseña actual real. Mostrar mensaje específico ("tu contraseña actual no es correcta"), no un error genérico. |
 | 400 | `password_policy_violation` | `newPass` no cumple la política de arriba (detectado localmente, sin llamar a PanAccess). |
 | 400 | `password_rejected_by_panaccess` | PanAccess respondió y rechazó la contraseña por una regla no cubierta por la validación local. Incluye además `"panaccess_error_code"` (puede ser `null`). |
+| 429 | `old_password_locked` | Demasiados `oldPass` incorrectos seguidos (5 intentos, ventana de 5 min) -- bloqueado 15 min. Distinto del `rate_limited` general: este es específico de intentos fallidos de la contraseña actual. |
 | 429 | `rate_limited` | Demasiados intentos; reintentar más tarde. |
 | 502 | `panaccess_integration_error` | Problema de la sesión/credencial de servicio con PanAccess -- no es culpa del valor enviado. |
 | 503 | `panaccess_unavailable` | PanAccess no respondió (conectividad). |
 | 504 | `panaccess_timeout` | PanAccess tardó demasiado en responder. |
 
-Antes de este fix, cualquiera de estos casos (incluida la violación de política) se devolvía como 502 sin `code`, indistinguible de una falla real de PanAccess -- si el cliente ya tenía lógica especial para 502, debe actualizarla para tratar 400 con `code=password_policy_violation`/`password_rejected_by_panaccess` como error de input corregible, no como "reintentar más tarde".
+Antes de este fix, cualquiera de estos casos (incluida la violación de política) se devolvía como 502 sin `code`, indistinguible de una falla real de PanAccess -- si el cliente ya tenía lógica especial para 502, debe actualizarla para tratar 400 con `code=password_policy_violation`/`password_rejected_by_panaccess`/`old_password_incorrect` como error de input corregible, no como "reintentar más tarde".
 
 **Efecto colateral automático (solo en éxito):** invalida todos los JWT ya emitidos y revoca **todos** los `DeviceSession` de la cuenta -- incluida la propia sesión que hizo el cambio. Tras un cambio exitoso, la app debe volver a loguearse (JWT nuevo) y volver a registrar el dispositivo (sección 4.1).
 
@@ -243,6 +247,9 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 - Orden lexicográfico en `subscriber_code_generator.py` -- `generate_unique_subscriber_code()` ahora compara numéricamente el sufijo de cada código existente, no como texto.
 - `client_ip` en WS sin filtro de proxy confiable -- `device_consumers.py`/`consumers.py` ahora usan `get_client_ip_from_scope()`, que aplica el mismo filtro de `TrustedProxyConfig.TRUSTED_PROXIES` que ya existía para HTTP.
 - `device_registered` sin `id` -- ver sección 4.1, ya devuelve `id` y se usa en appVideo para marcar "este dispositivo" (sección 3.1, 4.4.c).
+- **`oldPass` obligatorio al cambiar contraseña (2026-08-28)** -- ver sección 5.1. Cambio de contrato: cierra el hueco de que un JWT robado alcanzara por sí solo para cambiar la contraseña sin conocer la actual.
+- **`DeviceSession` sin expiración (2026-08-28)** -- ahora una tarea Celery diaria revoca automáticamente cualquier sesión de dispositivo sin actividad (`last_seen_at`) hace más de 183 días (`DEVICE_SESSION_IDLE_EXPIRY_DAYS`, ajustable). Un dispositivo perdido/vendido/olvidado ya no queda "de confianza" indefinidamente.
+- **appVideo -- los 2 gaps client-side (revisados 2026-08-28), sin acción pendiente:** el de `ws/device/` ya está resuelto (no en `splashAuthFlow.js` puntual, sino con un watchdog centralizado en `useAppLifecycle.js` que garantiza la conexión sin importar el camino de login/reactivación); el de `loginFlow.js`/`device_token` es diseño intencional (fire-and-forget a propósito, para que el registro de dispositivo nunca pueda bloquear ni tumbar el login real), y el único consumidor (`LinkedDevicesPanel.jsx`) ya se actualiza por evento en vez de asumir que está listo de entrada.
 
 **Todavía abiertos:**
 
@@ -250,8 +257,6 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 - **Fingerprint de dispositivo evadible** rotando los headers que lo derivan (server-side, ya no lo declara el cliente, pero sigue sin ser una huella robusta) -- limitación estructural, sin una solución de bajo riesgo identificada.
 - **Site-key de reCAPTCHA para mobile**: todavía sin definir cuál usar en "olvidé mi contraseña" / "eliminar cuenta" desde iOS/Android.
 - **Brand `bromteck` en `appVideo`** sigue apuntando a `http://` en vez de `https://` -- error menor, pendiente de que el equipo de `appVideo` lo resuelva.
-- **`DeviceSession` no tiene expiración/limpieza automática**: una vez creado, un registro queda `status="active"` para siempre salvo revocación explícita (manual, cambio de contraseña o cierre de cuenta -- sección 4.4/5). No hay ningún job/Celery task que expire sesiones inactivas por tiempo. Observación nueva de esta ronda, sin decisión tomada todavía sobre si hace falta.
 - **`country`/`city` en `GET /wind/devices/` requieren un paso de despliegue manual en CADA servidor** (local ya resuelto, falta replicarlo en el servidor real de producción): la base `.mmdb` (DB-IP City Lite, gratuita y sin cuenta -- ver 4.2) y la variable `GEOIP_CITY_DB_PATH` viven **fuera de git a propósito** (`.gitignore`), así que un deploy normal no las lleva solas. Pasos en el servidor real: (1) descargar el `.mmdb` mensual y guardarlo en una ruta que sobreviva a futuros deploys (fuera de la carpeta del repo que se pisa con cada `git pull`), (2) definir `GEOIP_CITY_DB_PATH` en el `.env` de ESE servidor apuntando a esa ruta (si es relativa, se ancla sola a la raíz del proyecto -- pero conviene una ruta absoluta para no depender del CWD del proceso), (3) programar el reemplazo mensual del archivo. Recordar la atribución que exige la licencia CC BY 4.0 de DB-IP (link visible a db-ip.com donde se muestre el dato). Opcionalmente, `IP_API_KEY` (+ `IP_API_BASE_URL`/`GEOIP_IP_API_TIMEOUT_SECONDS`) habilita el fallback a ip-api.com Pro para las IPs que la base local no cubra. Sin ninguna de las dos fuentes configuradas, `country`/`city` seguirán viniendo en `null` siempre -- no rompe nada, pero tampoco muestra ubicación hasta que se complete el despliegue.
-- **appVideo -- 2 gaps client-side sin resolver** (detalle completo en sección 3.1): `splashAuthFlow.js` no reabre `ws/device/` en el camino rápido de sesión ya válida (refresh de pantalla), y `loginFlow.js` no espera (`await`) a que `maybeEstablishDeviceSession` persista el `device_token` antes de continuar, dejando una ventana de carrera estrecha entre login y persistencia del token.
 - **Formato del QR/código de la TV**: sigue sin estandarizar en ningún documento del backend -- lo define el equipo de `appVideo`; confirmar antes de programar el parseo en mobile.
 - **Posible incidente de pérdida de datos** (`docs/limpiar tablas.txt` + `restaurar_tablas.py`): cerrado -- las bases de datos se restauraron después de varias migraciones, no requiere auditoría adicional.

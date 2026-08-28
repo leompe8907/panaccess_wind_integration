@@ -122,15 +122,14 @@ def profile_password_view(request):
     quedan reservados para lo que sí es un problema de la integración con
     PanAccess, no del valor que mandó el cliente.
 
-    Verificación de "contraseña actual" (Alto #6, fase 1 del rollout -- ver
-    docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md): `oldPass` es
-    opcional por ahora. Si viene, se verifica contra la contraseña actual
-    real (reutilizando `verify_panaccess_credentials`, el mismo camino que
-    usa el login) antes de aplicar el cambio -- protege contra un JWT
-    robado/filtrado que, sin esto, alcanzaba solo por sí mismo para tomar
-    la cuenta. Si no viene, se deja pasar igual que antes (compatibilidad
-    con clientes que todavía no mandan el campo nuevo) pero se deja un log
-    de advertencia para medir la migración antes de volverlo obligatorio.
+    Verificación de "contraseña actual" (Alto #6, fase 2 del rollout -- ver
+    docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md y
+    docs/VERIFICACION_CONTRASENA_ACTUAL_FASE2_2026-08-28.md): `oldPass` es
+    obligatorio (lo exige el serializer). Se verifica contra la contraseña
+    actual real (reutilizando `verify_panaccess_credentials`, el mismo
+    camino que usa el login) antes de aplicar el cambio -- protege contra
+    un JWT robado/filtrado que, sin esto, alcanzaba solo por sí mismo para
+    tomar la cuenta.
     """
     ser = ProfilePasswordSerializer(data=request.data)
     if not ser.is_valid():
@@ -141,7 +140,7 @@ def profile_password_view(request):
 
     code = ser.validated_data["code"]
     new_pass = ser.validated_data["newPass"]
-    old_pass = ser.validated_data.get("oldPass")
+    old_pass = ser.validated_data["oldPass"]
 
     if ProfilePasswordLockoutConfig.ENABLED and _is_profile_password_locked(code):
         logger.warning(
@@ -158,30 +157,22 @@ def profile_password_view(request):
             status=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
-    if old_pass:
-        from wind.services.subscriber_auth import verify_panaccess_credentials
+    from wind.services.subscriber_auth import verify_panaccess_credentials
 
-        record = verify_panaccess_credentials(code, old_pass)
-        if not record:
-            if ProfilePasswordLockoutConfig.ENABLED:
-                _register_failed_old_password(code)
-            return Response(
-                {
-                    "success": False,
-                    "code": "old_password_incorrect",
-                    "message": "La contraseña actual no es correcta.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    record = verify_panaccess_credentials(code, old_pass)
+    if not record:
         if ProfilePasswordLockoutConfig.ENABLED:
-            _clear_failed_old_password(code)
-    else:
-        logger.warning(
-            "DEPRECATION: cambio de contraseña sin oldPass para %s -- ver "
-            "docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md "
-            "(fase 1 del rollout, todavía opcional)",
-            code,
+            _register_failed_old_password(code)
+        return Response(
+            {
+                "success": False,
+                "code": "old_password_incorrect",
+                "message": "La contraseña actual no es correcta.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
+    if ProfilePasswordLockoutConfig.ENABLED:
+        _clear_failed_old_password(code)
 
     try:
         reset_password_in_panaccess(code, new_pass)

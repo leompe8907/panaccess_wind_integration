@@ -204,6 +204,7 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
     max_record_id_seen = 0
     channel_names: Dict[int, str] = {}
     view_events: List[TelemetryOttViewEvent] = []
+    malformed_skipped = 0
 
     for record in records:
         record_id = record.get("recordId")
@@ -224,9 +225,28 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
         if action_id != OTT_STOP_ACTION_ID:
             # No debería pasar -- PanAccess ya filtró a actionId 7/8 --
             # pero se deja como red de seguridad ante cualquier cambio.
+            # Se loguea (auditoría, Medio #10): antes se descartaba en
+            # silencio, sin ninguna forma de detectar si PanAccess empieza
+            # a mandar un actionId inesperado.
+            logger.warning(
+                "Ingesta OTT: actionId inesperado %s (record_id=%s), fila descartada",
+                action_id,
+                record_id,
+            )
+            malformed_skipped += 1
             continue
 
         if data_id is None or record_id is None:
+            # Evento STOP (actionId=8) sin los campos mínimos para armar
+            # un TelemetryOttViewEvent -- antes se descartaba en silencio
+            # (auditoría, Medio #10). Loguear cuál campo falta para poder
+            # rastrear si es un problema recurrente del lado de PanAccess.
+            logger.warning(
+                "Ingesta OTT: evento STOP incompleto (data_id=%s, record_id=%s), fila descartada",
+                data_id,
+                record_id,
+            )
+            malformed_skipped += 1
             continue
 
         view_events.append(
@@ -254,8 +274,17 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
         # de eventos *intentados*, no confirmados como nuevos.
         attempted = len(view_events)
         if view_events:
+            # `unique_fields=["record_id"]` (auditoría, Medio #11): antes
+            # `ignore_conflicts=True` solo, sin esto, le decía a Postgres
+            # "ON CONFLICT DO NOTHING" a secas -- silenciaba CUALQUIER
+            # violación de constraint, no solo el duplicado esperado por
+            # `record_id` (que es la única unique constraint real de este
+            # modelo hoy). Con `unique_fields` apuntado, el conflicto
+            # ignorado queda acotado a esa columna -- si en el futuro se
+            # agrega otra constraint (FK, check) y la viola, vuelve a
+            # explotar como error real en vez de desaparecer en silencio.
             TelemetryOttViewEvent.objects.bulk_create(
-                view_events, ignore_conflicts=True, batch_size=500
+                view_events, ignore_conflicts=True, unique_fields=["record_id"], batch_size=500
             )
 
         if max_record_id_seen:
@@ -267,6 +296,7 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
         "fetched": len(records),
         "channel_names_upserted": len(channel_names),
         "view_events_attempted": attempted,
+        "malformed_skipped": malformed_skipped,
     }
     logger.info("Ingesta OTT completada: %s", result)
     return result
