@@ -40,18 +40,19 @@ En Wind se identificaron 4 puntos de riesgo, todos endpoints accesibles sin nece
 
 Si solo se configura la llave secreta sin este último paso, los 4 flujos empezarían a **fallar siempre** (el backend esperaría un token que el formulario nunca envía).
 
-## Cómo obtener las llaves
+## Cómo obtener las llaves (actualizado 2026-08-26 -- ver nota importante)
+
+**Nota importante:** Google migró todo reCAPTCHA a "Google Cloud Fraud Defense" (antes llamado "reCAPTCHA Enterprise"). Ya no se puede crear una llave "Classic" suelta como antes -- desde Q3 2024 no se permiten llaves Classic nuevas, y desde Q1 2026 Google terminó de migrar automáticamente hasta las llaves Classic viejas que quedaban sin proyecto de Google Cloud asociado. **Esto no rompe el plan original ni el código que ya existe** (`wind/utils/recaptcha.py` sigue funcionando igual, sin cambios), pero el proceso para conseguir la llave tiene un par de pasos nuevos respecto a lo que decía este documento antes. Ver la guía completa y verificada en `docs/GUIA_CREAR_LLAVES_RECAPTCHA_2026-08-26.md`.
+
+Resumen rápido:
 
 1. Entrar a **https://www.google.com/recaptcha/admin/create** con una cuenta de Google (idealmente una cuenta de la empresa, no personal).
 2. Ponerle una etiqueta al registro, por ejemplo "Wind — producción".
-3. En "Tipo de reCAPTCHA", elegir **reCAPTCHA v3** (no v2 / checkbox — el código actual está pensado para v3).
-4. Agregar los dominios donde va a funcionar (dominio de producción, y opcionalmente `localhost` para pruebas).
-5. Aceptar los términos y enviar.
-
-Google entrega dos llaves:
-
-- **Site key** (pública): va en el frontend, en el widget del formulario de registro.
-- **Secret key** (privada): va en el servidor, en la variable de entorno `RECAPTCHA_SECRET_KEY`.
+3. En "Tipo de reCAPTCHA", elegir **Score based (v3)** (no v2 / checkbox — el código actual está pensado para v3).
+4. Agregar los dominios donde va a funcionar (`backend.wind.do`, y opcionalmente `localhost` para pruebas).
+5. Aceptar los términos y enviar. Google crea automáticamente, sin costo, un proyecto de Google Cloud detrás de escena para alojar la llave -- no hace falta configurar nada de Google Cloud a mano ni cargar una tarjeta (el nivel gratuito "Essentials" da 10,000 verificaciones/mes sin necesidad de facturación).
+6. Google entrega la **Site key** (pública, va en el frontend) de inmediato.
+7. **Paso nuevo que antes no hacía falta:** para conseguir la **Secret key** (la que va en `RECAPTCHA_SECRET_KEY`), hay que entrar a la consola de Google Cloud (el enlace que llega en el correo de confirmación), abrir el detalle de la llave, pestaña "Integration", y click en **"Use Legacy Key"** -- ahí aparece la secret key clásica, compatible 1:1 con lo que `wind/utils/recaptcha.py` ya sabe usar.
 
 ## Recomendación
 

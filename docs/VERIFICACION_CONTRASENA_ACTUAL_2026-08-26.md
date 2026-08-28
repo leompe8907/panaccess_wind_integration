@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-26
 Referencia: `docs/AUDITORIA_CONSOLIDADA_2026-08-24.md` (Alto #6), `docs/PLAN_VERIFICACION_CONTRASENA_ACTUAL_2026-08-26.md` (plan original)
-Estado: **Implementada la fase 1 del rollout (backend acepta `oldPass` opcional; web ya lo manda). Falta confirmar Android/iOS y, más adelante, volverlo obligatorio.**
+Estado: **Implementada la fase 1 del rollout y verificada end-to-end contra producción (ver "Verificación hecha"). Falta confirmar Android/iOS y, más adelante, volverlo obligatorio (fase 2).**
 
 ## De qué se trata
 
@@ -48,7 +48,16 @@ El plan dejaba dos opciones abiertas. Se implementó la **opción de 2 fases** (
 - `python3 manage.py check` -- "System check identified no issues".
 - `manage.py shell`: confirmado que `ProfilePasswordLockoutConfig` resuelve a los defaults esperados, y que `ProfilePasswordSerializer` es válido tanto con `oldPass` como sin él (fase 1, compatibilidad confirmada).
 - `dashboard.html` carga sin errores de sintaxis Django, y los `<div>` nuevos quedan balanceados.
-- **Pendiente (requiere producción):** probar el flujo real -- cambiar contraseña con `oldPass` correcta (éxito), incorrecta (`400`/`old_password_incorrect`), ausente (funciona igual que antes, con el log de advertencia), y 5 intentos fallidos seguidos (`429`/`old_password_locked`, y que se libere solo tras los 15 minutos).
+- **Verificación end-to-end contra producción (2026-08-26, post-deploy)**, con una cuenta de prueba real (`bmk@bmk.com` / suscriptor `1556234`), pegando directo a Daphne (`127.0.0.1:8000` con header `Host` manual, evitando un problema de cadena de certificados SSL en el `curl` del servidor -- ver nota abajo):
+  - `oldPass` correcta → `200`, contraseña cambiada.
+  - `oldPass` incorrecta → `400`, `{"code": "old_password_incorrect", ...}`.
+  - Sin `oldPass` → `200`, cambio aplicado igual que antes, y confirmado el log `DEPRECATION: cambio de contraseña sin oldPass para 1556234` en `journalctl`.
+  - 5 intentos seguidos con `oldPass` incorrecta → los 5 primeros `400`, el 6to `429` con `{"code": "old_password_locked", ...}` -- incluso reintentando con la contraseña **correcta** mientras está bloqueado, sigue rechazando.
+  - Liberación manual del bloqueo vía `manage.py shell` (`cache.delete("wind:profile_pwd_lockout:<code>")` / `cache.delete("wind:profile_pwd_failcount:<code>")`) confirmada -- después de liberar, un cambio con la contraseña correcta vuelve a funcionar.
+  - Confirmado además, como efecto colateral esperado (Alto #4, no es parte de este cambio): cada cambio exitoso invalida los JWT emitidos antes de ese cambio (`"Token emitido antes del último cambio de contraseña; inicia sesión de nuevo"`) -- se probó en carne propia reutilizando un token viejo por error durante la prueba.
+  - Confirmado que PanAccess no rechaza poner la misma contraseña que ya tenía (usado al final para dejar la cuenta de prueba en su valor original sin efectos netos).
+
+**Nota aparte (no relacionada a este cambio):** durante la prueba se detectó que `curl` desde el servidor no puede validar la cadena de certificados SSL de `https://backend.wind.do` (`SSL certificate problem: unable to get local issuer certificate`) -- probablemente falta el certificado intermedio en el almacén de CAs del servidor, o hay un problema real en la cadena que sirve nginx. No bloqueó esta prueba (se hizo pegando directo a Daphne por `127.0.0.1:8000`), pero vale la pena revisarlo aparte: un cliente que valide TLS estrictamente (algunos validadores de apps móviles, a diferencia de navegadores) podría rechazar la conexión igual que este `curl`.
 
 ## Cómo desplegar y verificar en producción
 
