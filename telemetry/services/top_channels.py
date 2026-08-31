@@ -41,6 +41,15 @@ DEFAULT_LIMIT = 10  # confirmado con el cliente: top 10 a nivel general
 # fijos en código; el card_design sí es configurable (ver appConfig).
 TOP_CHANNELS_BOUQUET_ID = "most-watched"
 TOP_CHANNELS_BOUQUET_NAME = "Más vistos"
+# `priority`/`isMain` -- mismos campos que trae un bouquet real de PanAccess
+# y que appVideo ya sabe leer para ordenar el muro de Inicio
+# (`tvDataService.js`: prioridad ascendente, "0" primero; `isMain` decide
+# si el bouquet entra en Inicio vs. "Servicios TV y Radio"). "0" como
+# string a propósito -- `tvDataService.js` lo castea con `Number(...)`, así
+# que da lo mismo que un int, pero así queda igual de tipo que como
+# PanAccess manda esta clave en los bouquets reales.
+TOP_CHANNELS_BOUQUET_PRIORITY = "0"
+TOP_CHANNELS_BOUQUET_IS_MAIN = True
 
 
 def compute_top_channels_global(
@@ -111,6 +120,8 @@ def build_top_channels_bouquet(
     return {
         "bouquetId": TOP_CHANNELS_BOUQUET_ID,
         "name": TOP_CHANNELS_BOUQUET_NAME,
+        "priority": TOP_CHANNELS_BOUQUET_PRIORITY,
+        "isMain": TOP_CHANNELS_BOUQUET_IS_MAIN,
         "customData": _build_top_channels_custom_data(),
         "channels": get_top_channels_global(window_days=window_days, limit=limit),
     }
