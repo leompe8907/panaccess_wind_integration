@@ -1,4 +1,3 @@
-import os
 import time
 import math
 import random
@@ -6,7 +5,6 @@ import hashlib
 import logging
 from django.core.cache import cache
 from django.utils import timezone
-from datetime import timedelta
 from appConfig import RedisConfig, TrustedProxyConfig
 
 logger = logging.getLogger('rate_limiting')
@@ -172,69 +170,6 @@ def check_temp_token_rate_limit(temp_token, max_requests=10, window_minutes=5):
         return False, 0, 0
     cache_key = f"rate_limit:temp_token:{temp_token}"
     return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
-
-
-def check_websocket_rate_limit(udid, device_fingerprint, max_connections=5, window_minutes=5):
-    if not device_fingerprint:
-        return True, 1, 0
-    
-    cache_key_fp = f"ws_rate_limit:fp:{device_fingerprint}"
-    current_connections_fp = cache.get(cache_key_fp, 0)
-    
-    if current_connections_fp >= max_connections:
-        retry_after = window_minutes * 60
-        return False, 0, retry_after
-    
-    if udid:
-        cache_key_udid = f"ws_rate_limit:udid:{udid}"
-        current_connections_udid = cache.get(cache_key_udid, 0)
-        
-        if current_connections_udid >= max_connections:
-            retry_after = window_minutes * 60
-            return False, 0, retry_after
-    
-    remaining = max_connections - max(current_connections_fp, current_connections_udid if udid else 0)
-    return True, remaining, 0
-
-
-def increment_websocket_connection(udid, device_fingerprint, window_minutes=5):
-    timeout = window_minutes * 60
-    
-    cache_key_fp = f"ws_rate_limit:fp:{device_fingerprint}"
-    try:
-        cache.incr(cache_key_fp)
-    except ValueError:
-        cache.set(cache_key_fp, 1, timeout=timeout)
-    else:
-        cache.expire(cache_key_fp, timeout)
-    
-    if udid:
-        cache_key_udid = f"ws_rate_limit:udid:{udid}"
-        try:
-            cache.incr(cache_key_udid)
-        except ValueError:
-            cache.set(cache_key_udid, 1, timeout=timeout)
-        else:
-            cache.expire(cache_key_udid, timeout)
-
-
-def decrement_websocket_connection(udid, device_fingerprint):
-    cache_key_fp = f"ws_rate_limit:fp:{device_fingerprint}"
-    try:
-        current = cache.get(cache_key_fp, 0)
-        if current > 0:
-            cache.set(cache_key_fp, current - 1)
-    except Exception:
-        pass
-    
-    if udid:
-        cache_key_udid = f"ws_rate_limit:udid:{udid}"
-        try:
-            current = cache.get(cache_key_udid, 0)
-            if current > 0:
-                cache.set(cache_key_udid, current - 1)
-        except Exception:
-            pass
 
 
 def check_websocket_limits(udid, device_fingerprint, max_per_token=5, max_global=1000):

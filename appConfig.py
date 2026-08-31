@@ -208,6 +208,12 @@ class DatabaseConfig:
     # conexión reutilizada siga viva antes de usarla, en vez de fallar el
     # request si Postgres la cerró por su cuenta (idle timeout, reinicio, etc).
     CONN_HEALTH_CHECKS = _env_bool("DB_CONN_HEALTH_CHECKS", True)
+    # Bajo #30 de la auditoría: sin esto, un intento de conexión contra un
+    # host caído/inalcanzable (primaria o réplica) se cuelga con el timeout
+    # por defecto del SO/red (a veces minutos) en vez de fallar rápido y
+    # dejar que el caller decida (reintentar, degradar, alertar). psycopg2
+    # lo expone como `connect_timeout` en `OPTIONS` (segundos).
+    CONNECT_TIMEOUT_SECONDS = max(1, _env_int("DB_CONNECT_TIMEOUT_SECONDS", 10))
 
     REPLICA_HOST = _strip_env(os.getenv("DB_REPLICA_HOST"))
     REPLICA_PORT = _strip_env(os.getenv("DB_REPLICA_PORT"))
@@ -252,12 +258,19 @@ class DatabaseConfig:
         if cls.CONN_MAX_AGE:
             db["CONN_MAX_AGE"] = cls.CONN_MAX_AGE
             db["CONN_HEALTH_CHECKS"] = cls.CONN_HEALTH_CHECKS
+        if cls.CONNECT_TIMEOUT_SECONDS:
+            db["OPTIONS"] = {
+                **db.get("OPTIONS", {}),
+                "connect_timeout": cls.CONNECT_TIMEOUT_SECONDS,
+            }
         return db
 
     @classmethod
     def django_replica_database(cls) -> dict | None:
         if not cls.use_postgresql() or not cls.REPLICA_HOST:
             return None
+        # Parte de `django_default_database()` -- hereda `connect_timeout`
+        # (y CONN_MAX_AGE/CONN_HEALTH_CHECKS) sin tener que repetirlos acá.
         base = cls.django_default_database()
         return {
             **base,
@@ -660,6 +673,20 @@ class CeleryConfig:
     DEVICE_SESSION_IDLE_EXPIRY_ENABLED = _env_bool("CELERY_DEVICE_SESSION_IDLE_EXPIRY_ENABLED", True)
     DEVICE_SESSION_IDLE_EXPIRY_DAYS = max(1, _env_int("DEVICE_SESSION_IDLE_EXPIRY_DAYS", 183))
     DEVICE_SESSION_CLEANUP_MINUTES = max(60, _env_int("CELERY_DEVICE_SESSION_CLEANUP_MINUTES", 1440))
+
+    # Circuit breaker de salud para la réplica de solo lectura (Bajo #30 de
+    # la auditoría). Solo tiene efecto real cuando `DB_REPLICA_HOST` está
+    # configurado (`wind.db_router.PrimaryReplicaRouter` activo) -- ver
+    # `wind/tasks.check_replica_health_task` y `wind/db_router.py`.
+    # `SELECT 1` cada N minutos contra la conexión 'replica'; si falla, se
+    # marca "no saludable" en cache por `UNHEALTHY_TTL_SECONDS` y el router
+    # redirige las lecturas a la primaria mientras dure esa marca -- evita
+    # que cada request individual tenga que esperar su propio timeout de
+    # conexión (`DatabaseConfig.CONNECT_TIMEOUT_SECONDS`) contra una réplica
+    # caída.
+    DB_REPLICA_HEALTHCHECK_ENABLED = _env_bool("CELERY_DB_REPLICA_HEALTHCHECK_ENABLED", True)
+    DB_REPLICA_HEALTHCHECK_MINUTES = max(1, _env_int("DB_REPLICA_HEALTHCHECK_MINUTES", 2))
+    DB_REPLICA_UNHEALTHY_TTL_SECONDS = max(30, _env_int("DB_REPLICA_UNHEALTHY_TTL_SECONDS", 300))
 
     # --- App "telemetry" (canales más vistos) ---------------------------
     # Cola propia para no competir con el pipeline de sincronización de
@@ -1194,6 +1221,14 @@ class FeatureConfig:
     SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER = _env_bool(
         "SOCIAL_LOGIN_REQUIRE_EXISTING_SUBSCRIBER", False
     )
+    # Páginas de test/debug (auditoría, Bajo #20): `subscriber_test_view`,
+    # `login_test_view`, `login_facebook_test_view` quedaban montadas
+    # incondicionalmente en urls.py, alcanzables en producción sin ningún
+    # gate. Default False -- no atarlo a DEBUG porque estas páginas a
+    # veces sirven para que soporte/staff troubleshootee en producción
+    # real; con esto, se pueden prender puntualmente por .env sin deploy
+    # de código, en vez de estar siempre expuestas.
+    DEBUG_TEST_PAGES_ENABLED = _env_bool("DEBUG_TEST_PAGES_ENABLED", False)
 
 
 # ---------------------------------------------------------------------------

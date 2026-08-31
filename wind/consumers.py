@@ -9,8 +9,6 @@ from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import close_old_connections
 
-import hmac
-
 from wind.services.udid_auth_service import authenticate_with_udid_service, FATAL_CODES
 from wind.utils.websocket_utils import (
     generate_device_fingerprint,

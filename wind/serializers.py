@@ -1,11 +1,8 @@
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (
-    ListOfSubscriber, ListOfSmartcards, SubscriberLoginInfo, SubscriberInfo,
-    ListOfProducts, SubscriberEmailRegistry, SubscriberDocumentRegistry,
-    UDIDAuthRequest, AuthAuditLog, AppCredentials
+    ListOfSubscriber, SubscriberInfo, ListOfProducts, UDIDAuthRequest,
 )
 
 User = get_user_model()
@@ -21,89 +18,10 @@ class ListOfSubscriberSerializer(serializers.ModelSerializer):
         return value
 
 
-class ListOfSmartcardsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ListOfSmartcards
-        fields = '__all__'
-        
-    def validate_sn(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("El número de serie es requerido")
-        return value.strip()
-
-
-class SubscriberLoginInfoSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SubscriberLoginInfo
-        # Antes `fields = '__all__'` con `password_hash` declarado
-        # `read_only=True` -- `read_only` solo evita que el cliente lo
-        # escriba, no lo saca de la respuesta serializada (ver auditoría).
-        # Como el hash de la contraseña nunca debería viajar en una
-        # respuesta de API, se lista explícito el resto de los campos y se
-        # excluye `password_hash` del todo, en vez de solo protegerlo de
-        # escritura.
-        fields = [
-            'id', 'subscriberCode', 'login1', 'login2',
-            'additionalLogins', 'licenses',
-        ]
-
-
 class ListOfProductsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ListOfProducts
         fields = '__all__'
-
-
-class SubscriberInfoSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    pin = serializers.CharField(write_only=True, required=False, allow_blank=True)
-
-    failed_login_attempts = serializers.IntegerField(read_only=True)
-    locked_until = serializers.DateTimeField(read_only=True)
-
-    class Meta:
-        model = SubscriberInfo
-        # `password_hash`/`pin_hash` ya no se incluyen: estaban declarados
-        # `read_only=True` pero eso solo bloquea la escritura del cliente,
-        # no evita que se serialicen en la respuesta (ver auditoría).
-        fields = [
-            'id', 'subscriber_code', 'sn', 'first_name', 'last_name',
-            'lastActivation', 'lastContact', 'lastServiceListDownload',
-            'lastActivationIP', 'lastApiKeyId', 'products', 'packages',
-            'packageNames', 'model', 'login1', 'login2', 'activated',
-            'activation_date', 'last_login', 'created_at', 'updated_at',
-            'password', 'pin',
-            'failed_login_attempts', 'locked_until'
-        ]
-        
-    def create(self, validated_data):
-        password = validated_data.pop('password', None)
-        pin = validated_data.pop('pin', None)
-        
-        instance = SubscriberInfo.objects.create(**validated_data)
-        
-        if password:
-            instance.set_password(password)
-        if pin:
-            instance.set_pin(pin)
-            
-        instance.save()
-        return instance
-        
-    def update(self, instance, validated_data):
-        password = validated_data.pop('password', None)
-        pin = validated_data.pop('pin', None)
-        
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-            
-        if password:
-            instance.set_password(password)
-        if pin:
-            instance.set_pin(pin)
-            
-        instance.save()
-        return instance
 
 
 class JWTUserDetailsSerializer(serializers.ModelSerializer):
@@ -127,35 +45,6 @@ class JWTUserDetailsSerializer(serializers.ModelSerializer):
         if not obj:
             return None
         return resolve_subscriber_code_for_user(obj)
-
-
-class ContactSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(
-        choices=['email', 'phone', 'fax', 'skype', 'mobile', 'custodian'],
-        required=True
-    )
-    isBusiness = serializers.BooleanField(required=True)
-    contact = serializers.CharField(required=True, max_length=255)
-
-
-class AddressSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(
-        choices=['private', 'company', 'bill', 'deliver'],
-        required=True
-    )
-    name = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    country = serializers.CharField(required=True, max_length=2)
-    city = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
-    zip = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=20)
-    street = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    addition = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    addition2 = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    addition3 = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    zone = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
-    district = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
-    ownership = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=2)
-    ownerName = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
-    ownerPhone = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
 
 
 class CreateSubscriberSerializer(serializers.Serializer):
@@ -200,33 +89,6 @@ class CreateSubscriberSerializer(serializers.Serializer):
 
 class ValidateSubscriberEmailSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, help_text="Email a validar contra registros existentes")
-
-
-class UDIDAuthRequestSerializer(serializers.ModelSerializer):
-    temp_token = serializers.CharField(read_only=True)
-    attempts_count = serializers.IntegerField(read_only=True)
-    
-    class Meta:
-        model = UDIDAuthRequest
-        fields = [
-            'id', 'udid', 'subscriber_code', 'status', 'created_at',
-            'expires_at', 'validated_at', 'used_at', 'validated_by_operator',
-            'client_ip', 'user_agent', 'device_fingerprint',
-            'temp_token', 'attempts_count'
-        ]
-        read_only_fields = ['udid', 'expires_at', 'created_at']
-        
-    def validate_subscriber_code(self, value):
-        if not SubscriberInfo.objects.filter(subscriber_code=value).exists():
-            raise serializers.ValidationError("Código de suscriptor no válido")
-        return value
-
-
-class AuthAuditLogSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AuthAuditLog
-        fields = '__all__'
-        read_only_fields = ['timestamp']
 
 
 class UDIDAssociationSerializer(serializers.Serializer):

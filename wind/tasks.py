@@ -923,6 +923,42 @@ def expire_idle_device_sessions_task(self):
     return {"success": True, "revoked": updated, "cutoff": cutoff.isoformat()}
 
 
+@shared_task(bind=True)
+def check_replica_health_task(self):
+    """
+    Circuit breaker de salud para la réplica de solo lectura (Bajo #30 de
+    la auditoría). Solo se registra en `CELERY_BEAT_SCHEDULE` cuando
+    `DB_REPLICA_HOST` está configurado (ver `settings.py`), así que en la
+    inmensa mayoría de despliegues de hoy (réplica todavía apagada) esta
+    tarea ni siquiera corre.
+
+    Un `SELECT 1` barato contra la conexión 'replica' -- si falla (réplica
+    caída, red particionada, lo que sea), se marca "no saludable" en cache
+    por `DB_REPLICA_UNHEALTHY_TTL_SECONDS`; `PrimaryReplicaRouter.db_for_read`
+    ya consulta esa marca y cae a la primaria mientras dure. Si responde
+    bien, se limpia la marca (por si un chequeo previo falló y esto ya se
+    recuperó, no hace falta esperar a que expire el TTL).
+    """
+    from django.db import connections
+
+    from wind.db_router import mark_replica_healthy, mark_replica_unhealthy
+
+    if not CeleryConfig.DB_REPLICA_HEALTHCHECK_ENABLED:
+        return {"success": True, "skipped": True, "message": "DB_REPLICA_HEALTHCHECK_ENABLED=false"}
+
+    try:
+        with connections["replica"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception as exc:
+        logger.warning("Chequeo de salud de réplica falló: %s", exc, exc_info=True)
+        mark_replica_unhealthy(ttl_seconds=CeleryConfig.DB_REPLICA_UNHEALTHY_TTL_SECONDS)
+        return {"success": True, "healthy": False, "error": str(exc)}
+
+    mark_replica_healthy()
+    return {"success": True, "healthy": True}
+
+
 def _alert_provisioning_exhausted(subscriber_code: str, attempts: int, to_address: str) -> None:
     if not to_address:
         return

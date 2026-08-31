@@ -26,6 +26,35 @@ _force_primary_reads: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "force_primary_reads", default=False
 )
 
+# Bajo #30 de la auditoría: circuit breaker de salud para la réplica.
+# `wind.tasks.check_replica_health_task` (Celery beat) hace un `SELECT 1`
+# periódico contra la conexión 'replica' y marca el resultado acá. Mientras
+# la marca diga "no saludable", `db_for_read` cae a 'default' -- así una
+# réplica caída no le agrega el timeout de conexión completo
+# (`DatabaseConfig.CONNECT_TIMEOUT_SECONDS`) a cada request individual que
+# intente leer de ella, solo al próximo chequeo periódico.
+_REPLICA_UNHEALTHY_CACHE_KEY = "db_router:replica_unhealthy"
+
+
+def mark_replica_unhealthy(*, ttl_seconds: int) -> None:
+    """Registra que la réplica falló el último chequeo de salud."""
+    from django.core.cache import cache
+
+    cache.set(_REPLICA_UNHEALTHY_CACHE_KEY, True, timeout=ttl_seconds)
+
+
+def mark_replica_healthy() -> None:
+    """Limpia la marca de "no saludable" -- la réplica volvió a responder."""
+    from django.core.cache import cache
+
+    cache.delete(_REPLICA_UNHEALTHY_CACHE_KEY)
+
+
+def is_replica_healthy() -> bool:
+    from django.core.cache import cache
+
+    return not cache.get(_REPLICA_UNHEALTHY_CACHE_KEY, False)
+
 
 class use_primary_for_reads:
     """
@@ -47,6 +76,8 @@ class use_primary_for_reads:
 class PrimaryReplicaRouter:
     def db_for_read(self, model, **hints):
         if _force_primary_reads.get():
+            return 'default'
+        if not is_replica_healthy():
             return 'default'
         return 'replica'
 

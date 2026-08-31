@@ -1,7 +1,6 @@
 from datetime import timedelta
 import hmac
 import secrets
-import uuid
 import hashlib
 
 from django.db import models

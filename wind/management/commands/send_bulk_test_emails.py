@@ -20,7 +20,7 @@ Ejemplos:
 from __future__ import annotations
 
 from django.core.mail import send_mail
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from appConfig import EmailConfig
 from wind.models import ListOfSubscriber

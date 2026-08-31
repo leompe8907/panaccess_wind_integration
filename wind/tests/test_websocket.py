@@ -1,9 +1,7 @@
-import json
 from django.test import TransactionTestCase
 from channels.testing import WebsocketCommunicator
 from channels.routing import ProtocolTypeRouter, URLRouter
-from django.conf import settings
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from wind.routing import websocket_urlpatterns
 from wind.models import UDIDAuthRequest

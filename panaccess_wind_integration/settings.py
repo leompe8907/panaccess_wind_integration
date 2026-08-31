@@ -305,6 +305,7 @@ TEMPLATES = [
 # ============================================================================
 # BASE DE DATOS
 # ============================================================================
+_replica = None
 if DatabaseConfig.use_postgresql():
     DATABASES = {'default': DatabaseConfig.django_default_database()}
     _replica = DatabaseConfig.django_replica_database()
@@ -542,6 +543,20 @@ if CeleryConfig.DEVICE_SESSION_IDLE_EXPIRY_ENABLED:
         "options": {
             "queue": _PIPELINE_QUEUE,
             "expires": CeleryConfig.DEVICE_SESSION_CLEANUP_MINUTES * 60,
+        },
+    }
+
+# Bajo #30: circuit breaker de salud para la réplica de solo lectura -- solo
+# tiene sentido registrarlo si la réplica está configurada (`_replica`
+# truthy, ver bloque "BASE DE DATOS" arriba). Sin réplica, no hay nada que
+# chequear.
+if _replica and CeleryConfig.DB_REPLICA_HEALTHCHECK_ENABLED:
+    CELERY_BEAT_SCHEDULE["check-replica-health"] = {
+        "task": "wind.tasks.check_replica_health_task",
+        "schedule": timedelta(minutes=CeleryConfig.DB_REPLICA_HEALTHCHECK_MINUTES),
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": CeleryConfig.DB_REPLICA_HEALTHCHECK_MINUTES * 60,
         },
     }
 

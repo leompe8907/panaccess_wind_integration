@@ -1,6 +1,5 @@
 import logging
 from django.db import transaction
-from django.utils import timezone
 from appConfig import PanaccessConfig
 from wind.models import (
     ListOfSubscriber,

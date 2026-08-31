@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import render
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, Http404
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from asgiref.sync import async_to_sync
@@ -17,16 +17,16 @@ from cryptography.hazmat.primitives import serialization
 
 from wind.functions.getSubscriberLoginInfo import CallGetSubscriberLoginInfo
 
-from appConfig import EmailConfig
+from appConfig import EmailConfig, FeatureConfig
 from wind.models import ListOfSubscriber
 from wind.services.welcome_email import resolve_subscriber_login_email
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 
-from wind.models import UDIDAuthRequest, SubscriberInfo
+from wind.models import UDIDAuthRequest
 from wind.serializers import UDIDAssociationSerializer
 from wind.services.udid_auth_service import authenticate_with_udid_service
 from wind.utils.websocket_utils import (
@@ -791,6 +791,8 @@ def dashboard_view(request):
 
 def subscriber_test_view(request):
     """Página de prueba: solo muestra subscriber de /api/v1/profile/me/ con logs."""
+    if not FeatureConfig.DEBUG_TEST_PAGES_ENABLED:
+        raise Http404()
     return render(request, "wind/subscriber_test.html")
 
 
@@ -799,6 +801,8 @@ def login_test_view(request):
     Página de prueba para iniciar sesión con Google.
     Muestra un botón que enlaza al flujo de allauth (Google).
     """
+    if not FeatureConfig.DEBUG_TEST_PAGES_ENABLED:
+        raise Http404()
     google_client_id = settings.SOCIALACCOUNT_PROVIDERS.get('google', {}).get('APP', {}).get('client_id', '')
     context = {
         'google_client_id': google_client_id,
@@ -810,6 +814,8 @@ def login_facebook_test_view(request):
     """
     Página de prueba para iniciar sesión con Facebook (SDK JS) y consumir el endpoint REST.
     """
+    if not FeatureConfig.DEBUG_TEST_PAGES_ENABLED:
+        raise Http404()
     facebook_app_id = settings.SOCIALACCOUNT_PROVIDERS.get('facebook', {}).get('APP', {}).get('client_id', '')
     context = {
         'facebook_app_id': facebook_app_id,

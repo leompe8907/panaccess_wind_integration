@@ -24,7 +24,7 @@ Flujo:
 import logging
 import os
 from datetime import datetime, timedelta, timezone as dt_timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from django.db import transaction
 from django.utils import timezone
@@ -249,6 +249,22 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
             malformed_skipped += 1
             continue
 
+        parsed_timestamp = _parse_timestamp(record.get("timestamp"))
+        if parsed_timestamp is None:
+            # Antes: si el timestamp era inválido/no parseable, el evento
+            # se guardaba igual con event_date = fecha del SERVIDOR (hoy) --
+            # eso puede distorsionar el ranking de "canales más vistos" en
+            # el día equivocado, en vez de simplemente faltar ese dato
+            # puntual (auditoría, Bajo #22). Ahora se descarta el evento
+            # completo, igual que los demás casos de fila malformada.
+            logger.warning(
+                "Ingesta OTT: timestamp inválido/no parseable (record_id=%s, raw=%r), evento descartado",
+                record_id,
+                record.get("timestamp"),
+            )
+            malformed_skipped += 1
+            continue
+
         view_events.append(
             TelemetryOttViewEvent(
                 record_id=record_id,
@@ -257,8 +273,8 @@ def ingest_new_ott_records(page_size: int = 1000, max_pages: int = 500) -> Dict[
                 smartcard_id=record.get("smartcardId"),
                 device_id=record.get("deviceId"),
                 duration_seconds=max(0, record.get("dataDuration") or 0),
-                event_date=(_parse_timestamp(record.get("timestamp")) or timezone.now()).date(),
-                timestamp=_parse_timestamp(record.get("timestamp")),
+                event_date=parsed_timestamp.date(),
+                timestamp=parsed_timestamp,
             )
         )
 

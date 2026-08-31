@@ -3,7 +3,7 @@ Permisos reutilizables para API operativa y perfil de usuario.
 """
 import hmac
 
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import BasePermission
 
 
 class HasCrmApiKey(BasePermission):

@@ -6,14 +6,13 @@ from __future__ import annotations
 import logging
 from datetime import timedelta, timezone as dt_timezone
 
-from django.db import connection, transaction
+from django.db import connection
 from django.utils import timezone
 
 from appConfig import PanaccessConfig, RedisConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from wind.models import ListOfSmartcards, ListOfSubscriber
-from wind.serializers import ListOfSmartcardsSerializer
 
 from wind.services import get_panaccess
 from wind.exceptions import PanAccessException
