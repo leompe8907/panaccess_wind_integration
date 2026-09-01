@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mi cuenta | Wind</title>
     <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=7" />
+    {% if recaptcha_site_key %}
+    <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+    {% endif %}
   </head>
   <body class="dash-body-v2">
     <div class="dash-shell-v2">
@@ -335,6 +338,26 @@
           return "La contraseña debe incluir al menos un número.";
         }
         return null;
+      }
+
+      // reCAPTCHA v3 (invisible) -- solo se usa en "Eliminar cuenta" (ver
+      // submitCloseAccount más abajo). Ver docs/PLAN_ACTIVACION_RECAPTCHA_2026-08-26.md.
+      // Opt-in de los dos lados, mismo patrón que register.html/forgot-password.html.
+      var RECAPTCHA_SITE_KEY = "{{ recaptcha_site_key|default:'' }}";
+      function getRecaptchaToken(action) {
+        if (!RECAPTCHA_SITE_KEY || typeof grecaptcha === "undefined") {
+          return Promise.resolve(null);
+        }
+        return new Promise(function (resolve) {
+          grecaptcha.ready(function () {
+            grecaptcha
+              .execute(RECAPTCHA_SITE_KEY, { action: action })
+              .then(resolve)
+              .catch(function () {
+                resolve(null);
+              });
+          });
+        });
       }
 
       (function () {
@@ -1176,15 +1199,21 @@
           if (closeAccountBtn) closeAccountBtn.disabled = true;
           if (closeModalConfirm) closeModalConfirm.disabled = true;
 
-          WindAuth.fetchApi("/api/v1/profile/account/close/", {
-            method: "POST",
-            body: JSON.stringify({
-              code: subscriberCode,
-              confirm: confirmCode,
-              reason: reason,
-              dry_run: dryRun,
-            }),
-          })
+          getRecaptchaToken("close_account")
+            .then(function (recaptchaToken) {
+              var body = {
+                code: subscriberCode,
+                confirm: confirmCode,
+                reason: reason,
+                dry_run: dryRun,
+              };
+              if (recaptchaToken) body.recaptcha_token = recaptchaToken;
+
+              return WindAuth.fetchApi("/api/v1/profile/account/close/", {
+                method: "POST",
+                body: JSON.stringify(body),
+              });
+            })
             .then(function (res) {
               return res.json().then(function (data) {
                 return { ok: res.ok, status: res.status, data: data };

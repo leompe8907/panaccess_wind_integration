@@ -1312,6 +1312,10 @@ class RecaptchaConfig:
     """
 
     SECRET_KEY = _strip_env(os.getenv("RECAPTCHA_SECRET_KEY"))
+    # Pública -- se inyecta como contexto en los templates que muestran el
+    # widget (register/forgot-password/reset-password/dashboard) para no
+    # hardcodearla en 4 archivos HTML (ver docs/PLAN_ACTIVACION_RECAPTCHA_2026-08-26.md).
+    SITE_KEY = _strip_env(os.getenv("RECAPTCHA_SITE_KEY"))
     MIN_SCORE = float(os.getenv("RECAPTCHA_MIN_SCORE", "0.5"))
 
 

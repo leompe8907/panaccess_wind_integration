@@ -786,7 +786,13 @@ def login_page_view(request):
 
 def dashboard_view(request):
     """Área de usuario autenticado (JWT en el navegador)."""
-    return render(request, "wind/dashboard.html")
+    from appConfig import RecaptchaConfig
+
+    return render(
+        request,
+        "wind/dashboard.html",
+        {"recaptcha_site_key": RecaptchaConfig.SITE_KEY},
+    )
 
 
 def subscriber_test_view(request):
@@ -829,7 +835,13 @@ def register_view(request):
     Página web para registrar suscriptores vía /wind/create-subscriber/.
     Se renderiza en el mismo origen para evitar CORS.
     """
-    return render(request, 'wind/register.html', {'debug': bool(settings.DEBUG)})
+    from appConfig import RecaptchaConfig
+
+    return render(
+        request,
+        'wind/register.html',
+        {'debug': bool(settings.DEBUG), 'recaptcha_site_key': RecaptchaConfig.SITE_KEY},
+    )
 
 
 def go_windtv_view(request):
@@ -975,7 +987,13 @@ def credentials_view(request):
 @ensure_csrf_cookie
 def forgot_password_view(request):
     """Página para solicitar recuperación de contraseña por correo."""
-    return render(request, "wind/forgot-password.html")
+    from appConfig import RecaptchaConfig
+
+    return render(
+        request,
+        "wind/forgot-password.html",
+        {"recaptcha_site_key": RecaptchaConfig.SITE_KEY},
+    )
 
 
 def delete_account_info_view(request):
@@ -1037,5 +1055,11 @@ def reset_password_view(request):
             status=400,
         )
 
-    return render(request, "wind/reset-password.html", {"token": token})
+    from appConfig import RecaptchaConfig
+
+    return render(
+        request,
+        "wind/reset-password.html",
+        {"token": token, "recaptcha_site_key": RecaptchaConfig.SITE_KEY},
+    )
 

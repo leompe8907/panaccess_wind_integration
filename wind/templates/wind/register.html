@@ -5,6 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Registro | Wind</title>
+    {% if recaptcha_site_key %}
+    <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+    {% endif %}
     <style>
       :root {
         color-scheme: dark;
@@ -489,6 +492,26 @@
     </div>
 
     <script>
+      // reCAPTCHA v3 (invisible) -- ver docs/PLAN_ACTIVACION_RECAPTCHA_2026-08-26.md.
+      // Opt-in de los dos lados: sin recaptcha_site_key acá, getRecaptchaToken()
+      // resuelve null y el registro sigue funcionando igual que hoy; sin
+      // RECAPTCHA_SECRET_KEY en el backend, el token (si llega) simplemente no
+      // se exige.
+      const RECAPTCHA_SITE_KEY = "{{ recaptcha_site_key|default:'' }}";
+      function getRecaptchaToken(action) {
+        if (!RECAPTCHA_SITE_KEY || typeof grecaptcha === "undefined") {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve) => {
+          grecaptcha.ready(() => {
+            grecaptcha
+              .execute(RECAPTCHA_SITE_KEY, { action })
+              .then(resolve)
+              .catch(() => resolve(null));
+          });
+        });
+      }
+
       (function () {
         const apiPath = "/wind/create-subscriber/";
         const form = document.getElementById("registerForm");
@@ -743,6 +766,9 @@
           setSubmitting(true);
 
           try {
+            const recaptchaToken = await getRecaptchaToken("register");
+            if (recaptchaToken) payload.recaptcha_token = recaptchaToken;
+
             const csrftoken = getCookie("csrftoken");
             const res = await fetch(apiPath, {
               method: "POST",
