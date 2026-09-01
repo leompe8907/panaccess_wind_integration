@@ -91,7 +91,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="logevent",
-            index=models.Index(fields=["issue", "-created_at"], name="applogs_event_issue_created_idx"),
+            index=models.Index(fields=["issue", "-created_at"], name="applogs_evt_issue_created_idx"),
         ),
         migrations.AddIndex(
             model_name="logevent",

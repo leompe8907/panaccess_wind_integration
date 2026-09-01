@@ -88,7 +88,7 @@ class LogEvent(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["issue", "-created_at"], name="applogs_event_issue_created_idx"),
+            models.Index(fields=["issue", "-created_at"], name="applogs_evt_issue_created_idx"),
             models.Index(fields=["subscriber_code"], name="applogs_event_subscriber_idx"),
         ]
 
