@@ -1058,6 +1058,66 @@ class ThrottleConfig:
     # para navegación normal, no para una acción de escritura que además
     # dispara un broadcast por WebSocket en cada llamada (segunda auditoría).
     DEVICE_SESSION = _strip_env(os.getenv("DRF_THROTTLE_DEVICE_SESSION")) or "60/minute"
+    # Ingesta de logs de diagnóstico (`POST /api/v1/logs/`, applogs): acepta
+    # requests sin JWT (puede haber un crash antes de loguearse), así que
+    # además de la API key propia (ver `AppLogsConfig`) necesita un límite
+    # de tasa -- más laxo que login/password (es tráfico esperado de una
+    # app funcionando normal, no un flujo sensible de auth) pero acotado
+    # para que un dispositivo en loop de errores no pueda escribir sin
+    # límite.
+    LOG_INGEST = _strip_env(os.getenv("DRF_THROTTLE_LOG_INGEST")) or "30/minute"
+
+
+class AppLogsConfig:
+    """
+    Logs de diagnóstico para desarrolladores (`applogs`) -- ver
+    docs/LOGS_DIAGNOSTICO_2026-09-01.md. Nada de esto es telemetría de
+    negocio ni auditoría de seguridad (ver `applogs/apps.py`).
+    """
+
+    # Captura de los propios logs ERROR+ del backend (ver
+    # `applogs.logging_handler.DiagnosticsLogHandler`, wireado en `LOGGING`
+    # de settings.py junto al handler `error_file` ya existente) -- kill
+    # switch independiente del resto de `applogs` por si hiciera falta
+    # apagar solo esta parte (ej. un logger particular generando demasiado
+    # volumen) sin tocar la ingesta HTTP de las apps cliente.
+    BACKEND_CAPTURE_ENABLED = _env_bool("APP_LOGS_BACKEND_CAPTURE_ENABLED", True)
+
+    # Secreto compartido que deben mandar las apps cliente en el header
+    # `X-App-Log-Key` de `POST /api/v1/logs/` -- el endpoint acepta
+    # requests sin JWT a propósito (para capturar errores antes del login),
+    # así que esta key es el único candado contra que cualquiera lo use
+    # como endpoint abierto de escritura. Una sola key compartida entre
+    # plataformas alcanza para v1 (no hay necesidad de revocar una
+    # plataforma sin afectar a las demás todavía); si eso cambia, pasar a
+    # un dict por plataforma es un cambio chico acá y en la vista.
+    INGEST_API_KEY = _strip_env(os.getenv("APP_LOGS_INGEST_KEY"))
+
+    ALERTS_ENABLED = _env_bool("APP_LOGS_ALERTS_ENABLED", True)
+    # A quién avisar cuando aparece un issue nuevo o pega un pico -- lista
+    # separada por comas. Vacío = alertas desactivadas de hecho, aunque
+    # ALERTS_ENABLED sea true (no hay a quién mandarle el mail).
+    _ALERT_RECIPIENTS_RAW = _strip_env(os.getenv("APP_LOGS_ALERT_RECIPIENTS")) or ""
+    # Cada cuántas ocurrencias repetidas de un issue YA CONOCIDO se manda
+    # una alerta de "pico" (además de la alerta automática de "issue
+    # nuevo", que siempre se manda la primera vez). 0 desactiva la alerta
+    # de pico y deja solo la de "nuevo".
+    ALERT_SPIKE_EVERY = max(0, _env_int("APP_LOGS_ALERT_SPIKE_EVERY", 50))
+    # No volver a alertar por el mismo issue antes de este tiempo, para no
+    # saturar el correo con el mismo error repitiéndose.
+    ALERT_COOLDOWN_MINUTES = max(1, _env_int("APP_LOGS_ALERT_COOLDOWN_MINUTES", 60))
+
+    @classmethod
+    def alert_recipients(cls) -> list[str]:
+        return [addr.strip() for addr in cls._ALERT_RECIPIENTS_RAW.split(",") if addr.strip()]
+
+    # Retención: cada cuánto corre la tarea de limpieza y cuántos días de
+    # `LogEvent` conserva -- el `LogIssue` agregado (agrupado) NO se borra
+    # nunca acá, solo las ocurrencias individuales viejas (ver
+    # `applogs.tasks.purge_old_log_events_task`).
+    RETENTION_ENABLED = _env_bool("APP_LOGS_RETENTION_ENABLED", True)
+    RETENTION_DAYS = max(1, _env_int("APP_LOGS_RETENTION_DAYS", 90))
+    RETENTION_MINUTES = max(60, _env_int("APP_LOGS_RETENTION_MINUTES", 1440))
 
 
 # ---------------------------------------------------------------------------

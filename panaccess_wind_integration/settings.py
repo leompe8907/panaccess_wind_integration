@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from celery.schedules import crontab, timedelta
 from appConfig import (
+    AppLogsConfig,
     CacheConfig,
     CeleryConfig,
     CorsConfig,
@@ -97,6 +98,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'wind',
     'telemetry',
+    'applogs',
     'channels',  # Django Channels
     'allauth',
     'allauth.account',
@@ -185,6 +187,7 @@ REST_FRAMEWORK = {
         'social_login': ThrottleConfig.SOCIAL_LOGIN,
         'device_session': ThrottleConfig.DEVICE_SESSION,
         'login': ThrottleConfig.LOGIN,
+        'log_ingest': ThrottleConfig.LOG_INGEST,
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -560,6 +563,17 @@ if _replica and CeleryConfig.DB_REPLICA_HEALTHCHECK_ENABLED:
         },
     }
 
+# --- App "applogs" (logs de diagnóstico) -------------------------------
+if AppLogsConfig.RETENTION_ENABLED:
+    CELERY_BEAT_SCHEDULE["purge-old-log-events"] = {
+        "task": "applogs.tasks.purge_old_log_events_task",
+        "schedule": timedelta(minutes=AppLogsConfig.RETENTION_MINUTES),
+        "options": {
+            "queue": _PIPELINE_QUEUE,
+            "expires": AppLogsConfig.RETENTION_MINUTES * 60,
+        },
+    }
+
 # --- App "telemetry" (canales más vistos) -----------------------------
 if CeleryConfig.TELEMETRY_INGEST_ENABLED:
     CELERY_BEAT_SCHEDULE["telemetry-ingest-ott"] = {
@@ -721,24 +735,33 @@ LOGGING = {
             'encoding': 'utf-8',
             'delay': True,
         },
+        # Diagnóstico para desarrolladores (`applogs`): duplica hacia la
+        # base de datos (agrupado por issue, con alertas) todo lo que ya
+        # cae en 'error_file' -- por eso siempre va pegado a 'error_file'
+        # en los mismos loggers de abajo, nunca solo. Ver
+        # applogs/logging_handler.py.
+        'diagnostics': {
+            'level': 'ERROR',
+            'class': 'applogs.logging_handler.DiagnosticsLogHandler',
+        },
     },
     'root': {
-        'handlers': ['console', 'file', 'error_file'],
+        'handlers': ['console', 'file', 'error_file', 'diagnostics'],
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console', 'file', 'error_file', 'diagnostics'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['error_file'],
+            'handlers': ['error_file', 'diagnostics'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.server': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console', 'file', 'error_file', 'diagnostics'],
             'level': 'INFO',
             'propagate': False,
         },
@@ -748,47 +771,47 @@ LOGGING = {
             'propagate': False,
         },
         'wind': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console', 'file', 'error_file', 'diagnostics'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
             'filters': ['unicode_safe'],
         },
         'wind.services.panaccess_singleton': {
-            'handlers': ['console', 'file', 'panaccess_file', 'error_file'],
+            'handlers': ['console', 'file', 'panaccess_file', 'error_file', 'diagnostics'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
             'filters': ['unicode_safe'],
         },
         'wind.utils.panaccess_auth': {
-            'handlers': ['console', 'file', 'panaccess_file', 'error_file'],
+            'handlers': ['console', 'file', 'panaccess_file', 'error_file', 'diagnostics'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
             'filters': ['unicode_safe'],
         },
         'wind.services.panaccess_client': {
-            'handlers': ['console', 'file', 'panaccess_file', 'error_file'],
+            'handlers': ['console', 'file', 'panaccess_file', 'error_file', 'diagnostics'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
             'filters': ['unicode_safe'],
         },
         'wind.apps': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console', 'file', 'error_file', 'diagnostics'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
             'filters': ['unicode_safe'],
         },
         'celery': {
-            'handlers': ['console', 'tasks_file', 'error_file'],
+            'handlers': ['console', 'tasks_file', 'error_file', 'diagnostics'],
             'level': 'INFO',
             'propagate': False,
         },
         'celery.worker': {
-            'handlers': ['console', 'tasks_file', 'error_file'],
+            'handlers': ['console', 'tasks_file', 'error_file', 'diagnostics'],
             'level': 'INFO',
             'propagate': False,
         },
         'celery.beat': {
-            'handlers': ['console', 'tasks_file', 'error_file'],
+            'handlers': ['console', 'tasks_file', 'error_file', 'diagnostics'],
             'level': 'INFO',
             'propagate': False,
         },

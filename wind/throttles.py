@@ -87,3 +87,14 @@ class DeviceSessionThrottle(UserRateThrottle):
     """
 
     scope = "device_session"
+
+
+class LogIngestThrottle(AnonRateThrottle):
+    """
+    `POST /api/v1/logs/` (applogs) -- acepta requests sin JWT a propósito
+    (un crash puede pasar antes del login), así que además de la API key
+    propia (`AppLogsConfig.INGEST_API_KEY`) necesita un límite de tasa por
+    IP para que un dispositivo en loop de errores no escriba sin límite.
+    """
+
+    scope = "log_ingest"
