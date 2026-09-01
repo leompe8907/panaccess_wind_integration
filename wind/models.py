@@ -803,6 +803,53 @@ class DeviceSession(models.Model):
         return f"DeviceSession: {self.subscriber_code} - {self.device_type or '?'} ({self.status})"
 
 
+class SubscriberPreferences(models.Model):
+    """
+    Preferencias de la app sincronizadas entre dispositivos de una cuenta:
+    control parental (PIN propio de la app -- nada que ver con el PIN de
+    la tarjeta que usa PanAccess para cambiar de perfil) y canales
+    favoritos. Antes vivían solo en `localStorage`, por dispositivo -- ver
+    docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md.
+
+    `profile_key` -- id de perfil real de PanAccess (Netflix-style) si la
+    cuenta los tiene activados y hay uno elegido, o `DEFAULT_PROFILE_KEY`
+    si la cuenta no tiene perfiles o el frontend todavía no resolvió
+    ninguno. Nunca se valida contra PanAccess acá -- es solo la clave de
+    partición del lado de Wind; PanAccess sigue siendo quien de verdad
+    sabe si ese perfil existe. Ver `wind.services.subscriber_preferences`
+    para la migración automática de `DEFAULT_PROFILE_KEY` hacia el primer
+    perfil real que se use, la primera vez que una cuenta activa perfiles.
+    """
+    DEFAULT_PROFILE_KEY = "default"
+
+    subscriber_code = models.CharField(max_length=100, db_index=True)
+    profile_key = models.CharField(max_length=100, default=DEFAULT_PROFILE_KEY)
+
+    # Blobs opacos: el frontend es quien entiende su forma interna (ver
+    # `parentalStore.js`/`userPreferences.js` en appVideo). El backend solo
+    # los persiste y los devuelve tal cual -- no interpreta el PIN ni
+    # valida los IDs de canal contra el catálogo.
+    parental = models.JSONField(null=True, blank=True)
+    favorite_channel_ids = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscriber_code", "profile_key"],
+                name="unique_subscriber_profile_preferences",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["subscriber_code", "profile_key"]),
+        ]
+
+    def __str__(self):
+        return f"SubscriberPreferences({self.subscriber_code}/{self.profile_key})"
+
+
 # ============================================================================
 # AUDITORÍA DE EVENTOS
 # ============================================================================

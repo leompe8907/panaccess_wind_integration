@@ -1,10 +1,11 @@
 # Guía única de integración: backend Wind ↔ apps (TV, mobile, web)
 
 Fecha: 2026-07-29 (actualizado con más lecciones de la misma integración real end-to-end en appVideo -- ver secciones 3.1, 4.2, 4.3 y 4.4).
+Actualización 2026-08-31: agregada sección 6, preferencias sincronizadas (control parental + favoritos) -- nueva funcionalidad, mismo JWT de sesión que el resto del documento, sin dependencia de dispositivos vinculados. Detalle de implementación backend/appVideo-web en `docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md`.
 Reemplaza y consolida: `docs/GUIA_INTEGRACION_APPS.md` (2026-07-22) y `docs/INTEGRACION_PAREO_TV_DISPOSITIVOS.md` (2026-07-27) -- ambos quedan como referencia histórica, pero **esta es la fuente única a partir de ahora**; si algo difiere entre ellos y este documento, vale lo que dice acá.
 Referencia de fondo: `docs/AUDITORIA_DECISIONES_Y_PENDIENTES.md` (todas las secciones de Fases 1-4 y revisiones posteriores).
 
-Organización de este documento: primero los conceptos comunes a todas las plataformas (sección 0), después lo que debe implementar **cada plataforma específicamente** (secciones 1 TV, 2 Mobile, 3 Web), después las funciones transversales que usan las tres (sección 4 dispositivos vinculados, sección 5 password/cuenta), y por último tabla de endpoints, manejo de errores, y pendientes (secciones 6-8).
+Organización de este documento: primero los conceptos comunes a todas las plataformas (sección 0), después lo que debe implementar **cada plataforma específicamente** (secciones 1 TV, 2 Mobile, 3 Web), después las funciones transversales que usan las tres (sección 4 dispositivos vinculados, sección 5 password/cuenta, sección 6 preferencias sincronizadas), y por último tabla de endpoints, manejo de errores, y pendientes (secciones 7-9).
 
 ---
 
@@ -104,7 +105,7 @@ Respuesta: `{"type":"device_registered","id":<int>,"device_token":"<token>","is_
 
 ### 4.2 Listar y revocar (REST, JWT)
 
-`GET /wind/devices/` → `{"devices": [{"id","device_type","device_model","first_seen_at","last_seen_at","client_ip","country","city"}, ...]}` (el `device_token` nunca se expone acá). `country`/`city` son una ubicación **aproximada** resuelta desde `client_ip` -- puramente informativa para que el usuario reconozca sus propios dispositivos en la lista, nunca debe usarse para ningún control de acceso ni decisión de seguridad. Pueden venir en `null` (ambos, nunca uno solo) si la IP es privada/inválida, si no se encontró en ninguna fuente, o si el backend no tiene ninguna fuente configurada (ver sección 8) -- los clientes deben ocultar el dato en vez de mostrar un "—" cuando ambos sean `null`.
+`GET /wind/devices/` → `{"devices": [{"id","device_type","device_model","first_seen_at","last_seen_at","client_ip","country","city"}, ...]}` (el `device_token` nunca se expone acá). `country`/`city` son una ubicación **aproximada** resuelta desde `client_ip` -- puramente informativa para que el usuario reconozca sus propios dispositivos en la lista, nunca debe usarse para ningún control de acceso ni decisión de seguridad. Pueden venir en `null` (ambos, nunca uno solo) si la IP es privada/inválida, si no se encontró en ninguna fuente, o si el backend no tiene ninguna fuente configurada (ver sección 9) -- los clientes deben ocultar el dato en vez de mostrar un "—" cuando ambos sean `null`.
 
 Dos fuentes, en orden (`wind/utils/geo_lookup.py`): (1) una base local `.mmdb` (GeoLite2-City de MaxMind, o DB-IP City Lite -- gratuita y sin cuenta, mismo formato/esquema), consultada primero, sin ninguna llamada de red; (2) si esa no encontró nada para la IP (caso raro), un fallback opcional a **ip-api.com Pro** (requiere `IP_API_KEY`, provista por el cliente) -- con timeout corto, nunca bloquea la respuesta si ip-api está lento o caído.
 
@@ -203,7 +204,87 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 
 ---
 
-## 6. Tabla resumen de endpoints
+## 6. Preferencias sincronizadas (control parental + favoritos)
+
+Funcionalidad nueva (2026-08-31), independiente de "dispositivos vinculados" (sección 4) aunque comparte el mismo JWT de sesión. Sincroniza entre todos los dispositivos de una cuenta el control parental **propio de la app** (PIN local, canales bloqueados, clasificación por edad) y la lista de canales favoritos -- antes vivían solo en almacenamiento local de cada dispositivo, sin compartirse entre ellos. **No tiene nada que ver** con el PIN de perfil de PanAccess (ese viene de la smartcard, se lee automático y el usuario nunca lo escribe) -- son dos sistemas de PIN totalmente separados.
+
+### 6.1 Prerrequisito
+
+Solo hace falta el JWT de sesión de la sección 0 -- el mismo que se obtiene con `POST /api/auth/login/` (o login social). **No depende de "dispositivos vinculados":** no hace falta abrir `ws/device/` ni tener un `device_token` registrado para usar este endpoint, son features independientes que solo comparten el mismo JWT. (Aclaración porque en appVideo-web hoy ese JWT solo se obtiene cuando `login.deviceSession.enabled` está activo por brand -- eso es una decisión de implementación de ese cliente puntual, no una restricción del backend. Mobile/iOS/Android pueden llamar a este endpoint apenas tengan el JWT de la sección 0, sin necesidad de implementar dispositivos vinculados.)
+
+### 6.2 `profileKey`: cómo se enlaza cada dispositivo al perfil correcto
+
+Cada cuenta puede tener varios perfiles tipo Netflix, administrados enteramente por PanAccess (no por este backend). La preferencia se guarda por el par `(subscriber_code, profileKey)`:
+
+- Si la cuenta **tiene un perfil PanAccess activo/elegido**, `profileKey` = el mismo identificador de perfil que el cliente ya usa para las llamadas a PanAccess.
+- Si la cuenta **no tiene perfiles activados, o todavía no se eligió ninguno**, `profileKey` = el string literal `"default"` (o se omite -- el backend usa `"default"` por omisión).
+
+El `subscriber_code` nunca lo manda el cliente -- se resuelve en el backend a partir del JWT, igual que el resto de la API (sección 0). Dos cuentas distintas usando `"default"` no se cruzan nunca: la clave real siempre es el par completo, no `profileKey` aislado.
+
+**Migración automática (una sola vez):** la primera vez que una cuenta usa un `profileKey` real (no `"default"`), el backend copia automáticamente lo que había bajo `"default"` hacia ese perfil nuevo, para no perder la config que el usuario ya tenía antes de activar perfiles. Cualquier perfil real siguiente arranca vacío -- cada persona de la cuenta configura lo suyo. Es transparente para el cliente: no hay que hacer nada especial, solo mandar el `profileKey` correcto en cada llamada.
+
+### 6.3 Leer preferencias guardadas
+
+`GET /api/v1/preferences/?profileKey=<opcional>` (JWT). Sin `profileKey`, usa `"default"`.
+
+Respuesta 200:
+
+```json
+{
+  "success": true,
+  "profileKey": "default",
+  "parental": {
+    "enabled": true,
+    "pinHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a1",
+    "pinSalt": "3f7a1c9e8b2d4560",
+    "pinMethod": "pbkdf2",
+    "pinIterations": 100000,
+    "blockedChannelIds": ["45", "112"],
+    "ratingEnabled": true,
+    "ratingAllowedMax": 13,
+    "ratingApplyToLive": true
+  },
+  "favorites": ["101", "202", "310"]
+}
+```
+
+`parental` viene `null` si la cuenta nunca guardó control parental (primer acceso); `favorites` viene `[]` si nunca guardó favoritos -- el cliente debe tratar ambos casos como "sin configurar todavía", no como error.
+
+**Importante -- qué NO trae `parental`:** solo la configuración durable (PIN, canales bloqueados, clasificación). Nunca incluye estado de desbloqueo temporal (por ejemplo "desbloqueado por 30 minutos") -- eso es intencionalmente local a cada dispositivo, para que un desbloqueo hecho en un dispositivo no desbloquee sin querer el control parental en otro. Si tu app maneja un PIN propio (distinto al de PanAccess), guardá el estado de "sesión desbloqueada" solo en local, nunca lo mandes a este endpoint.
+
+### 6.4 Guardar un cambio
+
+`PUT /api/v1/preferences/` (JWT), body con **solo los campos que cambiaron** -- es una actualización parcial: mandar `favorites` no borra `parental` ya guardado, y viceversa.
+
+```json
+{
+  "profileKey": "default",
+  "favorites": ["101", "202", "310", "415"]
+}
+```
+
+Respuesta 200: el estado completo actualizado, mismo formato que 6.3 (incluye también lo que no cambió, sin tocarlo).
+
+**Validación (400, body `{"success": false, "errors": {...}}`):**
+
+| Campo | Regla |
+|---|---|
+| `parental` | Debe ser un objeto JSON (no array, string ni número). Tamaño máximo ~20KB. |
+| `favorites` | Lista de strings. Máximo 500 elementos. |
+| `profileKey` | Opcional; en blanco o ausente cae a `"default"`. |
+
+Otros errores: 404 `{"success": false, "message": "No hay suscriptor vinculado a este usuario."}` si el JWT es válido pero no resuelve `subscriber_code` (mismo caso que el resto de `/api/v1/profile/...`). Rate limit: mismo `ProfileThrottle` que el resto de `/api/v1/profile/...`.
+
+### 6.5 Cuándo llamar a cada uno (patrón recomendado -- no es parte del contrato del backend)
+
+Esto es lo que ya implementa appVideo-web; cualquier cliente nuevo puede replicarlo o adaptarlo:
+
+- **Push (`PUT`) inmediato** cada vez que el usuario cambia algo -- no hace falta agrupar cambios, cada toggle/guardado dispara su propio `PUT`. Es fire-and-forget: si falla (sin red, JWT vencido, etc.) no debe bloquear ni revertir el cambio local, que ya se guardó antes de llamar al backend -- alcanza con reintentar en el próximo evento de sync.
+- **Pull (`GET`) en dos momentos:** al iniciar/reanudar la app (para traer lo último guardado por otro dispositivo) y al volver de segundo plano (background → foreground). **No hay push en tiempo real** del backend hacia otros dispositivos conectados en ese momento -- a diferencia de "dispositivos vinculados" (sección 4), este endpoint no tiene canal WebSocket. Si dos dispositivos de la misma cuenta están abiertos en primer plano a la vez, el cambio hecho en uno no le llega al otro hasta que ese otro pase por background/reapertura.
+
+---
+
+## 7. Tabla resumen de endpoints
 
 | Acción | Método y ruta | Auth |
 |---|---|---|
@@ -225,10 +306,12 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 | Eliminar/cerrar cuenta | `POST /api/v1/profile/account/close/` | JWT |
 | Mi perfil / suscriptor | `GET /api/v1/profile/me/` | JWT |
 | Mis productos/smartcards | `GET /api/v1/profile/products/` | JWT |
+| Leer preferencias sincronizadas (parental + favoritos) | `GET /api/v1/preferences/?profileKey=...` | JWT |
+| Guardar preferencias sincronizadas | `PUT /api/v1/preferences/` | JWT |
 
 ---
 
-## 7. Manejo de errores y rate limiting (aplica a todo lo anterior)
+## 8. Manejo de errores y rate limiting (aplica a todo lo anterior)
 
 - Los endpoints de pareo devuelven 429 con `retry_after` (segundos) -- respetar ese tiempo, no reintentar en loop inmediato.
 - Ningún endpoint documentado devuelve el detalle crudo de una excepción interna (`str(e)`) -- los mensajes de error son genéricos por diseño; reportar el `code`/`error_type` recibido, no parsear texto libre.
@@ -236,7 +319,7 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 
 ---
 
-## 8. Pendientes / decisiones abiertas (estado a 2026-07-28)
+## 9. Pendientes / decisiones abiertas (estado a 2026-07-28)
 
 **Ya resueltos** (se listaban acá en versiones anteriores de este documento, quedan solo como referencia de qué cambió):
 
@@ -248,6 +331,7 @@ Mismo efecto colateral que 5.1 (solo en éxito).
 - `client_ip` en WS sin filtro de proxy confiable -- `device_consumers.py`/`consumers.py` ahora usan `get_client_ip_from_scope()`, que aplica el mismo filtro de `TrustedProxyConfig.TRUSTED_PROXIES` que ya existía para HTTP.
 - `device_registered` sin `id` -- ver sección 4.1, ya devuelve `id` y se usa en appVideo para marcar "este dispositivo" (sección 3.1, 4.4.c).
 - **`oldPass` obligatorio al cambiar contraseña (2026-08-28)** -- ver sección 5.1. Cambio de contrato: cierra el hueco de que un JWT robado alcanzara por sí solo para cambiar la contraseña sin conocer la actual.
+- **Preferencias sincronizadas (control parental + favoritos) -- implementado 2026-08-31**, ver sección 6 y `docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md`. Queda documentado como limitación conocida, no como bug: sin push en tiempo real entre dispositivos abiertos simultáneamente en primer plano (solo sincroniza al iniciar/reanudar la app) -- si el producto lo requiere a futuro, se puede agregar un aviso liviano por el mismo canal WebSocket de dispositivos vinculados (`subscriber_devices_{subscriber_code}`, sección 4.4.d), sin necesidad de un canal nuevo.
 - **`DeviceSession` sin expiración (2026-08-28)** -- ahora una tarea Celery diaria revoca automáticamente cualquier sesión de dispositivo sin actividad (`last_seen_at`) hace más de 183 días (`DEVICE_SESSION_IDLE_EXPIRY_DAYS`, ajustable). Un dispositivo perdido/vendido/olvidado ya no queda "de confianza" indefinidamente.
 - **appVideo -- los 2 gaps client-side (revisados 2026-08-28), sin acción pendiente:** el de `ws/device/` ya está resuelto (no en `splashAuthFlow.js` puntual, sino con un watchdog centralizado en `useAppLifecycle.js` que garantiza la conexión sin importar el camino de login/reactivación); el de `loginFlow.js`/`device_token` es diseño intencional (fire-and-forget a propósito, para que el registro de dispositivo nunca pueda bloquear ni tumbar el login real), y el único consumidor (`LinkedDevicesPanel.jsx`) ya se actualiza por evento en vez de asumir que está listo de entrada.
 
