@@ -172,6 +172,28 @@ def check_temp_token_rate_limit(temp_token, max_requests=10, window_minutes=5):
     return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
 
 
+def check_udid_account_rate_limit(subscriber_code, max_requests=5, window_minutes=15):
+    """
+    Rate limit por CUENTA autenticada (no por udid individual) -- usado por
+    `AssociateUDIDByAccountView` (pareo UDID auto-servicio desde el
+    dashboard web, sin `temp_token`; ver
+    docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md).
+
+    `check_udid_rate_limit` limita intentos contra UN udid específico (20/hora
+    por udid) -- eso no protege nada acá, porque un atacante logueado en su
+    propia cuenta podría probar muchos udid DISTINTOS, cada uno con su propio
+    cupo de 20/hora. Este límite es el que realmente importa: topea el total
+    de intentos de asociación de ESA cuenta sin importar cuántos udid
+    distintos prueba, así que enumerar el espacio de 32 bits del udid
+    (secrets.token_hex(4)) queda fuera de alcance incluso con muchas cuentas
+    controladas por el mismo atacante (cada una limitada igual).
+    """
+    if not subscriber_code:
+        return False, 0, 0
+    cache_key = f"rate_limit:udid_account:{subscriber_code}"
+    return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
+
+
 def check_websocket_limits(udid, device_fingerprint, max_per_token=5, max_global=1000):
     token_identifier = udid or device_fingerprint
     if not token_identifier:

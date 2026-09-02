@@ -538,10 +538,22 @@ class AppCredentials(models.Model):
     is_compromised = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
-    
+
     last_used = models.DateTimeField(null=True, blank=True)
     usage_count = models.IntegerField(default=0)
     key_fingerprint = models.CharField(max_length=64, null=True, blank=True)
+
+    # Medio #8 (ver docs/AUDITORIA_CONSOLIDADA_2026-08-24.md y
+    # docs/MIGRACION_AEAD_CREDENCIALES_LEGADAS_2026-09-02.md): opt-in por
+    # credencial para que `hybrid_encrypt_for_app()` (wind/utils/crypto_tv.py)
+    # use AES-256-GCM (autenticado) en vez del AES-256-CBC histórico. Default
+    # False a propósito -- cualquier fila existente (incluidas las de
+    # clientes con TVs ya desplegadas decodificando el formato CBC de
+    # siempre) sigue produciendo exactamente el mismo payload que hoy hasta
+    # que alguien lo prenda a mano para un app_type/app_version puntual,
+    # después de confirmar que el lado que desencripta ya soporta el tag de
+    # GCM. Nunca activar sin esa confirmación -- ver el runbook del doc.
+    supports_aead = models.BooleanField(default=False)
 
     class Meta:
         unique_together = [['app_type', 'app_version']]

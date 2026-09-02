@@ -24,11 +24,15 @@ from wind.services.welcome_email import resolve_subscriber_login_email
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from wind.models import UDIDAuthRequest
+from wind.models import UDIDAuthRequest, SubscriberInfo
 from wind.serializers import UDIDAssociationSerializer
 from wind.services.udid_auth_service import authenticate_with_udid_service
+from wind.services.subscriber_catalog import (
+    resolve_subscriber_code_for_user,
+    get_smartcards_for_subscriber,
+)
 from wind.utils.websocket_utils import (
     get_client_ip,
     generate_device_fingerprint,
@@ -36,6 +40,7 @@ from wind.utils.websocket_utils import (
     get_client_token,
     check_token_bucket_lua,
     check_udid_rate_limit,
+    check_udid_account_rate_limit,
     is_legitimate_reconnection,
     should_apply_retry_delay,
     check_adaptive_rate_limit,
@@ -338,6 +343,181 @@ class ValidateAndAssociateUDIDView(APIView):
                 "validation_timestamp": now.isoformat(),
             },
         )
+
+
+class AssociateUDIDByAccountView(APIView):
+    """
+    Auto-servicio (Medio #8 / pareo UDID web): un usuario ya logueado en el
+    dashboard de Wind (JWT) vincula un dispositivo (TV, celular o navegador
+    -- cualquier build de `appVideo` con `login.udid.enabled`, no solo una
+    Smart TV) escribiendo solo el código UDID corto que ve en pantalla --
+    sin `temp_token` (ese nunca se muestra en
+    texto, solo viaja adentro del QR, ver `appVideo/src/pages/LoginPage.jsx`)
+    y sin tener que saber el número de serie de su smartcard (se resuelve
+    del lado del servidor a partir de la cuenta autenticada).
+
+    Deliberadamente NO reutiliza `ValidateAndAssociateUDIDView` ni su
+    `UDIDAssociationSerializer` -- son el flujo anónimo/operador (protegido
+    por `temp_token`), y quedan intactos, sin ningún cambio de
+    comportamiento. Esta es una vía nueva y separada, con su propio modelo
+    de seguridad: `temp_token` se reemplaza por (a) sesión JWT real
+    (`IsAuthenticated`) y (b) un rate limit por CUENTA dedicado
+    (`check_udid_account_rate_limit`, ver `websocket_utils.py`) que no
+    existía antes. Ver docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md
+    para el análisis completo.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
+        subscriber_code = resolve_subscriber_code_for_user(request.user)
+        if not subscriber_code:
+            return Response(
+                {"error": "No hay suscriptor vinculado a esta cuenta."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        is_allowed, remaining, retry_after = check_udid_account_rate_limit(subscriber_code)
+        if not is_allowed:
+            logger.warning(
+                f"AssociateUDIDByAccountView: Rate limit por cuenta excedido - subscriber_code={subscriber_code}, ip={client_ip}"
+            )
+            retry_at = timezone.now() + timedelta(seconds=retry_after)
+            return Response({
+                "error_code": "UDID_ACCOUNT_RATE_LIMIT_EXCEEDED",
+                "retry_after": retry_after,
+                "retry_at": retry_at.isoformat(),
+                "remaining_requests": remaining,
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS, headers={
+                "Retry-After": str(retry_after)
+            })
+
+        udid = str(request.data.get('udid') or '').strip().lower()
+        if not udid:
+            return Response({"error": "Falta el código UDID."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            udid_request = UDIDAuthRequest.objects.get(udid=udid)
+        except UDIDAuthRequest.DoesNotExist:
+            logger.warning(
+                f"AssociateUDIDByAccountView: UDID no encontrado - subscriber_code={subscriber_code}, ip={client_ip}"
+            )
+            return Response({"error": "Código UDID no encontrado o inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        udid_request.attempts_count += 1
+        udid_request.save(update_fields=['attempts_count'])
+
+        if udid_request.is_expired():
+            udid_request.status = 'expired'
+            udid_request.save(update_fields=['status'])
+            return Response(
+                {"error": "El código UDID expiró. Generá uno nuevo desde la TV."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if udid_request.status != 'pending':
+            return Response(
+                {"error": f"Este código ya no está pendiente (estado: {udid_request.status})."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Resolver la smartcard de ESTA cuenta -- `sn` y `subscriber_code`
+        # nunca se aceptan del cliente en este endpoint (a diferencia del
+        # flujo operador/QR): ambos salen exclusivamente del JWT autenticado,
+        # así que no hay forma de que esta ruta asocie el UDID a una cuenta
+        # que no sea la propia del usuario logueado.
+        subscriber_info = None
+        for candidate_sn in get_smartcards_for_subscriber(subscriber_code).values_list('sn', flat=True):
+            info = SubscriberInfo.objects.filter(sn=candidate_sn, subscriber_code=subscriber_code).first()
+            if info:
+                subscriber_info = info
+                break
+
+        if not subscriber_info:
+            return Response(
+                {"error": "No se encontró una smartcard activa asociada a tu cuenta."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if subscriber_info.is_locked():
+            return Response({"error": "Tu cuenta está bloqueada temporalmente."}, status=status.HTTP_403_FORBIDDEN)
+
+        sn = subscriber_info.sn
+        conflict_qs = UDIDAuthRequest.objects.filter(
+            sn=sn, subscriber_code=subscriber_code, status__in=['validated', 'used']
+        ).exclude(udid=udid)
+        if conflict_qs.exists():
+            return Response(
+                {"error": "Esta smartcard ya está vinculada a otro pareo activo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operator_id = f"account_self_service:{request.user.pk}"
+
+        with transaction.atomic():
+            udid_request = UDIDAuthRequest.objects.select_for_update().get(pk=udid_request.pk)
+            if udid_request.status != 'pending':
+                return Response(
+                    {"error": f"Este código ya no está pendiente (estado: {udid_request.status})."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            now = timezone.now()
+            udid_request.subscriber_code = subscriber_code
+            udid_request.sn = sn
+            udid_request.status = 'validated'
+            udid_request.validated_at = now
+            udid_request.used_at = now
+            udid_request.validated_by_operator = operator_id
+            udid_request.client_ip = client_ip
+            udid_request.user_agent = user_agent
+            udid_request.method = 'manual'
+            udid_request.save()
+
+            log_audit_async(
+                action_type="udid_used",
+                udid=udid_request.udid,
+                subscriber_code=subscriber_code,
+                operator_id=operator_id,
+                client_ip=client_ip,
+                user_agent=user_agent,
+                details={
+                    "smartcard_sn": sn,
+                    "validation_timestamp": now.isoformat(),
+                    "association_method": "account_self_service",
+                },
+            )
+
+            def _notify():
+                try:
+                    channel_layer = get_channel_layer()
+                    if channel_layer:
+                        async_to_sync(channel_layer.group_send)(
+                            f"udid_{udid}",
+                            {"type": "udid.validated", "udid": udid}
+                        )
+                        logger.info("Notificado udid.validated (self-service) para %s", udid)
+                    else:
+                        logger.warning("Channel layer no disponible; no se notificó udid %s", udid)
+                except Exception as e:
+                    logger.exception("Error notificando WebSocket para udid %s: %s", udid, e)
+
+            transaction.on_commit(_notify)
+
+        logger.info(
+            f"AssociateUDIDByAccountView: Asociación exitosa - udid={udid}, subscriber_code={subscriber_code}, sn={sn}, user_id={request.user.pk}"
+        )
+
+        return Response({
+            "message": "Dispositivo vinculado correctamente.",
+            "udid": udid,
+            "subscriber_code": subscriber_code,
+            "smartcard_sn": sn,
+            "status": udid_request.status,
+            "validated_at": udid_request.validated_at,
+        }, status=status.HTTP_200_OK)
 
 
 class AuthenticateWithUDIDView(APIView):

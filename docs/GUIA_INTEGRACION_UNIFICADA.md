@@ -3,6 +3,7 @@
 Fecha: 2026-07-29 (actualizado con más lecciones de la misma integración real end-to-end en appVideo -- ver secciones 3.1, 4.2, 4.3 y 4.4).
 Actualización 2026-08-31: agregada sección 6, preferencias sincronizadas (control parental + favoritos) -- nueva funcionalidad, mismo JWT de sesión que el resto del documento, sin dependencia de dispositivos vinculados. Detalle de implementación backend/appVideo-web en `docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md`.
 Actualización 2026-09-01: agregada sección 7, logs de diagnóstico para desarrolladores -- endpoint de ingesta sin JWT obligatorio (con API key propia), pensado especialmente para que iOS/Android lo implementen desde el día uno. Detalle de implementación backend en `docs/LOGS_DIAGNOSTICO_2026-09-01.md`.
+Actualización 2026-09-02: aclarado en 2.2 el comportamiento de UX esperado del lado de la app (qué pantalla/flujo debe existir, y por qué "hacer login social" ahí NO significa mostrarle al usuario una pantalla de login si ya está logueado) -- esto no estaba especificado antes, solo el contrato de API. Agregada sección 2.5, alternativa de auto-servicio sin escanear QR (dashboard web, no requiere ningún trabajo de las apps) -- ver `docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md`.
 Reemplaza y consolida: `docs/GUIA_INTEGRACION_APPS.md` (2026-07-22) y `docs/INTEGRACION_PAREO_TV_DISPOSITIVOS.md` (2026-07-27) -- ambos quedan como referencia histórica, pero **esta es la fuente única a partir de ahora**; si algo difiere entre ellos y este documento, vale lo que dice acá.
 Referencia de fondo: `docs/AUDITORIA_DECISIONES_Y_PENDIENTES.md` (todas las secciones de Fases 1-4 y revisiones posteriores).
 
@@ -53,9 +54,27 @@ Con el prerrequisito de JWT resuelto (sección 0), la TV también puede implemen
 - **Vía pareo manual (fallback, sin login social):** `POST /wind/validate-and-associate-udid/`, body `{"udid","temp_token","subscriber_code","sn","operator_id","method":"automatic"|"manual"}` (`sn` es una smartcard del suscriptor, se puede traer de `GET /api/v1/profile/products/`). Respuesta 200 con `{"message","udid","subscriber_code","smartcard_sn","status","validated_at"}`. Errores 400 (udid/temp_token/SN inválido, cuenta bloqueada, SN ya asociado a otro UDID) y 429 (1/min por udid).
 - En ambos casos, el celular no necesita abrir ningún WebSocket para este flujo -- la TV recibe el resultado por su propio `ws/auth/` (sección 1).
 
+#### 2.2.1 Comportamiento de UX esperado (qué debe existir en la app, no solo qué API llamar)
+
+El punto de partida real es **el usuario ya logueado en la app, no en una pantalla de login**. Esto no estaba explicitado antes y genera confusión porque el backend describe el paso como "hacer login social" -- pero eso es la implementación del lado del servidor, no lo que la app le debe mostrar a la persona. Flujo esperado:
+
+1. **Tiene que existir un punto de entrada dentro de la app ya logueada** (ej. un botón/menú "Vincular TV" en inicio o ajustes) que abra la cámara para escanear el QR. No es la pantalla de login -- si la app manda al usuario a loguearse de nuevo para esto, la integración está mal hecha.
+2. La app decodifica el QR y extrae `udid` + `temp_token` (formato del QR: lo define el equipo de TV, confirmar antes de programar el parseo -- ver pendientes, sección 9).
+3. **La app obtiene un token de Google/Facebook de forma silenciosa**, usando la sesión ya activa del SDK (Google Sign-In / Facebook SDK) -- sin mostrarle al usuario ningún prompt de login ni pedirle que vuelva a autorizar nada. Si la sesión del SDK expiró o no hay una activa, ahí sí corresponde pedir que inicie sesión, pero es el caso borde, no el camino normal.
+4. Con ese token (silencioso o no), la app llama a `POST /wind/auth/google|facebook/` agregando `udid`+`temp_token` en el body (2.2). La respuesta trae un JWT nuevo -- si el usuario ya tenía uno, se puede simplemente reemplazar/ignorar, es la misma cuenta.
+5. La app **no tiene que hacer nada más** salvo mostrar el resultado: éxito (`udid_pairing.ok: true`) → "TV vinculada"; error → mensaje según `udid_pairing.code` (tabla en 2.2), casi siempre "pedí un código nuevo en la TV" porque son de un solo uso y expiran a los 5 minutos.
+
+En resumen, para el usuario todo el proceso debe verse como "tocar un botón, escanear, ver confirmación" -- nunca como un segundo login visible, aunque técnicamente el backend lo procese como tal.
+
 ### 2.3 Dispositivos vinculados y 2.4 Password/cuenta
 
 Ver secciones 4 y 5 -- mismo alcance, protocolo y endpoints que el resto de las plataformas.
+
+### 2.5 Alternativa sin escanear QR (auto-servicio web, no requiere trabajo de las apps)
+
+Agregado 2026-09-02, ver `docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md`. Mientras 2.2 (login social + QR) dependa de que las apps móviles lo implementen, existe un camino alternativo que ya funciona hoy sin tocar ninguna app: el usuario lee el código corto (`udid`, no el QR completo, no necesita `temp_token`) directamente de la pantalla que lo muestra -- TV, celular o navegador, `login.udid` es el mismo componente de `appVideo` en los tres -- y lo escribe en la sección "Vincular dispositivo" del dashboard web de Wind (`POST /wind/associate-udid-by-account/`, requiere sesión JWT en el navegador, sin `temp_token`).
+
+Esto no reemplaza 2.2 ni requiere que mobile haga nada -- es un stopgap independiente, útil para soporte/producto mientras la integración nativa sigue pendiente. Las apps pueden, opcionalmente, mostrar un mensaje tipo "¿no podés escanear? entrá a tu cuenta en la web y escribí el código" apuntando a esta alternativa, pero no es un requisito de esta guía.
 
 ---
 

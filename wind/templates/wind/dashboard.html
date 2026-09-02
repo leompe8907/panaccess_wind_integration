@@ -62,6 +62,18 @@
           >
             Dispositivos
           </button>
+          <button
+            type="button"
+            class="dash-tab"
+            role="tab"
+            id="tab-btn-link-tv"
+            aria-selected="false"
+            aria-controls="tab-panel-link-tv"
+            data-tab="link-tv"
+            hidden
+          >
+            Vincular dispositivo
+          </button>
         </nav>
         <div class="dash-sidebar-spacer"></div>
         <button
@@ -230,6 +242,42 @@
 
           <div
             role="tabpanel"
+            id="tab-panel-link-tv"
+            class="dash-tabpanel"
+            aria-labelledby="tab-btn-link-tv"
+            hidden
+          >
+            <section class="dash-module module-card" id="link-tv-module">
+              <h2 class="dash-section-title">Vincular dispositivo</h2>
+              <p class="dash-module-text">
+                En la TV, el celular o la web, abrí la app y elegí "Login UDID" -- vas a ver
+                un código corto en pantalla. Escribilo acá para vincular ese dispositivo con
+                tu cuenta.
+              </p>
+              <form id="link-tv-form" autocomplete="off">
+                <div class="app-field">
+                  <label for="link-tv-code">Código del dispositivo</label>
+                  <input
+                    id="link-tv-code"
+                    type="text"
+                    inputmode="text"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    maxlength="16"
+                    placeholder="Ej. a1b2c3d4"
+                  />
+                </div>
+                <p id="link-tv-msg" class="app-alert" role="status"></p>
+                <button type="submit" class="app-btn primary" id="btn-link-tv-submit">
+                  Vincular dispositivo
+                </button>
+              </form>
+            </section>
+          </div>
+
+          <div
+            role="tabpanel"
             id="tab-panel-close-account"
             class="dash-tabpanel"
             aria-labelledby="tab-btn-close-account"
@@ -391,7 +439,12 @@
         var tabBtnPassword = document.getElementById("tab-btn-password");
         var tabBtnProducts = document.getElementById("tab-btn-products");
         var tabBtnDevices = document.getElementById("tab-btn-devices");
+        var tabBtnLinkTv = document.getElementById("tab-btn-link-tv");
         var tabBtnCloseAccount = document.getElementById("tab-btn-close-account");
+        var linkTvForm = document.getElementById("link-tv-form");
+        var linkTvInput = document.getElementById("link-tv-code");
+        var linkTvMsg = document.getElementById("link-tv-msg");
+        var linkTvSubmitBtn = document.getElementById("btn-link-tv-submit");
         var pageTitleEl = document.getElementById("dash-page-title");
         var activeTab = "account";
         var productsLoaded = false;
@@ -429,6 +482,7 @@
           password: "Contraseña",
           products: "Productos",
           devices: "Dispositivos vinculados",
+          "link-tv": "Vincular dispositivo",
           "close-account": "Eliminar cuenta",
         };
 
@@ -505,6 +559,7 @@
           if (tabBtnPassword) tabBtnPassword.hidden = !hasSubscriber;
           if (tabBtnProducts) tabBtnProducts.hidden = !hasSubscriber;
           if (tabBtnDevices) tabBtnDevices.hidden = !hasSubscriber;
+          if (tabBtnLinkTv) tabBtnLinkTv.hidden = !hasSubscriber;
           if (tabBtnCloseAccount) tabBtnCloseAccount.hidden = !hasSubscriber;
           if (tablist) tablist.hidden = !hasSubscriber;
 
@@ -951,6 +1006,68 @@
             });
         }
 
+        function showLinkTvMsg(text, type) {
+          if (!linkTvMsg) return;
+          linkTvMsg.textContent = text;
+          linkTvMsg.className = "app-alert show " + (type || "error");
+        }
+
+        function clearLinkTvMsg() {
+          if (!linkTvMsg) return;
+          linkTvMsg.textContent = "";
+          linkTvMsg.className = "app-alert";
+        }
+
+        // Pareo UDID auto-servicio (Medio #8, ver
+        // docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md) -- a diferencia
+        // del pareo por QR/login social (appVideo), acá no hace falta
+        // `temp_token` ni conocer el número de serie de la smartcard: el
+        // backend los resuelve del lado del servidor a partir del JWT ya
+        // autenticado en este dashboard. La protección contra fuerza bruta
+        // es el rate limit por cuenta del propio endpoint (429 con
+        // `retry_after`), no algo que se maneje acá.
+        function submitLinkTv(event) {
+          if (event) event.preventDefault();
+          var code = ((linkTvInput && linkTvInput.value) || "").trim();
+          if (!code) {
+            showLinkTvMsg("Escribe el código que ves en pantalla.", "error");
+            return;
+          }
+
+          clearLinkTvMsg();
+          if (linkTvSubmitBtn) linkTvSubmitBtn.disabled = true;
+
+          WindAuth.fetchApi("/wind/associate-udid-by-account/", {
+            method: "POST",
+            body: JSON.stringify({ udid: code }),
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, status: res.status, data: data };
+              });
+            })
+            .then(function (out) {
+              if (!out.ok) {
+                if (out.status === 429) {
+                  var retryAfter = out.data.retry_after || 60;
+                  throw new Error(
+                    "Demasiados intentos. Probá de nuevo en " + Math.ceil(retryAfter / 60) + " minuto(s)."
+                  );
+                }
+                throw new Error(out.data.error || "No se pudo vincular la TV.");
+              }
+              showLinkTvMsg("¡Dispositivo vinculado correctamente!", "success");
+              if (linkTvInput) linkTvInput.value = "";
+              devicesLoaded = false;
+            })
+            .catch(function (err) {
+              showLinkTvMsg(err.message || "No se pudo vincular el dispositivo.", "error");
+            })
+            .finally(function () {
+              if (linkTvSubmitBtn) linkTvSubmitBtn.disabled = false;
+            });
+        }
+
         function showPasswordMsg(text, type) {
           if (!passwordMsg) return;
           passwordMsg.textContent = text;
@@ -1304,6 +1421,10 @@
 
         if (devicesRefreshBtn) {
           devicesRefreshBtn.addEventListener("click", loadDevices);
+        }
+
+        if (linkTvForm) {
+          linkTvForm.addEventListener("submit", submitLinkTv);
         }
 
         if (deviceModalConfirm) {

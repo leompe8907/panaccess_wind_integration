@@ -29,6 +29,7 @@ from wind.views import (
     delete_account_info_view,
     RequestUDIDManualView,
     ValidateAndAssociateUDIDView,
+    AssociateUDIDByAccountView,
     AuthenticateWithUDIDView,
     ValidateStatusUDIDView,
     DisassociateUDIDView,
@@ -101,6 +102,7 @@ urlpatterns = [
     # Smart TV UDID pairing paths (manual flow)
     path('request-udid-manual/', RequestUDIDManualView.as_view(), name='request-udid-manual'),
     path('validate-and-associate-udid/', ValidateAndAssociateUDIDView.as_view(), name='validate-and-associate-udid'),
+    path('associate-udid-by-account/', AssociateUDIDByAccountView.as_view(), name='associate-udid-by-account'),
     path('authenticate-with-udid/', AuthenticateWithUDIDView.as_view(), name='authenticate-with-udid'),
     path('validate/', ValidateStatusUDIDView.as_view(), name='validate_udid'),
     path('disassociate-udid/', DisassociateUDIDView.as_view(), name='disassociate-udid'),

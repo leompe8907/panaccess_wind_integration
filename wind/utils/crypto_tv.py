@@ -46,23 +46,25 @@ def _hybrid_encrypt_with_public_key(
     `use_aead` decide el modo de AES:
 
     - `False` (default) -- AES-256-CBC sin autenticación, el comportamiento
-      histórico intacto. Es el que sigue usando `hybrid_encrypt_for_app`
-      a propósito: ese esquema de llave estática por `app_type` tiene HOY
-      un cliente real en producción (cableatlantico, un proyecto
-      completamente distinto de Wind) desencriptando ese formato exacto en
-      TVs ya desplegadas -- cambiarle el algoritmo o el formato del
-      payload sin coordinar con ese equipo sería un incidente de
-      producción para un cliente que no tiene nada que ver con este
-      cambio (revisión adversarial).
+      histórico intacto. Sigue siendo lo que `hybrid_encrypt_for_app` manda
+      por default: ese esquema de llave estática por `app_type` tiene HOY
+      clientes reales en producción (bromteck/cableatlantico, ver
+      docs/MIGRACION_AEAD_CREDENCIALES_LEGADAS_2026-09-02.md) desencriptando
+      ese formato exacto en TVs ya desplegadas -- cambiarle el algoritmo o
+      el formato del payload sin coordinar con ese equipo sería un
+      incidente de producción para un cliente que no tiene nada que ver
+      con este cambio (revisión adversarial). Desde el 2026-09-02,
+      `hybrid_encrypt_for_app` puede pedir `True` acá también, pero solo si
+      la credencial (`AppCredentials.supports_aead`) fue marcada a mano
+      para un `app_type` puntual, después de confirmar el lado cliente.
     - `True` -- AES-256-GCM, modo autenticado: antes CBC daba
       confidencialidad pero nada garantizaba que el ciphertext no fue
       alterado en tránsito (vulnerable a bit-flipping/padding oracle, sin
       HMAC). GCM agrega un tag de integridad en la misma operación de
-      cifrado, sin padding manual (es un modo de flujo, no de bloque).
-      Reservado para `hybrid_encrypt_for_device_public_key` (esquema
-      nuevo de llave efímera por pareo), que todavía no tiene ningún
-      cliente integrado en producción -- es seguro adoptar el formato
-      nuevo ahí sin romper a nadie.
+      cifrado, sin padding manual (es un modo de flujo, no de bloque). Es
+      lo que siempre usa `hybrid_encrypt_for_device_public_key` (esquema de
+      llave efímera por pareo, sin clientes legados que romper), y lo que
+      `hybrid_encrypt_for_app` usa opt-in por credencial (ver arriba).
     """
     public_key = serialization.load_pem_public_key(
         public_key_pem.encode(),
@@ -118,8 +120,8 @@ def _hybrid_encrypt_with_public_key(
 def hybrid_encrypt_for_app(plaintext: str, app_type: str) -> dict:
     """
     Encriptación híbrida con la llave pública estática registrada para un
-    `app_type` en `AppCredentials`. Se conserva sin cambios de contrato para
-    el/los integrador(es) que ya dependen de este esquema.
+    `app_type` en `AppCredentials`. Se conserva sin cambios de contrato por
+    default para el/los integrador(es) que ya dependen de este esquema.
 
     Antes: `.get(app_type=app_type, is_active=True)` -- no filtraba
     `is_compromised` y, si llegaran a existir dos filas activas para el
@@ -127,6 +129,16 @@ def hybrid_encrypt_for_app(plaintext: str, app_type: str) -> dict:
     `MultipleObjectsReturned` (ver auditoría). Ahora se filtra
     explícitamente por `is_active`/`is_compromised=False` y se toma la más
     reciente entre las que además no estén expiradas.
+
+    Medio #8 (2026-09-02, ver docs/MIGRACION_AEAD_CREDENCIALES_LEGADAS_2026-09-02.md):
+    `use_aead` ya no es un `False` fijo -- se lee de
+    `AppCredentials.supports_aead` de la credencial resuelta. Default de esa
+    columna es `False`, así que sin acción explícita esto sigue devolviendo
+    exactamente el mismo AES-256-CBC de siempre para cualquier app_type
+    existente. Solo produce AES-256-GCM (payload con campo `tag` extra) para
+    una credencial que alguien marcó `supports_aead=True` a mano, después de
+    confirmar que el lado que desencripta ya lo soporta -- ver el runbook en
+    ese doc antes de activarlo para un app_type real.
     """
     try:
         candidates = (
@@ -139,7 +151,10 @@ def hybrid_encrypt_for_app(plaintext: str, app_type: str) -> dict:
             raise AppCredentials.DoesNotExist
 
         return _hybrid_encrypt_with_public_key(
-            plaintext, app_credentials.public_key_pem, app_type=app_type
+            plaintext,
+            app_credentials.public_key_pem,
+            app_type=app_type,
+            use_aead=app_credentials.supports_aead,
         )
     except AppCredentials.DoesNotExist:
         raise Exception(f"No se encontraron claves activas para app_type={app_type}")
