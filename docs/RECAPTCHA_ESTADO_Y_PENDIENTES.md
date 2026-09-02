@@ -28,7 +28,7 @@ En Wind se identificaron 4 puntos de riesgo, todos endpoints accesibles sin nece
   - Olvidé contraseña — `wind/api/password_reset/views.py` (`password_forgot_view`).
   - Restablecer contraseña — `wind/api/password_reset/views.py` (`password_reset_confirm_view`).
   - Eliminar cuenta — `wind/api/profile/views.py` (`profile_close_account_view`).
-  - El inicio de sesión y el cambio de contraseña desde el dashboard (ya logueado) quedaron fuera de este alcance a pedido del cliente.
+  - El inicio de sesión y el cambio de contraseña desde el dashboard (ya logueado) quedaron fuera de este alcance a pedido del cliente. **Actualización 2026-09-01:** se extendió a login manual y a cambio de contraseña -- ver `docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md`. Login social (Google/Facebook) sigue fuera, ver ese documento para el motivo.
 - **Tipo:** reCAPTCHA **v3** — la versión invisible, sin checkbox "no soy un robot". Evalúa el comportamiento del usuario y devuelve un puntaje de 0 a 1; si es muy bajo, se rechaza el envío.
 - **Comportamiento actual:** la verificación es "opt-in" — mientras no exista la llave secreta en el entorno, el sistema no bloquea absolutamente nada en ninguno de los 4 endpoints. Es decir, está construido pero apagado a propósito, para no romper nada mientras no esté todo listo.
 

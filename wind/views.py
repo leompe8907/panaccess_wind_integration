@@ -768,7 +768,7 @@ def login_page_view(request):
     """
     Página principal de acceso: email/contraseña, registro y login social.
     """
-    from appConfig import LoginPageConfig
+    from appConfig import LoginPageConfig, RecaptchaConfig
 
     google_client_id = settings.SOCIALACCOUNT_PROVIDERS.get('google', {}).get('APP', {}).get('client_id', '')
     facebook_app_id = settings.SOCIALACCOUNT_PROVIDERS.get('facebook', {}).get('APP', {}).get('client_id', '')
@@ -780,6 +780,7 @@ def login_page_view(request):
             'facebook_app_id': facebook_app_id,
             'show_register_link': LoginPageConfig.SHOW_REGISTER_LINK,
             'show_social_login': LoginPageConfig.SHOW_SOCIAL_LOGIN,
+            'recaptcha_site_key': RecaptchaConfig.SITE_KEY,
         },
     )
 

@@ -340,9 +340,10 @@
         return null;
       }
 
-      // reCAPTCHA v3 (invisible) -- solo se usa en "Eliminar cuenta" (ver
-      // submitCloseAccount más abajo). Ver docs/PLAN_ACTIVACION_RECAPTCHA_2026-08-26.md.
-      // Opt-in de los dos lados, mismo patrón que register.html/forgot-password.html.
+      // reCAPTCHA v3 (invisible) -- usada en "Eliminar cuenta" (submitCloseAccount)
+      // y en "Cambiar contraseña" (submitPasswordChange, agregado 2026-09-01, ver
+      // docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md). Opt-in de los dos
+      // lados, mismo patrón que register.html/forgot-password.html.
       var RECAPTCHA_SITE_KEY = "{{ recaptcha_site_key|default:'' }}";
       function getRecaptchaToken(action) {
         if (!RECAPTCHA_SITE_KEY || typeof grecaptcha === "undefined") {
@@ -986,14 +987,20 @@
           if (passwordSubmitBtn) passwordSubmitBtn.disabled = true;
           if (passwordModalConfirm) passwordModalConfirm.disabled = true;
 
-          WindAuth.fetchApi("/api/v1/profile/password/", {
-            method: "POST",
-            body: JSON.stringify({
-              code: subscriberCode,
-              oldPass: pendingOldPassword,
-              newPass: pendingNewPassword,
-            }),
-          })
+          getRecaptchaToken("change_password")
+            .then(function (recaptchaToken) {
+              var body = {
+                code: subscriberCode,
+                oldPass: pendingOldPassword,
+                newPass: pendingNewPassword,
+              };
+              if (recaptchaToken) body.recaptcha_token = recaptchaToken;
+
+              return WindAuth.fetchApi("/api/v1/profile/password/", {
+                method: "POST",
+                body: JSON.stringify(body),
+              });
+            })
             .then(function (res) {
               return res.json().then(function (data) {
                 return { ok: res.ok, data: data };

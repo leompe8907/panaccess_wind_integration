@@ -15,21 +15,41 @@ from requests import HTTPError
 from rest_framework import exceptions, serializers
 
 from wind.services.subscriber_auth import authenticate_portal_user, mark_portal_email_verified
+from wind.utils.recaptcha import verify_recaptcha
 
 
 class PanAccessLoginSerializer(BaseLoginSerializer):
     """
     Login con texto libre (login1, login2, código o email) + contraseña.
+
+    reCAPTCHA v3 (2026-09-01, extensión de Alto #7 -- ver
+    docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md): a diferencia de
+    los otros 4 flujos (registro/olvidé/restablecer/eliminar cuenta), login
+    quedó fuera del alcance original a pedido del cliente porque ya tenía
+    `LoginThrottle` + bloqueo temporal (Alto #5) -- se agrega igual como capa
+    extra contra credential stuffing (bots probando listas de credenciales
+    filtradas, algo que el throttle por volumen no distingue de tráfico
+    humano). Opt-in/fail-open igual que los otros 4: sin
+    `RECAPTCHA_SECRET_KEY` configurado, `verify_recaptcha` no bloquea nada.
     """
 
     username = serializers.CharField(label=_("Usuario"), required=True, allow_blank=False)
     email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+    recaptcha_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     def validate(self, attrs):
         username = (attrs.get("username") or "").strip()
         password = attrs.get("password")
         if not username or not password:
             raise exceptions.ValidationError(_("Debe incluir usuario y contraseña."))
+
+        request = self.context.get("request")
+        recaptcha_ok, recaptcha_error = verify_recaptcha(
+            attrs.get("recaptcha_token"),
+            remote_ip=request.META.get("REMOTE_ADDR") if request else None,
+        )
+        if not recaptcha_ok:
+            raise exceptions.ValidationError(recaptcha_error or _("Verificación reCAPTCHA fallida."))
 
         user = authenticate_portal_user(username, password)
         if not user:

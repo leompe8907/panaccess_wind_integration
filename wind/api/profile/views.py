@@ -130,7 +130,27 @@ def profile_password_view(request):
     camino que usa el login) antes de aplicar el cambio -- protege contra
     un JWT robado/filtrado que, sin esto, alcanzaba solo por sí mismo para
     tomar la cuenta.
+
+    reCAPTCHA v3 (2026-09-01, extensión de Alto #7 -- ver
+    docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md): capa extra sobre
+    lo de arriba, mismo patrón opt-in/fail-open que los otros flujos.
     """
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     ser = ProfilePasswordSerializer(data=request.data)
     if not ser.is_valid():
         payload = {"success": False, "errors": ser.errors}

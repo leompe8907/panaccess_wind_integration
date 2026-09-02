@@ -9,6 +9,9 @@
     {% if show_social_login %}
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     {% endif %}
+    {% if recaptcha_site_key %}
+    <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+    {% endif %}
   </head>
   <body class="split-body">
     <div class="split-shell">
@@ -77,6 +80,25 @@
       const GOOGLE_CLIENT_ID = "{{ google_client_id|escapejs }}";
       const FACEBOOK_APP_ID = "{{ facebook_app_id|escapejs }}";
 
+      // reCAPTCHA v3 (invisible) -- solo en el login manual (usuario/contraseña),
+      // no en Google/Facebook (ver docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md
+      // -- el login social comparte serializer con el pareo de TV, que queda
+      // fuera de alcance por ahora). Mismo patrón opt-in que los demás templates.
+      const RECAPTCHA_SITE_KEY = "{{ recaptcha_site_key|default:'' }}";
+      function getRecaptchaToken(action) {
+        if (!RECAPTCHA_SITE_KEY || typeof grecaptcha === "undefined") {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve) => {
+          grecaptcha.ready(() => {
+            grecaptcha
+              .execute(RECAPTCHA_SITE_KEY, { action })
+              .then(resolve)
+              .catch(() => resolve(null));
+          });
+        });
+      }
+
       const alertEl = document.getElementById("alert");
 
       function showAlert(message, type) {
@@ -116,10 +138,15 @@
         const password = document.getElementById("password").value;
 
         try {
+          const recaptchaToken = await getRecaptchaToken("login");
           const res = await fetch("/api/auth/login/", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: username, password: password }),
+            body: JSON.stringify({
+              username: username,
+              password: password,
+              ...(recaptchaToken ? { recaptcha_token: recaptchaToken } : {}),
+            }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {

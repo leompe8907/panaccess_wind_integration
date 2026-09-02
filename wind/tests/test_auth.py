@@ -170,7 +170,8 @@ class SubscriberAuthTestCase(APITestCase):
         self.assertTrue(addr.verified)
         self.assertTrue(addr.primary)
 
-    def test_jwt_login_success(self):
+    @patch('wind.auth_serializers.verify_recaptcha', return_value=(True, None))
+    def test_jwt_login_success(self, mock_verify_recaptcha):
         # Intentar login estándar a través de dj_rest_auth
         response = self.client.post(
             '/api/auth/login/',
