@@ -111,15 +111,32 @@
         alertEl.textContent = "";
       }
 
+      const params = new URLSearchParams(window.location.search);
+
+      // "next" (hallazgo #34, ver docs/PROPUESTA_FORMATO_QR_UDID_2026-09-02.md)
+      // -- permite volver a donde el usuario venía (ej. la landing del QR de
+      // pareo, /wind/l/v1/<udid>/, que redirige acá con ?next=... si no
+      // estaba logueado). Saneado a propósito: solo se acepta una ruta
+      // relativa que empiece con un solo "/" (nunca "//" -- eso es un
+      // truco de open-redirect, un navegador lo interpreta como protocolo-
+      // relativo a OTRO dominio) y sin "://" en ningún lado del string.
+      function safeNextUrl() {
+        const next = params.get("next");
+        if (!next) return null;
+        if (!next.startsWith("/") || next.startsWith("//") || next.includes("://")) {
+          return null;
+        }
+        return next;
+      }
+
       function goDashboard() {
-        window.location.href = "{% url 'dashboard' %}";
+        window.location.href = safeNextUrl() || "{% url 'dashboard' %}";
       }
 
       if (WindAuth.isLoggedIn()) {
         goDashboard();
       }
 
-      const params = new URLSearchParams(window.location.search);
       if (params.get("session") === "expired") {
         showAlert("Tu sesión expiró. Inicia sesión de nuevo.", "error");
       }

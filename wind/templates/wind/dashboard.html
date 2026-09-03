@@ -1006,6 +1006,21 @@
             });
         }
 
+        // Precarga de "Vincular dispositivo" desde el QR (hallazgo #34, ver
+        // docs/PROPUESTA_FORMATO_QR_UDID_2026-09-02.md) -- el nuevo
+        // link_device_view() del backend redirige acá con ?link_tv=<udid>
+        // (o pasa por /wind/login/?next=... primero si no había sesión).
+        // Se limpia el query param con replaceState para que un F5
+        // posterior no vuelva a saltar de pestaña solo.
+        function maybeHandleLinkTvParam() {
+          var params = new URLSearchParams(window.location.search);
+          var linkTv = params.get("link_tv");
+          if (!linkTv || !linkTvInput || !tabBtnLinkTv || tabBtnLinkTv.hidden) return;
+          linkTvInput.value = linkTv;
+          switchTab("link-tv");
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+
         function showLinkTvMsg(text, type) {
           if (!linkTvMsg) return;
           linkTvMsg.textContent = text;
@@ -1155,7 +1170,11 @@
 
         function loadAccount() {
           if (!window.WindAuth || !WindAuth.isLoggedIn()) {
-            window.location.href = "/wind/login/";
+            // Preserva a dónde volver (ej. ?link_tv=... desde la landing del
+            // QR de pareo, hallazgo #34) -- login.html sanea este valor
+            // antes de usarlo (safeNextUrl), acá solo se arma.
+            var next = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.href = "/wind/login/?next=" + next;
             return;
           }
 
@@ -1182,6 +1201,7 @@
               }
               statusEl.hidden = true;
               renderAccount(sub);
+              maybeHandleLinkTvParam();
               setLoading(false);
             })
             .catch(function (err) {

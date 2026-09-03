@@ -18,6 +18,7 @@ from wind.functions import (
 from wind.views import (
     login_test_view,
     login_page_view,
+    link_device_view,
     dashboard_view,
     subscriber_test_view,
     login_facebook_test_view,
@@ -41,6 +42,8 @@ urlpatterns = [
     # Portal de usuario
     path('', login_page_view, name='home'),
     path('login/', login_page_view, name='login'),
+    # Landing del QR de pareo (hallazgo #34) -- ver link_device_view() para el detalle.
+    path('l/v1/<str:udid>/', link_device_view, name='link_device'),
     path('dashboard/', dashboard_view, name='dashboard'),
     path('subscriber-test/', subscriber_test_view, name='subscriber_test'),
 

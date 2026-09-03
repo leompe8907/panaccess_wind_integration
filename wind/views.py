@@ -1,4 +1,5 @@
 import logging
+import re
 import secrets
 from datetime import timedelta
 import base64
@@ -942,6 +943,38 @@ class DisassociateUDIDView(APIView):
             # profile/views.py). El detalle completo queda en el log.
             logger.error(f"DisassociateUDIDView: Error interno - error={str(e)}", exc_info=True)
             return Response({"error": "Error interno del servidor. Intenta de nuevo más tarde."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+_UDID_FORMAT_RE = re.compile(r'^[0-9a-fA-F]{1,32}$')
+
+
+def link_device_view(request, udid):
+    """
+    Landing del QR de pareo (Medio/hallazgo #34, ver
+    docs/PROPUESTA_FORMATO_QR_UDID_2026-09-02.md). Reemplaza al string plano
+    "{appName}:{udid}:{temp_token}" que armaba `appVideo` -- el QR ahora
+    codifica esta URL (`/wind/l/v1/<udid>/?t=<temp_token>`), así que
+    CUALQUIER cámara puede abrirlo (antes, escanearlo con algo que no fuera
+    la app nativa no hacía nada).
+
+    Esta vista es deliberadamente la mitad "boba" del diseño: no valida nada
+    contra `UDIDAuthRequest` ni toca la base de datos -- solo redirige al
+    dashboard con el `udid` como query param para que la sección "Vincular
+    dispositivo" (`docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md`) lo
+    precargue. Toda la validación real (expiración, estado, rate limit) ya
+    la hace `AssociateUDIDByAccountView` cuando el usuario confirma -- acá
+    solo se sanea el formato para no reflejar basura en la URL de redirect.
+
+    El `t` (`temp_token`) se acepta en la URL por compatibilidad con una
+    futura app nativa que abra este mismo link vía App/Universal Link (lo
+    leería antes de que el sistema operativo la abra a ella en vez de al
+    navegador) -- el camino web de acá no lo necesita ni lo reenvía.
+    """
+    if not _UDID_FORMAT_RE.match(udid or ''):
+        return HttpResponseRedirect('/wind/login/')
+
+    dashboard_url = f"/wind/dashboard/?link_tv={quote(udid)}"
+    return HttpResponseRedirect(dashboard_url)
 
 
 def login_page_view(request):
