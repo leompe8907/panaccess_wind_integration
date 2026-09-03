@@ -3,11 +3,12 @@
 Fecha: 2026-07-29 (actualizado con más lecciones de la misma integración real end-to-end en appVideo -- ver secciones 3.1, 4.2, 4.3 y 4.4).
 Actualización 2026-08-31: agregada sección 6, preferencias sincronizadas (control parental + favoritos) -- nueva funcionalidad, mismo JWT de sesión que el resto del documento, sin dependencia de dispositivos vinculados. Detalle de implementación backend/appVideo-web en `docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md`.
 Actualización 2026-09-01: agregada sección 7, logs de diagnóstico para desarrolladores -- endpoint de ingesta sin JWT obligatorio (con API key propia), pensado especialmente para que iOS/Android lo implementen desde el día uno. Detalle de implementación backend en `docs/LOGS_DIAGNOSTICO_2026-09-01.md`.
+Actualización 2026-09-03: **removida** la sección de logs de diagnóstico de esta guía -- todavía no está confirmado del lado backend (faltan destinatarios de alerta configurados y correr la suite de tests contra Postgres real). Esta guía solo debe listar contratos resueltos y confirmados; se vuelve a agregar cuando esos dos puntos se cierren. Ver `docs/LOGS_DIAGNOSTICO_2026-09-01.md` para el estado real y detallado.
 Actualización 2026-09-02: aclarado en 2.2 el comportamiento de UX esperado del lado de la app (qué pantalla/flujo debe existir, y por qué "hacer login social" ahí NO significa mostrarle al usuario una pantalla de login si ya está logueado) -- esto no estaba especificado antes, solo el contrato de API. Agregada sección 2.5, alternativa de auto-servicio sin escanear QR (dashboard web, no requiere ningún trabajo de las apps) -- ver `docs/PAREO_UDID_AUTOSERVICIO_CUENTA_2026-09-02.md`. Agregada sección 1.1.1, documentando por primera vez el formato exacto del código/QR que muestra la TV (hallazgo #34) -- y una propuesta de formato alternativo (QR como URL versionada) en `docs/PROPUESTA_FORMATO_QR_UDID_2026-09-02.md`, pendiente de decisión.
 Reemplaza y consolida: `docs/GUIA_INTEGRACION_APPS.md` (2026-07-22) y `docs/INTEGRACION_PAREO_TV_DISPOSITIVOS.md` (2026-07-27) -- ambos quedan como referencia histórica, pero **esta es la fuente única a partir de ahora**; si algo difiere entre ellos y este documento, vale lo que dice acá.
 Referencia de fondo: `docs/AUDITORIA_DECISIONES_Y_PENDIENTES.md` (todas las secciones de Fases 1-4 y revisiones posteriores).
 
-Organización de este documento: primero los conceptos comunes a todas las plataformas (sección 0), después lo que debe implementar **cada plataforma específicamente** (secciones 1 TV, 2 Mobile, 3 Web), después las funciones transversales que usan las tres (sección 4 dispositivos vinculados, sección 5 password/cuenta, sección 6 preferencias sincronizadas, sección 7 logs de diagnóstico), y por último tabla de endpoints, manejo de errores, y pendientes (secciones 8-10).
+Organización de este documento: primero los conceptos comunes a todas las plataformas (sección 0), después lo que debe implementar **cada plataforma específicamente** (secciones 1 TV, 2 Mobile, 3 Web), después las funciones transversales que usan las tres (sección 4 dispositivos vinculados, sección 5 password/cuenta, sección 6 preferencias sincronizadas), y por último tabla de endpoints, manejo de errores, y pendientes (secciones 7-9).
 
 ---
 
@@ -314,59 +315,7 @@ Esto es lo que ya implementa appVideo-web; cualquier cliente nuevo puede replica
 
 ---
 
-## 7. Logs de diagnóstico para desarrolladores
-
-Funcionalidad nueva (2026-09-01): las apps pueden reportar errores/crashes al backend para que el equipo los revise sin depender de que el suscriptor los reporte manualmente. **No es telemetría de negocio ni analítica de uso** -- es diagnóstico técnico puro (ver `docs/LOGS_DIAGNOSTICO_2026-09-01.md` para el detalle completo del lado backend). Pensada especialmente para que **iOS/Android la implementen desde el día uno**, ya que ese contrato no depende de nada que hoy solo exista en appVideo-web.
-
-### 7.1 Prerrequisito: ninguno (a propósito)
-
-A diferencia de todo lo demás en este documento, este endpoint **no requiere JWT** -- el caso de uso central es justamente capturar errores que ocurren antes de poder loguearse (una pantalla de login rota, por ejemplo). Si hay un JWT válido disponible, mandarlo igual (ver 7.2) para que el reporte quede asociado al suscriptor; si no hay uno, o está vencido, el reporte se manda igual y queda sin asociar.
-
-Lo que sí es obligatorio es una **API key propia de la integración** (no es un JWT, no expira, no es por usuario) -- pedir este valor al equipo de backend antes de integrar. Sin ella, o con una incorrecta, el endpoint devuelve 401 sin importar el resto del body.
-
-### 7.2 Enviar un reporte
-
-`POST /api/v1/logs/`, header `X-App-Log-Key: <api key de la integración>`, y opcionalmente `Authorization: Bearer <jwt>` si hay una sesión activa (mismo JWT de la sección 0 -- no hace falta "dispositivos vinculados" activo, son features independientes).
-
-Body:
-
-```json
-{
-  "platform": "ios",
-  "level": "error",
-  "message": "TypeError: no se pudo cargar el EPG",
-  "stack": "TypeError: ...\n  at EpgLoader.swift:42",
-  "breadcrumbs": [
-    { "category": "nav", "message": "abrió BouquetPage" },
-    { "category": "http", "message": "GET /api/v1/epg -> 500" }
-  ],
-  "appVersion": "2.4.0",
-  "deviceType": "ios"
-}
-```
-
-| Campo | Obligatorio | Notas |
-|---|---|---|
-| `platform` | Sí | Uno de: `web`, `tv_tizen`, `tv_webos`, `ios`, `android`. |
-| `level` | No | `error` (default), `warning`, `info`. |
-| `message` | Sí | Hasta 2000 caracteres. |
-| `stack` | No | Hasta 8000 caracteres. |
-| `breadcrumbs` | No | Lista de objetos libres (máx. 100) -- lo último que pasó antes del error: navegación, llamadas de red, acciones del usuario. No hay un shape fijo por campo, pero se recomienda al menos `category`/`message` para que sea legible en el panel. |
-| `extra` | No | Objeto libre, hasta ~20KB serializado -- cualquier contexto adicional puntual. |
-| `appVersion` | No | Versión de la app que reporta. |
-| `deviceType` | No | Texto libre descriptivo del dispositivo (modelo, SO, etc.). |
-
-Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o incorrecta), 400 con `{"success": false, "errors": {...}}` (validación del body), 429 (rate limit -- 30/minuto por defecto, mismo criterio de "no bloquear ni reintentar en loop" que el resto del documento).
-
-### 7.3 Patrón recomendado del lado cliente (no es parte del contrato del backend)
-
-- **Buffer local + envío solo si hay error** (el mismo patrón que ya usa appVideo-web en `errorReporting.js`): mantener en memoria un ring buffer chico (~50 entradas) de "breadcrumbs" -- navegación, llamadas de red, acciones del usuario -- y adjuntarlas recién cuando ocurre un error real. No hace falta mandar nada mientras la app funciona bien.
-- **Nunca debe bloquear ni romper la app**: si el envío falla (sin red, endpoint caído), descartar o guardar para reintentar más tarde -- el reporte de diagnóstico nunca debe generar un error nuevo ni afectar la experiencia del usuario.
-- Deduplicar en el cliente antes de mandar (mismo mensaje+contexto repitiéndose en loop) para no gastar el rate limit en la primera ráfaga de un error que se repite -- el backend igual agrupa por fingerprint del lado servidor, pero evitar el envío redundante ahorra red en el dispositivo.
-
----
-
-## 8. Tabla resumen de endpoints
+## 7. Tabla resumen de endpoints
 
 | Acción | Método y ruta | Auth |
 |---|---|---|
@@ -390,11 +339,10 @@ Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o inco
 | Mis productos/smartcards | `GET /api/v1/profile/products/` | JWT |
 | Leer preferencias sincronizadas (parental + favoritos) | `GET /api/v1/preferences/?profileKey=...` | JWT |
 | Guardar preferencias sincronizadas | `PUT /api/v1/preferences/` | JWT |
-| Reportar un log de diagnóstico | `POST /api/v1/logs/` | API key (`X-App-Log-Key`); JWT opcional |
 
 ---
 
-## 9. Manejo de errores y rate limiting (aplica a todo lo anterior)
+## 8. Manejo de errores y rate limiting (aplica a todo lo anterior)
 
 - Los endpoints de pareo devuelven 429 con `retry_after` (segundos) -- respetar ese tiempo, no reintentar en loop inmediato.
 - Ningún endpoint documentado devuelve el detalle crudo de una excepción interna (`str(e)`) -- los mensajes de error son genéricos por diseño; reportar el `code`/`error_type` recibido, no parsear texto libre.
@@ -402,7 +350,7 @@ Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o inco
 
 ---
 
-## 10. Pendientes / decisiones abiertas (estado a 2026-07-28)
+## 9. Pendientes / decisiones abiertas (estado a 2026-07-28)
 
 **Ya resueltos** (se listaban acá en versiones anteriores de este documento, quedan solo como referencia de qué cambió):
 
@@ -415,12 +363,12 @@ Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o inco
 - `device_registered` sin `id` -- ver sección 4.1, ya devuelve `id` y se usa en appVideo para marcar "este dispositivo" (sección 3.1, 4.4.c).
 - **`oldPass` obligatorio al cambiar contraseña (2026-08-28)** -- ver sección 5.1. Cambio de contrato: cierra el hueco de que un JWT robado alcanzara por sí solo para cambiar la contraseña sin conocer la actual.
 - **Preferencias sincronizadas (control parental + favoritos) -- implementado 2026-08-31**, ver sección 6 y `docs/SINCRONIZACION_PREFERENCIAS_2026-08-31.md`. Queda documentado como limitación conocida, no como bug: sin push en tiempo real entre dispositivos abiertos simultáneamente en primer plano (solo sincroniza al iniciar/reanudar la app) -- si el producto lo requiere a futuro, se puede agregar un aviso liviano por el mismo canal WebSocket de dispositivos vinculados (`subscriber_devices_{subscriber_code}`, sección 4.4.d), sin necesidad de un canal nuevo.
-- **Logs de diagnóstico para desarrolladores -- implementado 2026-09-01**, ver sección 7 y `docs/LOGS_DIAGNOSTICO_2026-09-01.md`. Del lado backend: falta generar `APP_LOGS_INGEST_KEY` real en el `.env` del servidor (hoy vacío -- el endpoint rechaza todo hasta configurarlo) y definir `APP_LOGS_ALERT_RECIPIENTS`. Del lado cliente: **appVideo-web todavía no lo implementa** (queda pendiente extender `errorReporting.js` con breadcrumbs y apuntarlo a este endpoint); iOS/Android pueden implementarlo desde cero directo contra el contrato de la sección 7.
 - **`DeviceSession` sin expiración (2026-08-28)** -- ahora una tarea Celery diaria revoca automáticamente cualquier sesión de dispositivo sin actividad (`last_seen_at`) hace más de 183 días (`DEVICE_SESSION_IDLE_EXPIRY_DAYS`, ajustable). Un dispositivo perdido/vendido/olvidado ya no queda "de confianza" indefinidamente.
 - **appVideo -- los 2 gaps client-side (revisados 2026-08-28), sin acción pendiente:** el de `ws/device/` ya está resuelto (no en `splashAuthFlow.js` puntual, sino con un watchdog centralizado en `useAppLifecycle.js` que garantiza la conexión sin importar el camino de login/reactivación); el de `loginFlow.js`/`device_token` es diseño intencional (fire-and-forget a propósito, para que el registro de dispositivo nunca pueda bloquear ni tumbar el login real), y el único consumidor (`LinkedDevicesPanel.jsx`) ya se actualiza por evento en vez de asumir que está listo de entrada.
 
 **Todavía abiertos:**
 
+- **Logs de diagnóstico para desarrolladores** -- backend construido (`applogs`, `docs/LOGS_DIAGNOSTICO_2026-09-01.md`), pero todavía no confirmado del todo: falta definir `APP_LOGS_ALERT_RECIPIENTS` y correr la suite de tests contra Postgres real. Removido de esta guía (era la sección 7) hasta que se cierre -- se vuelve a agregar cuando quede confirmado.
 - **Password en texto plano** en el correo de bienvenida y en la respuesta de login social -- decisión de negocio ya aceptada, se re-lista solo porque sigue siendo una superficie de exposición real.
 - **Fingerprint de dispositivo evadible** rotando los headers que lo derivan (server-side, ya no lo declara el cliente, pero sigue sin ser una huella robusta) -- limitación estructural, sin una solución de bajo riesgo identificada.
 - **Site-key de reCAPTCHA para mobile**: todavía sin definir cuál usar en "olvidé mi contraseña" / "eliminar cuenta" desde iOS/Android.
