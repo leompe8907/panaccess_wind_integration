@@ -42,6 +42,7 @@ from wind.utils.websocket_utils import (
     check_token_bucket_lua,
     check_udid_rate_limit,
     check_udid_account_rate_limit,
+    check_udid_request_ip_rate_limit,
     is_legitimate_reconnection,
     should_apply_retry_delay,
     check_adaptive_rate_limit,
@@ -70,6 +71,33 @@ class RequestUDIDManualView(APIView):
         
         try:
             device_fingerprint = generate_device_fingerprint(request)
+
+            # Segunda capa de rate limit, por IP -- el fingerprint por sí
+            # solo se puede evadir rotando headers (User-Agent, etc.) en
+            # cada intento; la IP es más cara de rotar (ver
+            # check_udid_request_ip_rate_limit). Se chequea primero porque
+            # es la defensa contra ese caso puntual: si alguien ya viene
+            # rotando el fingerprint para esquivar el límite de abajo, no
+            # hace falta ni calcular ese fingerprint de nuevo para cortarlo.
+            ip_allowed, ip_remaining, ip_retry_after = check_udid_request_ip_rate_limit(
+                client_ip,
+                max_requests=10,
+                window_minutes=5
+            )
+
+            if not ip_allowed:
+                logger.warning(
+                    f"RequestUDIDManualView: Rate limit por IP excedido - ip={client_ip}, retry_after={ip_retry_after}s"
+                )
+                retry_at = timezone.now() + timedelta(seconds=ip_retry_after)
+                return Response({
+                    "error_code": "IP_RATE_LIMIT_EXCEEDED",
+                    "retry_after": ip_retry_after,
+                    "retry_at": retry_at.isoformat(),
+                    "remaining_requests": ip_remaining
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS, headers={
+                    "Retry-After": str(ip_retry_after)
+                })
 
             is_allowed, remaining, retry_after = check_device_fingerprint_rate_limit(
                 device_fingerprint,

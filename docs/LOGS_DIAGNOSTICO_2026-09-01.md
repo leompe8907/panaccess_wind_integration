@@ -79,7 +79,11 @@ No aplica: no hay fila nueva en `docs/AUDITORIA_CONSOLIDADA_2026-08-24.md` -- es
 
 ## Pendiente antes de producción
 
-- Generar un valor real para `APP_LOGS_INGEST_KEY` en el `.env` del servidor (hoy vacío en el ejemplo -- el endpoint rechaza todo hasta que se configure).
-- Definir `APP_LOGS_ALERT_RECIPIENTS` con las direcciones del equipo que deben recibir las alertas.
-- Correr `manage.py makemigrations --check` + `manage.py check` + la suite de tests contra Postgres real apenas se recupere el acceso de shell a este repo (ver "Cómo se verificó").
-- Wiring del lado de appVideo (breadcrumbs + llamada a este endpoint desde `errorReporting.js`) -- todavía no implementado, queda como siguiente paso.
+**Actualización 2026-09-03 -- todo lo de abajo quedó resuelto y confirmado:**
+
+- `APP_LOGS_INGEST_KEY` -- ya tiene un valor real en `.env` (`c4TKLCO3Q9NbmUhkynnYyKBYVOF-qN2BfCXDPmmAto0`).
+- `APP_LOGS_ALERT_RECIPIENTS` -- ya configurado con las direcciones del equipo (`sw4@bromteck.com,sw1@bromteck.com`). Ojo con este campo: es una lista separada por comas, no un booleano -- se detectó y corrigió un typo (`=True`) que habría mandado el correo de alerta a la dirección literal "True".
+- `manage.py makemigrations --check` + `manage.py check` + los 20 tests de `applogs/tests.py`, corridos contra Postgres real (efímero, mismo harness `pgserver` del resto del proyecto): **check sin problemas, sin migraciones faltantes, 20/20 tests OK**.
+- Wiring del lado de appVideo (`src/utils/errorReporting.js`, función `sendToDiagnosticsBackend()`) -- confirmado ya implementado en el código (llama a `POST /api/v1/logs/` con `X-App-Log-Key` y adjunta JWT si hay sesión de dispositivo activa). No se documentó en su momento porque se hizo en una sesión aparte sobre el mismo repo.
+
+Con esto, la funcionalidad completa (backend + cliente appVideo) queda confirmada y se restauró su sección en `docs/GUIA_INTEGRACION_UNIFICADA.md`.

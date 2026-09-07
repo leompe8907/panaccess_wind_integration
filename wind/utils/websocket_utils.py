@@ -194,6 +194,34 @@ def check_udid_account_rate_limit(subscriber_code, max_requests=5, window_minute
     return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
 
 
+def check_udid_request_ip_rate_limit(client_ip, max_requests=10, window_minutes=5):
+    """
+    Segunda capa de rate limit para `RequestUDIDManualView`, POR IP -- además
+    del límite existente por `device_fingerprint` (1 cada 5 minutos).
+
+    El fingerprint se deriva server-side de headers (User-Agent,
+    Accept-Language, etc.) -- ver `generate_device_fingerprint` -- pero nada
+    impide que un cliente insistente rote esos headers en cada request y
+    obtenga un fingerprint "nuevo" cada vez, esquivando por completo ese
+    límite (limitación estructural señalada en la auditoría, sin una huella
+    robusta disponible mientras no exista attestation de hardware). La IP es
+    más cara de rotar (requiere cambiar de red/proxy real, no solo headers),
+    así que sirve de resguardo: alguien que logra rotar el fingerprint en
+    cada intento sigue topando acá si insiste desde la misma IP.
+
+    A propósito más laxo que el límite por fingerprint (10 cada 5 minutos,
+    no 1) -- una IP real puede estar compartida por varios dispositivos
+    legítimos detrás del mismo NAT (varias TVs de una casa/oficina pidiendo
+    su propio código al mismo tiempo), y este límite no debe bloquear ese
+    caso normal. No reemplaza al límite por fingerprint, se suma: cualquiera
+    de los dos que se exceda primero corta el request.
+    """
+    if not client_ip:
+        return False, 0, 0
+    cache_key = f"rate_limit:udid_request_ip:{client_ip}"
+    return _reserve_atomic_slot(cache_key, max_requests, window_minutes * 60)
+
+
 def check_websocket_limits(udid, device_fingerprint, max_per_token=5, max_global=1000):
     token_identifier = udid or device_fingerprint
     if not token_identifier:

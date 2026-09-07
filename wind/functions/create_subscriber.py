@@ -41,27 +41,36 @@ PHONE_INVALID_MESSAGE = (
 )
 
 # Prefijos de subscriber_code según origen del registro (ajuste solicitado
-# por el cliente): registro manual -> "BM$" + documento; login social ->
-# "BG$"/"BF$" + documento si viene (hoy el login social no captura documento
+# por el cliente): registro manual -> "BM" + documento; login social ->
+# "BG"/"BF" + documento si viene (hoy el login social no captura documento
 # en ningún punto del flujo, así que en la práctica siempre cae al número
 # progresivo) o número progresivo por prefijo si no. Solo aplica a
 # suscriptores NUEVOS -- los códigos ya existentes en producción no se tocan.
-MANUAL_CODE_PREFIX = "BM$"
-SOCIAL_PROVIDER_CODE_PREFIXES = {"google": "BG$", "facebook": "BF$"}
-DEFAULT_SOCIAL_CODE_PREFIX = "BG$"
+#
+# CORREGIDO (2026-09-07, incidente en producción): estos prefijos originalmente
+# llevaban un "$" (p. ej. "BM$"). PanAccess solo acepta `code` alfanumérico
+# (a-z, A-Z, 0-9) -- con el "$" adentro, TODO registro nuevo (manual con
+# documento, manual sin documento, y login social Google/Facebook, que
+# comparte esta misma función vía `_create_subscriber_core`) fallaba siempre
+# en `addSubscriber` desde que se desplegó este esquema de prefijos, sin que
+# nadie lo notara hasta que se activaron los logs de diagnóstico. Ver
+# docs/FIX_PREFIJOS_SUBSCRIBER_CODE_2026-09-07.md.
+MANUAL_CODE_PREFIX = "BM"
+SOCIAL_PROVIDER_CODE_PREFIXES = {"google": "BG", "facebook": "BF"}
+DEFAULT_SOCIAL_CODE_PREFIX = "BG"
 
 # Prefijo SEPARADO para cuando el registro manual no trae documento (el
 # formulario público lo permite -- `code`/`document_number` son opcionales en
 # CreateSubscriberSerializer) y hay que generar un número progresivo. Si se
-# usara el mismo "BM$" para esto, `generate_unique_subscriber_code` mezclaría
+# usara el mismo "BM" para esto, `generate_unique_subscriber_code` mezclaría
 # en la misma consulta (`code__startswith`) códigos progresivos puramente
-# numéricos ("BM$1", "BM$2"...) con códigos de documento no numéricos
-# ("BM$AB123456"...) -- el `order_by('-code')` es un ordenamiento de texto,
+# numéricos ("BM1", "BM2"...) con códigos de documento no numéricos
+# ("BMAB123456"...) -- el `order_by('-code')` es un ordenamiento de texto,
 # no numérico, así que un documento no numérico puede "ganarle" al último
 # progresivo real y romper el conteo (se detectó en revisión adversarial de
 # este mismo ajuste). Al no reutilizarse el mismo prefijo, ambos universos
 # quedan separados y esto no puede pasar.
-MANUAL_AUTO_CODE_PREFIX = "BM$AUTO"
+MANUAL_AUTO_CODE_PREFIX = "BMAUTO"
 
 logger = logging.getLogger(__name__)
 

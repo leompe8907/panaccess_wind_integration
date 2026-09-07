@@ -2,7 +2,9 @@
 
 Documento de referencia para explicar al cliente el estado de la protección anti-bots (reCAPTCHA) en el portal.
 
-## Resumen ejecutivo
+**Actualización 2026-09-03 -- estado real actual, este doc ya no refleja el resumen ejecutivo de abajo (quedó desactualizado, ver historial):** reCAPTCHA se activó de verdad el 2026-09-01 (`RECAPTCHA_SECRET_KEY` real + widget en los 4 formularios + extendido a login/cambio de contraseña, ver `docs/RECAPTCHA_WIDGET_4_FORMULARIOS_2026-09-01.md` y `docs/RECAPTCHA_LOGIN_Y_CAMBIO_PASSWORD_2026-09-01.md`) y luego se **desactivó de nuevo a propósito** el 2026-09-03 (decisión de negocio, ver `docs/DESACTIVACION_TEMPORAL_RECAPTCHA_2026-09-03.md`) porque la app Wind iOS todavía no manda `recaptcha_token` y rompía login/cambio de contraseña/cierre de cuenta para ese cliente. Hoy: `RECAPTCHA_SECRET_KEY` vacía de nuevo, nada bloquea en ningún flujo, para ningún cliente (web, appVideo, iOS). Bot-mitigation aceptada como riesgo temporal a pedido del cliente mientras el proyecto sigue en pruebas internas.
+
+## Resumen ejecutivo (histórico, previo a la activación del 2026-09-01 -- ver actualización arriba)
 
 reCAPTCHA está **parcialmente implementado**: la lógica de verificación en el backend ya existe y funciona para los 4 flujos públicos que la necesitan (registro, olvidé contraseña, restablecer contraseña y eliminar cuenta), pero está **desactivada** porque falta un dato de configuración (la llave secreta), y además falta agregar el widget correspondiente en cada formulario del frontend. Hoy, ninguno de estos 4 flujos tiene protección anti-bot activa todavía.
 
