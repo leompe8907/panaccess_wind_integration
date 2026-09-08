@@ -1,4 +1,5 @@
 import os
+import sys
 from celery import Celery
 from celery.signals import task_postrun, task_prerun
 
@@ -12,6 +13,17 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Autodiscover tasks.py en las apps instaladas
 app.autodiscover_tasks()
+
+# CORREGIDO (2026-09-08): mismo patrón que settings.py (CHANNEL_LAYERS,
+# CacheConfig) para detectar `manage.py test`. Bajo CELERY_TASK_ALWAYS_EAGER
+# (activo en tests) una tarea corre sincrónica en el mismo proceso/hilo que
+# el test; si un test dispara una tarea (p. ej. envío de email) a mitad de
+# un TestCase, estos hooks cerraban la conexión de Postgres en medio de la
+# transacción atómica que Django usa para aislar cada test, rompiendo con
+# "connection already closed" los tests que corrían después en la misma
+# clase (visto en PasswordResetServiceTestCase). En producción esta
+# variable siempre es False -- no cambia nada del comportamiento real.
+_RUNNING_TESTS = "test" in sys.argv
 
 
 @task_prerun.connect
@@ -29,6 +41,9 @@ def _close_old_connections_before_task(**kwargs):
     antes de cada tarea, la misma revalidación que un request HTTP tendría
     gratis.
     """
+    if _RUNNING_TESTS:
+        return
+
     from django.db import close_old_connections
 
     close_old_connections()
@@ -40,6 +55,9 @@ def _close_old_connections_after_task(**kwargs):
     dejar la conexión abierta ociosa hasta la siguiente ejecución programada
     (contribuía a los agotamientos de pool "reserved for roles with the
     SUPERUSER" vistos junto con getSmartcard.py)."""
+    if _RUNNING_TESTS:
+        return
+
     from django.db import close_old_connections
 
     close_old_connections()

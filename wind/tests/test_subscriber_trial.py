@@ -6,7 +6,13 @@ from wind.models import SubscriberEmailRegistry, SubscriberDocumentRegistry
 
 
 class SubscriberTrialEligibilityTestCase(SimpleTestCase):
-    def test_new_email_is_eligible(self):
+    @patch("wind.services.subscriber_trial.SubscriberEmailRegistry.objects.filter")
+    def test_new_email_is_eligible(self, mock_filter):
+        # CORREGIDO (2026-09-08): a este test le faltaba el mock que sí
+        # tienen sus hermanos en esta misma clase -- sin él, is_eligible_for_trial
+        # termina pegándole a la BD real, y esta clase es SimpleTestCase (no
+        # permite queries), lo que rompía con DatabaseOperationForbidden.
+        mock_filter.return_value.first.return_value = None
         self.assertTrue(is_eligible_for_trial(email="new@example.com"))
 
     @patch("wind.services.subscriber_trial.SubscriberEmailRegistry.objects.filter")

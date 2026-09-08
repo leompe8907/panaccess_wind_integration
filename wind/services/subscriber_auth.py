@@ -350,7 +350,15 @@ def get_or_create_portal_user(login_record: SubscriberLoginInfo) -> User:
     # is_subscriber_closed_locally(). El caller (authenticate_portal_user)
     # ya debería haber bloqueado el login antes de llegar acá; esto es una
     # segunda capa para cualquier otro caller presente o futuro.
-    if not is_subscriber_closed_locally(code):
+    #
+    # CORREGIDO (2026-09-08): antes esta rama solo se abstenía de poner
+    # is_active=True cuando el abonado estaba cerrado, pero nunca lo ponía en
+    # False -- para un User recién creado con create_user() (default
+    # is_active=True del modelo) eso dejaba la cuenta activa igual. Ahora se
+    # fuerza explícitamente el estado en ambos sentidos.
+    if is_subscriber_closed_locally(code):
+        user.is_active = False
+    else:
         user.is_active = True
     user.save()
     mark_portal_email_verified(user, email)
