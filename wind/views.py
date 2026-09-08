@@ -1076,8 +1076,20 @@ def register_view(request):
     """
     Página web para registrar suscriptores vía /wind/create-subscriber/.
     Se renderiza en el mismo origen para evitar CORS.
+
+    CORREGIDO (2026-09-07): antes esta página se renderizaba siempre, sin
+    importar `FeatureConfig.CREATE_SUBSCRIBER_PUBLIC_ENABLED` -- ese flag
+    solo gateaba el POST del endpoint (`create_subscriber_view`), así que
+    con la funcionalidad "desactivada" el formulario igual se mostraba
+    completo y solo fallaba recién al enviarlo. Mismo criterio que
+    `login_facebook_test_view` (arriba): si la funcionalidad está apagada,
+    la página ni siquiera debe existir para quien no tenga el enlace.
     """
     from appConfig import RecaptchaConfig
+    from wind.functions.create_subscriber import _create_subscriber_public_enabled
+
+    if not _create_subscriber_public_enabled():
+        raise Http404()
 
     return render(
         request,
