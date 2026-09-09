@@ -985,6 +985,30 @@ class EmailConfig:
     # manda desde una tarea de Celery sin request activo, STATIC_URL puede
     # ser relativo). Por defecto asume que el mismo backend sirve /static/;
     # sobreescribir con CDN_STATIC_URL/env si aplica.
+    # Confirmación de eliminación de cuenta (2026-09-08, nuevo flujo pedido
+    # por el cliente: la solicitud desde la app no borra nada todavía, manda
+    # este correo con un enlace de confirmación de 24h -- ver
+    # wind/services/account_deletion.py). Reusa el mismo banner que "olvidé
+    # mi contraseña" por defecto (mismo estilo de correo, sin arte propio
+    # todavía); sobreescribir con su propia URL si el cliente aprueba un
+    # diseño distinto.
+    ACCOUNT_DELETION_CONFIRM_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_ACCOUNT_DELETION_CONFIRM_SUBJECT"))
+        or "Confirma la eliminación de tu cuenta de WindTV"
+    )
+    # Base para armar el link de confirmación del correo de arriba -- igual
+    # que PORTAL_LOGIN_URL/PASSWORD_RESET_BANNER_IMAGE_URL, se manda desde
+    # una tarea de Celery sin request activo (a diferencia de
+    # request_password_reset(), que sí puede usar request.build_absolute_uri()).
+    ACCOUNT_DELETION_CONFIRM_LINK_BASE_URL = (
+        _strip_env(os.getenv("EMAIL_ACCOUNT_DELETION_CONFIRM_BASE_URL"))
+        or "https://backend.wind.do"
+    )
+    ACCOUNT_DELETION_BANNER_IMAGE_URL = (
+        _strip_env(os.getenv("EMAIL_ACCOUNT_DELETION_BANNER_URL"))
+        or _strip_env(os.getenv("EMAIL_PASSWORD_RESET_BANNER_URL"))
+        or "https://backend.wind.do/static/wind/images/password_reset_banner.jpg"
+    )
     PASSWORD_RESET_BANNER_IMAGE_URL = (
         _strip_env(os.getenv("EMAIL_PASSWORD_RESET_BANNER_URL"))
         or "https://backend.wind.do/static/wind/images/password_reset_banner.jpg"

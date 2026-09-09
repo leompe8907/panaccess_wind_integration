@@ -43,7 +43,11 @@ def password_forgot_view(request):
         )
 
     reset_page_url = request.build_absolute_uri("/wind/reset-password/")
-    result = request_password_reset(ser.validated_data["email"], reset_page_url)
+    # Allowlist de un solo valor a propósito (ver docstring de
+    # request_password_reset): cualquier otra cosa que no sea "app" cae al
+    # comportamiento de siempre, no hace falta validar más que esto.
+    origin = "app" if request.data.get("origin") == "app" else ""
+    result = request_password_reset(ser.validated_data["email"], reset_page_url, origin=origin)
     return Response(result, status=status.HTTP_200_OK)
 
 

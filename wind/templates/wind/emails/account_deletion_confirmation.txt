@@ -1,0 +1,23 @@
+WIND TV
+═══════════════════════════════════════
+
+Hola {{ full_name }}
+
+Recibimos una solicitud para eliminar tu cuenta de WindTV.
+
+Si realizaste esta solicitud, confirma la eliminación en el siguiente enlace:
+{{ confirm_link }}
+
+Tu suscripción seguirá activa hasta finalizar tu período de facturación
+actual. La eliminación se ejecutará en esa fecha.
+
+Este enlace expirará en 24 horas. Si no fuiste tú, ignora este correo -- tu
+cuenta seguirá funcionando con normalidad.
+
+¿No fuiste tú quien solicitó esto? Contáctanos de inmediato a
+{{ support_email }} o al {{ support_phone }}.
+
+───────────────────────────────────────
+WIND — Conecta tu vida.
+
+Si tienes alguna duda, sugerencia, queja o necesitas asistencia escríbenos a {{ support_email }} o llámanos al {{ support_phone }} sin costo alguno.

@@ -1,0 +1,75 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Confirmar eliminación de cuenta | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=7" />
+  </head>
+  <body class="app-body">
+    <div class="app-wrap">
+      <div class="app-card">
+        <header class="app-header">
+          <div class="app-brand">
+            <div class="app-logo" aria-hidden="true"></div>
+            <div>
+              <h1>Eliminar cuenta</h1>
+              <p>Confirmación de eliminación</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="app-content">
+          {% if error %}
+          <div class="app-panel">
+            <p class="app-alert show error" style="display: block">{{ error }}</p>
+            <p style="text-align: center; margin: 16px 0 0">
+              <a class="app-link" href="{% url 'go_windtv' %}">Volver a WindTV</a>
+            </p>
+          </div>
+          {% elif confirmed %}
+          <div class="app-panel">
+            <p class="app-alert show success" style="display: block">
+              {% if already_confirmed %}
+                Esta eliminación ya había sido confirmada.
+              {% else %}
+                Eliminación confirmada. Podés seguir usando tu cuenta con normalidad hasta la fecha programada.
+              {% endif %}
+            </p>
+            {% if scheduled_for %}
+            <p style="text-align: center; margin: 16px 0 0; color: #c8d6e5;">
+              Tu suscripción seguirá activa y tu cuenta se eliminará el
+              <strong>{{ scheduled_for }}</strong>.
+            </p>
+            {% else %}
+            <p style="text-align: center; margin: 16px 0 0; color: #c8d6e5;">
+              Tu cuenta quedó programada para eliminarse. Te avisaremos por correo cuando se complete.
+            </p>
+            {% endif %}
+            <p style="text-align: center; margin: 24px 0 0">
+              <a class="app-link" href="{% url 'go_windtv' %}">Ir a WindTV</a>
+            </p>
+          </div>
+          {% else %}
+          <div class="app-panel">
+            <p style="margin: 0 0 20px; color: #c8d6e5; text-align: center;">
+              Vas a confirmar la eliminación de tu cuenta de WindTV. Tu suscripción
+              seguirá activa hasta finalizar tu período de facturación actual; la
+              eliminación se ejecutará en esa fecha.
+            </p>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="t" value="{{ token }}" />
+              <button type="submit" class="app-btn primary">Confirmar eliminación</button>
+            </form>
+            <p style="text-align: center; margin: 16px 0 0">
+              <a class="app-link" href="{% url 'go_windtv' %}">Cancelar y volver a WindTV</a>
+            </p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

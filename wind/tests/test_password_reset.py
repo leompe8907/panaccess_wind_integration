@@ -56,6 +56,37 @@ class PasswordResetServiceTestCase(APITestCase):
         self.assertEqual(result["message"], GENERIC_FORGOT_MESSAGE)
         mock_task.delay.assert_not_called()
 
+    @patch("wind.tasks.send_password_reset_email_task")
+    def test_request_password_reset_with_app_origin_tags_the_link(self, mock_task):
+        # 2026-09-09: origin="app" viaja hasta el link del correo para que
+        # reset-password.html sepa, al terminar, si hay que volver a la
+        # app/windtv (ver wind/views.py::reset_password_view) en vez de
+        # quedarse en el login de prueba del backend.
+        request_password_reset(
+            self.email, "https://example.com/wind/reset-password/", origin="app"
+        )
+        args = mock_task.delay.call_args[0]
+        self.assertIn("origin=app", args[2])
+        self.assertIn("origin=app", args[3])
+
+    @patch("wind.tasks.send_password_reset_email_task")
+    def test_request_password_reset_without_origin_omits_flag(self, mock_task):
+        request_password_reset(self.email, "https://example.com/wind/reset-password/")
+        args = mock_task.delay.call_args[0]
+        self.assertNotIn("origin=", args[2])
+        self.assertNotIn("origin=", args[3])
+
+    @patch("wind.tasks.send_password_reset_email_task")
+    def test_request_password_reset_rejects_unknown_origin_value(self, mock_task):
+        # Solo "app" es un valor válido -- cualquier otra cosa se trata
+        # como si no hubiera venido nada (comportamiento de siempre).
+        request_password_reset(
+            self.email, "https://example.com/wind/reset-password/", origin="something-else"
+        )
+        args = mock_task.delay.call_args[0]
+        self.assertNotIn("origin=", args[2])
+        self.assertNotIn("origin=", args[3])
+
     @patch("wind.services.password_reset.reset_password_in_panaccess")
     @patch("wind.services.password_reset.mark_reset_token_used")
     def test_confirm_password_reset_success(self, mock_mark_used, mock_panaccess_reset):
@@ -136,6 +167,38 @@ class PasswordResetAPITestCase(APITestCase):
         self.assertIn("registrado", response.data["message"].lower())
         mock_task.delay.assert_called_once()
 
+    # Estas dos tests bypassean el throttle real (no es lo que se está
+    # probando acá, y el resto de esta clase ya usa el margen del límite de
+    # 5/hour compartido entre forgot/confirm -- ver
+    # test_forgot_api_throttled_message_is_friendly para el mismo patrón).
+    @patch.object(PasswordResetThrottle, "allow_request", return_value=True)
+    @patch("wind.tasks.send_password_reset_email_task")
+    def test_forgot_api_passes_through_app_origin(self, mock_task, mock_allow):
+        response = self.client.post(
+            self.forgot_url,
+            data=json.dumps({"email": self.email, "origin": "app"}),
+            content_type="application/json",
+            HTTP_HOST="testserver",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        args = mock_task.delay.call_args[0]
+        self.assertIn("origin=app", args[2])
+
+    @patch.object(PasswordResetThrottle, "allow_request", return_value=True)
+    @patch("wind.tasks.send_password_reset_email_task")
+    def test_forgot_api_ignores_unrecognized_origin_value(self, mock_task, mock_allow):
+        # Allowlist de un solo valor a propósito (ver password_forgot_view):
+        # cualquier cosa que no sea exactamente "app" se descarta.
+        response = self.client.post(
+            self.forgot_url,
+            data=json.dumps({"email": self.email, "origin": "<script>evil</script>"}),
+            content_type="application/json",
+            HTTP_HOST="testserver",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        args = mock_task.delay.call_args[0]
+        self.assertNotIn("origin=", args[2])
+
     @patch("wind.tasks.send_password_reset_email_task")
     def test_forgot_api_unknown_email_same_response(self, mock_task):
         response = self.client.post(
@@ -215,3 +278,48 @@ class PasswordResetThrottleMessageTestCase(APITestCase):
         self.assertEqual(response.data["error_type"], "Throttled")
         self.assertNotIn("throttled", response.data["message"].lower())
         self.assertIn("31 minutos", response.data["message"])
+
+
+class ForgotResetPasswordPagesOriginTestCase(APITestCase):
+    """
+    2026-09-09: `?origin=app` viaja de forgot-password.html hasta
+    reset-password.html (vía el link firmado del correo, ver
+    request_password_reset) para que, al terminar de poner la contraseña
+    nueva, la página sepa si hay que volver a la app/windtv o quedarse en
+    el backend. Ver docs/REDIRECT_OLVIDAR_CONTRASENA_2026-09-09.md.
+    """
+
+    def setUp(self):
+        self.email = "origin.page@example.com"
+        self.subscriber_code = "WND0300"
+        SubscriberEmailRegistry.objects.create(
+            email=self.email,
+            subscriber_code=self.subscriber_code,
+        )
+
+    def test_forgot_password_page_passes_through_app_origin(self):
+        response = self.client.get(reverse("forgot_password"), {"origin": "app"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('const ORIGIN = "app"', response.content.decode())
+
+    def test_forgot_password_page_defaults_to_empty_origin(self):
+        response = self.client.get(reverse("forgot_password"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('const ORIGIN = ""', response.content.decode())
+
+    def test_forgot_password_page_ignores_unrecognized_origin(self):
+        response = self.client.get(reverse("forgot_password"), {"origin": "anything"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('const ORIGIN = ""', response.content.decode())
+
+    def test_reset_password_page_passes_through_app_origin(self):
+        token = build_reset_token(self.subscriber_code, self.email)
+        response = self.client.get(reverse("reset_password"), {"t": token, "origin": "app"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('const ORIGIN = "app";', response.content.decode())
+
+    def test_reset_password_page_defaults_to_empty_origin(self):
+        token = build_reset_token(self.subscriber_code, self.email)
+        response = self.client.get(reverse("reset_password"), {"t": token})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('const ORIGIN = "";', response.content.decode())

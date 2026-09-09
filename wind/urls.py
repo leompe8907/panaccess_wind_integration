@@ -28,6 +28,7 @@ from wind.views import (
     forgot_password_view,
     reset_password_view,
     delete_account_info_view,
+    delete_account_confirm_view,
     RequestUDIDManualView,
     ValidateAndAssociateUDIDView,
     AssociateUDIDByAccountView,
@@ -67,6 +68,9 @@ urlpatterns = [
     path('forgot-password/', forgot_password_view, name='forgot_password'),
     path('reset-password/', reset_password_view, name='reset_password'),
     path('eliminar-cuenta/', delete_account_info_view, name='delete_account_info'),
+    # Confirmación por correo del nuevo flujo de eliminación (2026-09-08) --
+    # ver wind.views.delete_account_confirm_view.
+    path('eliminar-cuenta/confirmar/', delete_account_confirm_view, name='delete_account_confirm'),
     
     # Operaciones PanAccess (staff)
     path('ops/panaccess-session/', panaccess_session_status_view, name='panaccess_session'),

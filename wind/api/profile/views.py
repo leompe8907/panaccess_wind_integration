@@ -7,7 +7,11 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from wind.api.profile.serializers import ProfilePasswordSerializer, ProfileCloseAccountSerializer
+from wind.api.profile.serializers import (
+    ProfilePasswordSerializer,
+    ProfileCloseAccountSerializer,
+    ProfileRequestAccountDeletionSerializer,
+)
 from wind.exceptions import (
     PanAccessException,
     PanAccessAPIError,
@@ -314,6 +318,75 @@ def profile_subscriber_view(request):
             "subscriber": detail,
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsOwnerSubscriber])
+@throttle_classes([ProfileThrottle])
+def profile_request_account_deletion_view(request):
+    """
+    Nuevo flujo de eliminación de cuenta (2026-09-08, pedido del cliente):
+    en vez de cerrar la cuenta al toque como profile_close_account_view
+    (que sigue existiendo, sin cambios, para cierre inmediato/uso interno),
+    esto solo manda un correo de confirmación. Nada se ejecuta hasta que el
+    usuario hace click en el enlace (wind.views.delete_account_confirm_view)
+    y, aún así, la desaprovisión real en PanAccess queda diferida hasta la
+    fecha de corte de la suscripción -- ver wind/services/account_deletion.py.
+
+    Llamar de nuevo con el mismo `code` mientras haya una solicitud sin
+    confirmar reenvía el correo (mismo botón "Reenviar correo" del mockup),
+    no crea una segunda solicitud.
+    """
+    if not FeatureConfig.CLOSE_SUBSCRIBER_DASHBOARD_ENABLED:
+        return Response(
+            {
+                "success": False,
+                "message": "La eliminación de cuenta desde el dashboard está deshabilitada.",
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ser = ProfileRequestAccountDeletionSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response(
+            {"success": False, "errors": ser.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    code = ser.validated_data["code"].strip()
+    reason = (ser.validated_data.get("reason") or "").strip() or "user_app_delete_request"
+
+    from wind.services.account_deletion import request_account_deletion
+
+    try:
+        result = request_account_deletion(code, requested_by=request.user, reason=reason)
+        http_status = status.HTTP_200_OK if result.get("success") else status.HTTP_400_BAD_REQUEST
+        return Response(result, status=http_status)
+    except Exception:
+        logger.exception("Error en profile_request_account_deletion_view para %s", code)
+        return Response(
+            {
+                "success": False,
+                "message": "Ocurrió un error inesperado al solicitar la eliminación. Intenta de nuevo.",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["POST"])

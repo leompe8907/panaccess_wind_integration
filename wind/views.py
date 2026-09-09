@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import render
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from asgiref.sync import async_to_sync
@@ -1116,6 +1116,19 @@ def go_windtv_view(request):
     No requiere sesión ni parámetros -- es un simple router por
     User-Agent, pensado para ponerse detrás de un solo link estable
     (`/wind/go/windtv/`) que no cambia aunque cambien las URLs de destino.
+
+    CORREGIDO (2026-09-08): el caso Android generaba el `Location` con
+    `HttpResponseRedirect`, que valida el esquema contra
+    `allowed_schemes = ["http", "https", "ftp"]` (`HttpResponseRedirectBase`
+    de Django) y rechaza cualquier otro con `DisallowedRedirect` -- por eso
+    el hallazgo de logs de esta semana "Unsafe redirect to URL with
+    protocol 'intent'" (el esquema `intent://` nunca iba a pasar esa
+    validación). Nunca funcionó en producción: cualquier usuario Android
+    que tocara este link recibía un 500 en vez de abrir la app o caer al
+    fallback de Play Store. Se arma la respuesta a mano con `HttpResponse`
+    + `Location`, que no pasa por esa validación de esquema (el fallback
+    `S.browser_fallback_url` sigue intacto para cuando la app no está
+    instalada).
     """
     ua = request.META.get("HTTP_USER_AGENT", "").lower()
 
@@ -1130,7 +1143,9 @@ def go_windtv_view(request):
             f"S.browser_fallback_url={quote(play_store_url, safe='')};"
             "end"
         )
-        return HttpResponseRedirect(intent_url)
+        response = HttpResponse(status=302)
+        response["Location"] = intent_url
+        return response
 
     # iOS (sin app publicada todavía) y cualquier otra plataforma -> web.
     return HttpResponseRedirect(EmailConfig.WINDTV_WEB_URL)
@@ -1240,13 +1255,24 @@ def credentials_view(request):
 
 @ensure_csrf_cookie
 def forgot_password_view(request):
-    """Página para solicitar recuperación de contraseña por correo."""
+    """
+    Página para solicitar recuperación de contraseña por correo.
+
+    `?origin=app` (2026-09-09, ver docs/REDIRECT_OLVIDAR_CONTRASENA_2026-09-09.md):
+    esta misma página la usan tanto alguien que entra directo al backend
+    como los flujos que arrancan en la app (QR de TV, redirect de PC sin
+    modal nativo) -- se reenvía tal cual al pedir el enlace para que el
+    correo final sepa si al terminar hay que volver a la app/windtv o
+    quedarse en el backend (ver reset_password_view).
+    """
     from appConfig import RecaptchaConfig
+
+    origin = "app" if request.GET.get("origin") == "app" else ""
 
     return render(
         request,
         "wind/forgot-password.html",
-        {"recaptcha_site_key": RecaptchaConfig.SITE_KEY},
+        {"recaptcha_site_key": RecaptchaConfig.SITE_KEY, "origin": origin},
     )
 
 
@@ -1262,6 +1288,86 @@ def delete_account_info_view(request):
             "retention_years": 5,
         },
     )
+
+
+def delete_account_confirm_view(request):
+    """
+    Confirmación por correo de una solicitud de eliminación de cuenta
+    (nuevo flujo, 2026-09-08 -- ver wind/services/account_deletion.py).
+
+    GET: valida el token y muestra la página con el botón de confirmar (o
+    el estado de error correspondiente si el enlace ya no sirve).
+    POST: ejecuta la confirmación real -- NO corta el acceso (corregido
+    2026-09-09, ver wind/services/account_deletion.py::confirm_account_deletion):
+    la cuenta sigue activa y usable con normalidad, solo queda programado el
+    cierre real para la fecha de corte de la suscripción.
+
+    A diferencia de reset_password_view/password_reset_confirm_view (que
+    separan la página HTML de un endpoint JSON aparte porque hay que
+    recolectar la contraseña nueva), acá no hace falta pedir nada más que
+    el click -- un único view con GET/POST simple alcanza, con
+    {% csrf_token %} normal en vez de una API DRF.
+    """
+    from django.core.signing import BadSignature, SignatureExpired
+    from wind.services.account_deletion import confirm_account_deletion, parse_deletion_token
+
+    if request.method == "POST":
+        token = request.POST.get("t", "")
+        if not token:
+            return render(
+                request,
+                "wind/delete-account-confirm.html",
+                {"error": "Enlace inválido o incompleto."},
+                status=400,
+            )
+
+        result = confirm_account_deletion(token)
+        if not result.get("success"):
+            error_status = 400 if result.get("error_type") in ("TokenExpired", "InvalidToken") else 500
+            return render(
+                request,
+                "wind/delete-account-confirm.html",
+                {"error": result.get("message", "No se pudo confirmar la eliminación.")},
+                status=error_status,
+            )
+
+        return render(
+            request,
+            "wind/delete-account-confirm.html",
+            {
+                "confirmed": True,
+                "already_confirmed": result.get("already_confirmed", False),
+                "scheduled_for": result.get("scheduled_for"),
+            },
+        )
+
+    token = request.GET.get("t", "")
+    if not token:
+        return render(
+            request,
+            "wind/delete-account-confirm.html",
+            {"error": "Enlace inválido o incompleto."},
+            status=400,
+        )
+
+    try:
+        parse_deletion_token(token)
+    except SignatureExpired:
+        return render(
+            request,
+            "wind/delete-account-confirm.html",
+            {"error": "Este enlace expiró. Solicita la eliminación de nuevo desde la app."},
+            status=400,
+        )
+    except BadSignature:
+        return render(
+            request,
+            "wind/delete-account-confirm.html",
+            {"error": "Enlace inválido o incompleto."},
+            status=400,
+        )
+
+    return render(request, "wind/delete-account-confirm.html", {"token": token})
 
 
 @ensure_csrf_cookie
@@ -1311,9 +1417,11 @@ def reset_password_view(request):
 
     from appConfig import RecaptchaConfig
 
+    origin = "app" if request.GET.get("origin") == "app" else ""
+
     return render(
         request,
         "wind/reset-password.html",
-        {"token": token, "recaptcha_site_key": RecaptchaConfig.SITE_KEY},
+        {"token": token, "recaptcha_site_key": RecaptchaConfig.SITE_KEY, "origin": origin},
     )
 

@@ -109,6 +109,97 @@ def _revoke_udid_requests(subscriber_code: str) -> int:
     ).update(status="revoked", revoked_at=now, revoked_reason="account_closed")
 
 
+def cut_subscriber_access_and_tombstone(
+    subscriber_code: str, *, existing_subscriber: ListOfSubscriber | None = None
+) -> tuple[ListOfSubscriber, int | None, int | None]:
+    """
+    Corta el acceso YA (desactiva User/JWT, revoca UDID y DeviceSession) y
+    deja un tombstone PENDING_CLOSURE -- sin tocar todavía PanAccess.
+
+    Extraído de close_subscriber_account() (2026-09-08) para reusarlo desde
+    confirm_account_deletion(): el nuevo flujo de "eliminar cuenta" corta el
+    acceso al confirmar el correo, pero difiere la desaprovisión real en
+    PanAccess hasta la fecha de corte de la suscripción (ver
+    wind/services/account_deletion.py) -- necesita exactamente esta mitad
+    de lo que ya hacía close_subscriber_account, sin la otra mitad
+    (PanAccess + borrado de datos operativos + status CLOSED).
+
+    Todos los comentarios originales de por qué cada paso corre en este
+    orden y antes de PanAccess siguen aplicando igual acá.
+    """
+    subscriber = (
+        existing_subscriber
+        if existing_subscriber is not None
+        else ListOfSubscriber.objects.filter(code=subscriber_code).first()
+    )
+
+    # Tombstone de entrada, ANTES de llamar a PanAccess: protege la fila
+    # local durante todo el tiempo que tarde la desaprovisión (que puede
+    # ser varios pasos/segundos), incluso si el suscriptor nunca se
+    # habia sincronizado localmente antes. Sin esto, un
+    # periodic_sync_pipeline_task/full_sync_task que corriera justo en
+    # esa ventana podia insertar/refrescar la fila como "active" con
+    # datos de PanAccess mientras el cierre real todavia estaba en
+    # curso (_is_closure_tombstone solo protege status
+    # CLOSED/PENDING_CLOSURE, y antes de este cambio esa marca no
+    # existia hasta el final del proceso cuando no habia fila previa).
+    if subscriber:
+        if subscriber.status != ListOfSubscriber.STATUS_PENDING_CLOSURE:
+            subscriber.status = ListOfSubscriber.STATUS_PENDING_CLOSURE
+            subscriber.save(update_fields=["status"])
+    else:
+        subscriber, _ = ListOfSubscriber.objects.update_or_create(
+            code=subscriber_code,
+            defaults={
+                "id": subscriber_code,
+                "status": ListOfSubscriber.STATUS_PENDING_CLOSURE,
+            },
+        )
+
+    # Igual que el tombstone de arriba: se corta el acceso al portal
+    # DE UNA VEZ, antes de llamar a PanAccess -- no solo si la
+    # desaprovisión termina en éxito completo más abajo. Antes,
+    # `_deactivate_portal_users` solo corría tras un cierre 100%
+    # exitoso; si PanAccess fallaba o quedaba parcial, el `User` seguía
+    # activo y CUALQUIER sesión ya logueada (JWT emitido antes de este
+    # cierre) seguía entrando al dashboard con normalidad, aunque el
+    # abonado ya estuviera en PENDING_CLOSURE localmente (auditoría,
+    # sección 17/21/22 -- confirmado en la práctica por el cliente: el
+    # perfil devolvía 404 "sin suscriptor vinculado" pero el dashboard
+    # seguía cargando, señal de que la sesión seguía autenticando bien).
+    _deactivate_portal_users(subscriber_code)
+
+    # Auditoría (segunda ronda): _revoke_udid_requests y la revocación
+    # de DeviceSession (Fase 3/4) vivían más abajo, condicionadas a que
+    # la desaprovisión en PanAccess terminara en éxito completo -- el
+    # mismo hueco que la sección 22 ya había cerrado para
+    # _deactivate_portal_users/JWT. Un cierre que queda PARTIAL (ver
+    # sección 11: es un estado normal, no raro) dejaba pareos UDID y
+    # dispositivos vinculados activos indefinidamente, sin aviso. Se
+    # mueven acá, junto al resto del corte de acceso inmediato --
+    # revocar dos veces (acá y si el flujo llega al final) sería
+    # inofensivo (son operaciones idempotentes), pero se guardan los
+    # conteos acá y NO se repite la llamada más abajo, para no
+    # confundir logs con revocaciones duplicadas.
+    # Ninguna de las dos debe poder tumbar el cierre completo si falla
+    # -- son un efecto colateral de seguridad, no el objetivo principal
+    # de este request.
+    try:
+        udid_revoked_count = _revoke_udid_requests(subscriber_code)
+    except Exception:
+        logger.exception("Error revocando UDIDAuthRequest de %s durante cierre de cuenta", subscriber_code)
+        udid_revoked_count = None
+    try:
+        device_sessions_revoked_count = revoke_all_device_sessions_for_subscriber(
+            subscriber_code, reason="account_closed"
+        )
+    except Exception:
+        logger.exception("Error revocando DeviceSession de %s durante cierre de cuenta", subscriber_code)
+        device_sessions_revoked_count = None
+
+    return subscriber, udid_revoked_count, device_sessions_revoked_count
+
+
 def close_subscriber_account(
     subscriber_code: str,
     *,
@@ -134,69 +225,9 @@ def close_subscriber_account(
         }
 
     if not dry_run:
-        # Tombstone de entrada, ANTES de llamar a PanAccess: protege la fila
-        # local durante todo el tiempo que tarde la desaprovisión (que puede
-        # ser varios pasos/segundos), incluso si el suscriptor nunca se
-        # habia sincronizado localmente antes. Sin esto, un
-        # periodic_sync_pipeline_task/full_sync_task que corriera justo en
-        # esa ventana podia insertar/refrescar la fila como "active" con
-        # datos de PanAccess mientras el cierre real todavia estaba en
-        # curso (_is_closure_tombstone solo protege status
-        # CLOSED/PENDING_CLOSURE, y antes de este cambio esa marca no
-        # existia hasta el final del proceso cuando no habia fila previa).
-        if subscriber:
-            if subscriber.status != ListOfSubscriber.STATUS_PENDING_CLOSURE:
-                subscriber.status = ListOfSubscriber.STATUS_PENDING_CLOSURE
-                subscriber.save(update_fields=["status"])
-        else:
-            subscriber, _ = ListOfSubscriber.objects.update_or_create(
-                code=subscriber_code,
-                defaults={
-                    "id": subscriber_code,
-                    "status": ListOfSubscriber.STATUS_PENDING_CLOSURE,
-                },
-            )
-
-        # Igual que el tombstone de arriba: se corta el acceso al portal
-        # DE UNA VEZ, antes de llamar a PanAccess -- no solo si la
-        # desaprovisión termina en éxito completo más abajo. Antes,
-        # `_deactivate_portal_users` solo corría tras un cierre 100%
-        # exitoso; si PanAccess fallaba o quedaba parcial, el `User` seguía
-        # activo y CUALQUIER sesión ya logueada (JWT emitido antes de este
-        # cierre) seguía entrando al dashboard con normalidad, aunque el
-        # abonado ya estuviera en PENDING_CLOSURE localmente (auditoría,
-        # sección 17/21/22 -- confirmado en la práctica por el cliente: el
-        # perfil devolvía 404 "sin suscriptor vinculado" pero el dashboard
-        # seguía cargando, señal de que la sesión seguía autenticando bien).
-        _deactivate_portal_users(subscriber_code)
-
-        # Auditoría (segunda ronda): _revoke_udid_requests y la revocación
-        # de DeviceSession (Fase 3/4) vivían más abajo, condicionadas a que
-        # la desaprovisión en PanAccess terminara en éxito completo -- el
-        # mismo hueco que la sección 22 ya había cerrado para
-        # _deactivate_portal_users/JWT. Un cierre que queda PARTIAL (ver
-        # sección 11: es un estado normal, no raro) dejaba pareos UDID y
-        # dispositivos vinculados activos indefinidamente, sin aviso. Se
-        # mueven acá, junto al resto del corte de acceso inmediato --
-        # revocar dos veces (acá y si el flujo llega al final) sería
-        # inofensivo (son operaciones idempotentes), pero se guardan los
-        # conteos acá y NO se repite la llamada más abajo, para no
-        # confundir logs con revocaciones duplicadas.
-        # Ninguna de las dos debe poder tumbar el cierre completo si falla
-        # -- son un efecto colateral de seguridad, no el objetivo principal
-        # de este request.
-        try:
-            udid_revoked_count = _revoke_udid_requests(subscriber_code)
-        except Exception:
-            logger.exception("Error revocando UDIDAuthRequest de %s durante cierre de cuenta", subscriber_code)
-            udid_revoked_count = None
-        try:
-            device_sessions_revoked_count = revoke_all_device_sessions_for_subscriber(
-                subscriber_code, reason="account_closed"
-            )
-        except Exception:
-            logger.exception("Error revocando DeviceSession de %s durante cierre de cuenta", subscriber_code)
-            device_sessions_revoked_count = None
+        subscriber, udid_revoked_count, device_sessions_revoked_count = cut_subscriber_access_and_tombstone(
+            subscriber_code, existing_subscriber=subscriber
+        )
     else:
         udid_revoked_count = None
         device_sessions_revoked_count = None
@@ -263,7 +294,14 @@ def close_subscriber_account(
     subscriber.status = ListOfSubscriber.STATUS_CLOSED
     subscriber.closed_at = closed_at
     subscriber.closed_reason = reason or ""
-    subscriber.save(update_fields=["smartcards", "status", "closed_at", "closed_reason"])
+    # Limpieza de dato (no afecta el filtro de retry_partial_closures_task,
+    # que ya excluye todo lo que no sea PENDING_CLOSURE): si este cierre
+    # venía de una eliminación programada, no dejar una fecha de corte
+    # "fantasma" en una fila que ya terminó CLOSED.
+    subscriber.scheduled_closure_at = None
+    subscriber.save(
+        update_fields=["smartcards", "status", "closed_at", "closed_reason", "scheduled_closure_at"]
+    )
 
     local_result["registry"] = _mark_registry_closed(subscriber_code, closed_at)
     local_result["users_deactivated"] = _deactivate_portal_users(subscriber_code)

@@ -166,9 +166,21 @@ def sync_password_locally(subscriber_code: str, email: str, new_pass: str) -> No
         logger.warning("No se pudo encolar el aviso de contraseña actualizada para %s", email, exc_info=True)
 
 
-def request_password_reset(email: str, reset_page_url: str) -> dict:
+def request_password_reset(email: str, reset_page_url: str, *, origin: str = "") -> dict:
     """
     Solicita recuperación. Siempre devuelve mensaje genérico (no revela si el email existe).
+
+    `origin` (2026-09-09): banderita opcional, sin firmar, que solo decide a
+    dónde termina el flujo -- ver reset_password_view/reset-password.html.
+    "app" significa que el pedido vino de la app (modal nativo, QR de TV, o
+    el redirect de PC sin modal nativo -- los tres terminan en esta misma
+    página web para poner la contraseña nueva, no hay forma de evitarlo);
+    en ese caso, al terminar hay que volver a la app/windtv en vez de
+    quedarse en el login de prueba del backend. Vacío/cualquier otro valor
+    = comportamiento de siempre (alguien entró directo a esta página del
+    backend, sin pasar por la app -- se queda acá). No se firma porque no
+    hay nada sensible en juego: en el peor caso, alguien fuerza el valor y
+    el único efecto es terminar en una pantalla en vez de otra.
     """
     email_norm = normalize_email(email)
     registry = SubscriberEmailRegistry.objects.filter(email__iexact=email_norm).first()
@@ -187,6 +199,8 @@ def request_password_reset(email: str, reset_page_url: str) -> dict:
         token = build_reset_token(subscriber_code, email_norm)
         separator = "&" if "?" in reset_page_url else "?"
         reset_link = f"{reset_page_url}{separator}t={token}"
+        if origin == "app":
+            reset_link = f"{reset_link}&origin=app"
         try:
             from wind.services.password_reset_email import enqueue_password_reset_email
 

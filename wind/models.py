@@ -76,6 +76,18 @@ class ListOfSubscriber(models.Model):
     # se deja de reintentar automáticamente y se manda una alerta.
     closure_retry_count = models.PositiveIntegerField(default=0)
 
+    # Cierre programado (2026-09-08, pedido del cliente): "si decide
+    # eliminar hoy pero le quedan 5 días de uso, debería esperar esos 5
+    # días para que se ejecute". Se completa al confirmar por correo la
+    # solicitud de eliminación (ver wind/services/account_deletion.py) con
+    # la fecha de corte de la suscripción (normalmente lastExpiryTime).
+    # NULL = sin restricción (comportamiento de siempre: si está en
+    # PENDING_CLOSURE, retry_partial_closures_task lo reintenta apenas
+    # corre). Con fecha futura, ese mismo task salta la fila hasta que
+    # llegue -- no hizo falta una tarea nueva, solo este filtro extra (ver
+    # wind.tasks.retry_partial_closures_task).
+    scheduled_closure_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     # Estado de aprovisionamiento tras addSubscriber (auditoría: "fallos
     # parciales no abortan el registro" -- create_subscriber.py/
     # finish_subscriber_provisioning_task pueden terminar sin agregar
@@ -466,6 +478,49 @@ class SubscriberClosureLog(models.Model):
 
     def __str__(self):
         return f"Closure {self.subscriber_code} ({self.status})"
+
+
+class AccountDeletionRequest(models.Model):
+    """
+    Solicitud de eliminación de cuenta iniciada desde la app (2026-09-08,
+    nuevo flujo pedido por el cliente): a diferencia del cierre directo que
+    ya existía (`close_subscriber_account`, todavía disponible para uso
+    interno/staff), esta solicitud no toca nada hasta que el usuario
+    confirma por un enlace de correo (24h de vigencia) -- ver
+    wind/services/account_deletion.py.
+
+    Esta fila solo cubre el tramo "se mandó el correo, todavía no se hizo
+    click". Una vez confirmada (`confirmed_at` seteado), el resto del
+    estado vive donde ya vivía antes de este cambio: ListOfSubscriber
+    (status=PENDING_CLOSURE + scheduled_closure_at) y, cuando
+    retry_partial_closures_task lo ejecute de verdad en la fecha de corte,
+    SubscriberClosureLog. No hace falta duplicar esos estados acá.
+    """
+
+    subscriber_code = models.CharField(max_length=100, db_index=True)
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="account_deletion_requests",
+    )
+    reason = models.TextField(blank=True, default="")
+    requested_at = models.DateTimeField(auto_now_add=True)
+    # Se re-firma un token nuevo (24h) en cada "reenviar correo", pero es la
+    # misma fila -- no se crea una solicitud duplicada por subscriber_code
+    # mientras haya una sin confirmar (ver request_account_deletion()).
+    last_email_sent_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["subscriber_code", "confirmed_at"]),
+        ]
+
+    def __str__(self):
+        state = "confirmada" if self.confirmed_at else "pendiente de confirmar"
+        return f"AccountDeletionRequest {self.subscriber_code} ({state})"
 
 
 class PasswordResetTokenUse(models.Model):

@@ -28,6 +28,19 @@ class ProfilePasswordSerializer(serializers.Serializer):
         return value
 
 
+class ProfileRequestAccountDeletionSerializer(serializers.Serializer):
+    """
+    Nuevo flujo de eliminación (2026-09-08): a diferencia de
+    ProfileCloseAccountSerializer (todavía disponible, cierre inmediato),
+    acá no se pide escribir el código para confirmar -- la confirmación
+    real es el enlace que llega por correo. La fricción ("¿estás seguro?")
+    la maneja la UI antes de llamar a este endpoint.
+    """
+
+    code = serializers.CharField(max_length=100)
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
 class ProfileCloseAccountSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=100)
     confirm = serializers.CharField(max_length=100)

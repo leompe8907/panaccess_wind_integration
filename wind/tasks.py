@@ -804,13 +804,20 @@ def finish_subscriber_provisioning_task(
 @shared_task(bind=True)
 def retry_partial_closures_task(self):
     """
-    Reintenta cierres de cuenta que quedaron a medias en PanAccess
-    (ListOfSubscriber.status == PENDING_CLOSURE, nunca llegó a CLOSED).
+    Ejecuta cierres de cuenta pendientes: tanto reintentos de cierres que
+    quedaron a medias en PanAccess (status PENDING_CLOSURE, nunca llegó a
+    CLOSED) como la PRIMERA ejecución real de una eliminación programada
+    (status ACTIVE con scheduled_closure_at ya vencido -- ver
+    wind/services/account_deletion.py::confirm_account_deletion, corregido
+    2026-09-09: confirmar el correo ya NO corta el acceso ni cambia el
+    status, solo programa la fecha; el abonado sigue ACTIVE y usable hasta
+    que este task ejecute el cierre real en la fecha de corte).
 
     close_subscriber_account ya es idempotente (deja un tombstone
-    PENDING_CLOSURE desde el primer intento, y solo pasa a CLOSED si
-    PanAccess responde success), así que reintentar es simplemente volver a
-    llamarlo. Cada suscriptor lleva su propio contador
+    PENDING_CLOSURE desde el primer intento -- sea que venga de acá o de un
+    cierre inmediato manual -- y solo pasa a CLOSED si PanAccess responde
+    success), así que tanto "reintentar" como "ejecutar por primera vez" son
+    la misma llamada. Cada suscriptor lleva su propio contador
     (closure_retry_count); al llegar a CLOSURE_RETRY_MAX_ATTEMPTS se deja de
     reintentar automáticamente y se manda una alerta por correo para que
     alguien lo revise a mano.
@@ -822,10 +829,32 @@ def retry_partial_closures_task(self):
     if not CeleryConfig.CLOSURE_RETRY_ENABLED:
         return {"success": True, "skipped": True, "message": "CLOSURE_RETRY_ENABLED=false"}
 
+    from django.db.models import Q
+
     max_attempts = CeleryConfig.CLOSURE_RETRY_MAX_ATTEMPTS
-    stuck = ListOfSubscriber.objects.filter(
-        status=ListOfSubscriber.STATUS_PENDING_CLOSURE,
-        closure_retry_count__lt=max_attempts,
+    now = timezone.now()
+    stuck = ListOfSubscriber.objects.filter(closure_retry_count__lt=max_attempts).filter(
+        # Dos casos, unidos por OR:
+        #  1. PENDING_CLOSURE: cierre (inmediato o programado) que ya
+        #     arrancó pero quedó a medias en PanAccess -- reintento puro.
+        #     Sigue respetando scheduled_closure_at si está en el futuro:
+        #     aunque en el flujo normal un PENDING_CLOSURE solo se crea
+        #     cuando ya tocaba ejecutar (scheduled_closure_at nulo o
+        #     vencido), esto protege un caso borde -- un cierre inmediato
+        #     manual disparado sobre un abonado que YA tenía una
+        #     eliminación programada a futuro podría dejarlo en
+        #     PENDING_CLOSURE con esa fecha todavía vigente si PanAccess
+        #     falla a medias; sin este chequeo se ejecutaría antes de
+        #     tiempo en el próximo ciclo.
+        #  2. ACTIVE con scheduled_closure_at vencido: eliminación
+        #     confirmada por el usuario (ver confirm_account_deletion) que
+        #     todavía no se ejecutó nunca -- este es el disparador real de
+        #     la PRIMERA ejecución. Si scheduled_closure_at es futuro (o
+        #     null, i.e. abonado normal sin ninguna eliminación en curso),
+        #     no se toca.
+        Q(status=ListOfSubscriber.STATUS_PENDING_CLOSURE)
+        & (Q(scheduled_closure_at__isnull=True) | Q(scheduled_closure_at__lte=now))
+        | Q(status=ListOfSubscriber.STATUS_ACTIVE, scheduled_closure_at__isnull=False, scheduled_closure_at__lte=now)
     )
 
     retried = []
@@ -1194,6 +1223,37 @@ def send_password_reset_email_task(self, email, subject, text_body, html_body):
         return {"success": True, "email": email}
     except Exception as exc:
         logger.exception("Error al enviar email de recuperación a %s", email)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_account_deletion_confirmation_email_task(self, email, subject, text_body, html_body):
+    """
+    Envía el correo de confirmación de eliminación de cuenta (ver
+    wind/services/account_deletion_email.py y
+    wind/services/account_deletion.py::request_account_deletion). Mismo
+    patrón de reintento que send_password_reset_email_task.
+    """
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    logger.info("Enviando email de confirmación de eliminación de cuenta a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Email de confirmación de eliminación enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as exc:
+        logger.exception("Error al enviar email de confirmación de eliminación a %s", email)
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
