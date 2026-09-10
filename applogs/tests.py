@@ -3,20 +3,24 @@ Cobertura de tests para `applogs` (logs de diagnóstico para desarrolladores)
 -- ver docs/LOGS_DIAGNOSTICO_2026-09-01.md. No es telemetría de negocio ni
 auditoría de seguridad (ver `applogs/apps.py`).
 """
+import logging
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
+from applogs.logging_handler import DiagnosticsLogHandler
 from applogs.models import LogEvent, LogIssue
 from applogs.services import compute_fingerprint, record_log_event
 from applogs.tasks import purge_old_log_events_task
+from wind.middleware.request_context_middleware import RequestContextMiddleware
 from wind.models import SubscriberEmailRegistry
+from wind.utils.request_context import get_current_client_ip, reset_current_client_ip, set_current_client_ip
 
 User = get_user_model()
 
@@ -207,6 +211,110 @@ class RecordLogEventServiceTestCase(TestCase):
             record_log_event(platform=LogIssue.PLATFORM_WEB, message="algo se rompió")
 
         self.assertEqual(len(mail.outbox), 0)
+
+
+class RequestContextClientIpTestCase(TestCase):
+    """`wind.utils.request_context` -- ver docs/IP_ERRORES_BACKEND_2026-09-10.md."""
+
+    def test_set_and_reset_current_client_ip(self):
+        self.assertIsNone(get_current_client_ip())
+
+        token = set_current_client_ip("203.0.113.5")
+        self.assertEqual(get_current_client_ip(), "203.0.113.5")
+
+        reset_current_client_ip(token)
+        self.assertIsNone(get_current_client_ip())
+
+    def test_reset_with_none_token_is_a_noop(self):
+        reset_current_client_ip(None)  # no debe lanzar
+        self.assertIsNone(get_current_client_ip())
+
+    def test_set_with_falsy_ip_stores_none(self):
+        token = set_current_client_ip("")
+        self.assertIsNone(get_current_client_ip())
+        reset_current_client_ip(token)
+
+
+class RequestContextMiddlewareTestCase(TestCase):
+    def test_middleware_sets_ip_during_request_and_resets_after(self):
+        captured = {}
+
+        def get_response(request):
+            captured["ip_during_request"] = get_current_client_ip()
+            return "ok-response"
+
+        middleware = RequestContextMiddleware(get_response)
+        request = RequestFactory().get("/", REMOTE_ADDR="198.51.100.7")
+
+        result = middleware(request)
+
+        self.assertEqual(result, "ok-response")
+        self.assertEqual(captured["ip_during_request"], "198.51.100.7")
+        # Se restaura al valor anterior (None) apenas termina la request.
+        self.assertIsNone(get_current_client_ip())
+
+    def test_middleware_resets_even_if_get_response_raises(self):
+        def get_response(request):
+            raise RuntimeError("boom")
+
+        middleware = RequestContextMiddleware(get_response)
+        request = RequestFactory().get("/", REMOTE_ADDR="198.51.100.9")
+
+        with self.assertRaises(RuntimeError):
+            middleware(request)
+
+        self.assertIsNone(get_current_client_ip())
+
+
+@patch("appConfig.AppLogsConfig.BACKEND_CAPTURE_ENABLED", True)
+class DiagnosticsLogHandlerClientIpTestCase(TestCase):
+    """
+    Antes de este fix, `LogEvent.client_ip` quedaba siempre `NULL` para
+    errores de plataforma `backend` (ej. el "Login fallido" que loguea
+    `wind/utils/panaccess_auth.py`) porque el handler de logging no tenía
+    forma de saber qué request lo disparó. Ver
+    docs/IP_ERRORES_BACKEND_2026-09-10.md.
+    """
+
+    def setUp(self):
+        self.handler = DiagnosticsLogHandler()
+        self.logger = logging.getLogger("applogs.tests.diagnostics_probe")
+        self.logger.addHandler(self.handler)
+        self.logger.propagate = False
+        self.addCleanup(self.logger.removeHandler, self.handler)
+
+    def test_backend_error_captures_ip_from_context(self):
+        token = set_current_client_ip("192.0.2.99")
+        try:
+            self.logger.error("boom desde un contexto con IP conocida")
+        finally:
+            reset_current_client_ip(token)
+
+        event = LogEvent.objects.get()
+        self.assertEqual(event.client_ip, "192.0.2.99")
+        self.assertEqual(event.issue.platform, LogIssue.PLATFORM_BACKEND)
+
+    def test_backend_error_without_request_context_leaves_ip_null(self):
+        """Ej. una excepción logueada desde una tarea Celery, sin request de por medio."""
+        self.logger.error("boom sin ningún request/conexión en curso")
+
+        event = LogEvent.objects.get()
+        self.assertIsNone(event.client_ip)
+
+    def test_middleware_plus_handler_end_to_end(self):
+        """Simula el camino real: middleware set → logger.error en capas internas → IP en el evento."""
+
+        def get_response(request):
+            self.logger.error("Login fallido: simulación de conflicto de PanAccess")
+            return "ok"
+
+        middleware = RequestContextMiddleware(get_response)
+        request = RequestFactory().get("/", REMOTE_ADDR="203.0.113.42")
+
+        middleware(request)
+
+        event = LogEvent.objects.get()
+        self.assertEqual(event.client_ip, "203.0.113.42")
 
 
 class PurgeOldLogEventsTaskTestCase(TestCase):

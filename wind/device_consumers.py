@@ -20,6 +20,7 @@ from django.db import close_old_connections, transaction
 
 from wind.models import DeviceSession
 from wind.services.subscriber_catalog import resolve_subscriber_code_for_user
+from wind.utils.request_context import reset_current_client_ip, set_current_client_ip
 from wind.utils.websocket_utils import (
     generate_device_fingerprint,
     check_websocket_limits,
@@ -134,6 +135,11 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
     PING_INTERVAL = getattr(settings, "DEVICE_WS_PING_INTERVAL", 30)
 
     async def connect(self):
+        # IP de esta conexión disponible en contextvar durante toda su vida
+        # (ver wind.utils.request_context) -- para que un error de backend
+        # logueado en capas profundas quede asociado a esta IP.
+        self._client_ip_ctx_token = set_current_client_ip(get_client_ip_from_scope(self.scope))
+
         self.done = False
         self.subscriber_code = None
         self.device_token = None
@@ -285,6 +291,7 @@ class DeviceSessionWS(AsyncWebsocketConsumer):
         await self._send_json({"type": "device_list_changed"})
 
     async def disconnect(self, code):
+        reset_current_client_ip(getattr(self, "_client_ip_ctx_token", None))
         await self._cleanup()
 
     async def _ping_loop(self):

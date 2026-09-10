@@ -83,6 +83,46 @@ class SubscriberRegistrationTestCase(APITestCase):
         self.assertEqual(call_kwargs["subscriber_code"], "10001")
         self.assertFalse(call_kwargs["is_social_account"])
 
+    @patch('wind.functions.create_subscriber.release_registration_locks')
+    @patch('wind.functions.create_subscriber.acquire_registration_locks', return_value=[object()])
+    @patch('wind.functions.create_subscriber.get_panaccess')
+    def test_invalid_subscriber_code_returns_400_not_500(
+        self, mock_get_panaccess, mock_acquire_locks, mock_release_locks,
+    ):
+        """
+        Auditoría de logs de producción (2026-09-10): PanAccess rechazando un
+        `code` no alfanumérico (`addSubscriber` -> `PanAccessAPIError`, mismo
+        tipo que lanza `panaccess_client.call()` cuando PanAccess responde
+        `success: false`) terminaba devuelto como 500 -- 137 ocurrencias
+        reales. `except PanAccessAPIError` (agregado antes del
+        `except PanAccessException` genérico) debe capturarlo como 400, igual
+        que ya hacen `change_password.py`/`profile/views.py`.
+        """
+        from wind.exceptions import PanAccessAPIError
+
+        mock_client = MagicMock()
+        mock_get_panaccess.return_value = mock_client
+        mock_client.call.side_effect = PanAccessAPIError(
+            "Error en la respuesta de PanAccess: El valor de 'code' no es un valor alfanumérico válido. (a-z, A-Z, 0-9)",
+            status_code=200,
+            error_code=None,
+        )
+
+        payload = self.valid_payload.copy()
+        payload['email'] = 'invalid.code.case@example.com'
+        payload['document_number'] = '40299999999'
+
+        response = self.client.post(
+            self.register_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertFalse(response.data['success'])
+        self.assertEqual(response.data['code'], 'subscriber_rejected_by_panaccess')
+        self.assertEqual(response.data['error_type'], 'PanAccessAPIError')
+
     @patch('wind.functions.create_subscriber.get_panaccess')
     def test_duplicate_email_validation(self, mock_get_panaccess):
         # Crear un registro de email previo

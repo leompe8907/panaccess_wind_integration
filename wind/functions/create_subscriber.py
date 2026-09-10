@@ -1186,6 +1186,24 @@ def _create_subscriber_core(
         release_registration_locks(registration_locks)
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    except PanAccessAPIError as e:
+        # PanAccess respondió y rechazó el valor (ej. `code` no alfanumérico)
+        # -- error de input del cliente (400), no un fallo de servidor. Antes
+        # caía en el `except PanAccessException` genérico de abajo y se
+        # respondía 500 -- mismo criterio ya aplicado en
+        # wind/functions/change_password.py y wind/api/profile/views.py
+        # (ver auditoría de logs de producción, 2026-09-10: 137 ocurrencias
+        # de este caso puntual reportadas como "Internal Server Error").
+        logger.error(f"Error de PanAccess (input inválido): {str(e)}")
+        release_registration_locks(registration_locks)
+        return Response({
+            'success': False,
+            'error_type': 'PanAccessAPIError',
+            'code': 'subscriber_rejected_by_panaccess',
+            'panaccess_error_code': getattr(e, 'error_code', None),
+            'message': str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     except PanAccessException as e:
         logger.error(f"Error de PanAccess: {str(e)}")
         release_registration_locks(registration_locks)

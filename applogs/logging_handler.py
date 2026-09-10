@@ -41,6 +41,7 @@ class DiagnosticsLogHandler(logging.Handler):
 
         from applogs.models import LogIssue
         from applogs.services import record_log_event
+        from wind.utils.request_context import get_current_client_ip
 
         message = record.getMessage()
         stack = ""
@@ -53,4 +54,9 @@ class DiagnosticsLogHandler(logging.Handler):
             message=message[:2000],
             stack=stack[:8000],
             extra={"logger": record.name, "path": getattr(record, "pathname", "")},
+            # IP de la request/conexión que disparó este log, si había una en
+            # curso (ver wind.utils.request_context) -- `None` si el error
+            # ocurrió fuera de cualquier request/conexión (ej. una tarea
+            # Celery corriendo en background).
+            client_ip=get_current_client_ip(),
         )

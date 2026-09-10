@@ -229,9 +229,32 @@ Antes de este fix, un rechazo por política de contraseña en este flujo salía 
 
 Mismo efecto colateral que 5.1 (solo en éxito).
 
+**`origin=app` (2026-09-09, nuevo, opcional -- ver `docs/REDIRECT_OLVIDAR_CONTRASENA_2026-09-09.md`):** el usuario pone la contraseña nueva en una página web del backend (`/wind/reset-password/`), no en la app -- llega ahí por el link del correo, sin importar si el pedido salió de un modal nativo, un QR de TV, o un redirect de PC. Sin esta bandera, al terminar la página se queda en el backend (comportamiento de siempre); con ella, redirige de vuelta a la app/`windtv.wind.do`. Cómo mandarla según el camino que use cada cliente:
+
+- **Si el cliente pide el enlace llamando directo a `POST /api/auth/password/forgot/`** (p. ej. un modal nativo dentro de la app, sin abrir ninguna página del backend): agregar `"origin": "app"` al body de ese mismo POST.
+- **Si el cliente en cambio manda al usuario a la página del backend para pedir el enlace** (`/wind/forgot-password/` -- p. ej. un QR que apunta ahí, o un redirect de pestaña completa): agregarle `?origin=app` a esa URL antes de navegar/generar el QR. La página se encarga de reenviarlo sola desde ahí en adelante.
+
+Cualquier otro valor (o no mandar el campo) es exactamente el comportamiento de antes -- no hace falta ningún cambio si tu integración no le interesa este caso.
+
 ### 5.3 Cerrar cuenta
 
 `POST /api/v1/profile/account/close/` (JWT + reCAPTCHA), body `{"code","confirm" (=code),"reason","dry_run"}`. `dry_run:true` no borra nada, solo devuelve un plan. Cierre exitoso: `{"success":true,"subscriber_code","panaccess":{...},"local":{...,"device_sessions_revoked":N,"udid_revoked":N},"closure_log_id","re_registration":"allowed_without_trial",...}`. Cierre parcial (PanAccess falló pero el acceso local ya se cortó): `{"success": false, ...}` -- el corte de acceso local (JWT, dispositivos, pareos) ocurre siempre, incluso si PanAccess no terminó.
+
+**Importante:** este endpoint sigue existiendo tal cual y corta el acceso **al toque** -- sigue siendo la opción correcta si el producto quiere un cierre inmediato. Para el flujo nuevo de "eliminar cuenta pero seguir usándola hasta que se acabe la suscripción" (pedido del cliente, ver 5.4), usar el par de endpoints de esa sección en su lugar, no este.
+
+### 5.4 Eliminar cuenta con demora (nuevo, 2026-09-08/09 -- todavía sin implementar en ningún cliente)
+
+Pensado para el mockup del cliente de "Mi cuenta > Eliminar cuenta": a diferencia de 5.3, acá el usuario **sigue con acceso normal** hasta la fecha de corte de su suscripción actual -- no se corta nada hasta que esa fecha llega de verdad. Ver `docs/NUEVO_FLUJO_ELIMINACION_CUENTA_2026-09-08.md` para el diseño completo (incluida la corrección del 2026-09-09 sobre cuándo se corta el acceso).
+
+**Paso 1 -- pedir la eliminación (dentro de la app, con JWT):**
+
+`POST /api/v1/profile/account/close/request/` (JWT + `IsOwnerSubscriber` + reCAPTCHA), body `{"code": "<subscriber_code>", "reason": "<opcional>"}`. No corta nada ni toca PanAccess -- solo manda un correo con un link de confirmación (24h de vigencia). Respuesta siempre genérica: `{"success": true, "message": "..."}`, o si no se puede procesar: `{"success": false, "code": "already_closed"|"closure_already_scheduled"|"no_email_on_file", "message": "...", "scheduled_for": "<ISO 8601, solo con closure_already_scheduled>"}`. Llamarlo de nuevo antes de confirmar simplemente reenvía el mismo correo (no crea una segunda solicitud).
+
+**Paso 2 -- confirmar (fuera de la app, el usuario hace click en el correo):** esto pasa en una página web del backend (`/wind/eliminar-cuenta/confirmar/?t=<token>`), no hay ningún endpoint que la app deba llamar para este paso -- se documenta acá solo para que quede claro qué va a ver el usuario. Al confirmar, el backend programa la fecha de corte (`scheduled_closure_at` = fin de la suscripción actual) pero **no cambia nada del acceso** -- la cuenta sigue `ACTIVE`, el usuario puede seguir logueándose con normalidad hasta esa fecha. Recién en la fecha de corte se ejecuta el cierre real (mismo mecanismo que 5.3: JWT invalidado, dispositivos revocados, PanAccess desaprovisionado).
+
+**Qué debe esperar la app mientras tanto:** entre el paso 1 y la fecha de corte, no hay ningún estado especial que consultar -- el perfil (`GET /api/v1/profile/me/`) sigue devolviendo la cuenta con normalidad. Si el producto quiere mostrarle al usuario "tu cuenta se va a eliminar el `<fecha>`", hoy esa fecha solo se conoce por el `scheduled_for` que devuelve el paso 1 en el momento de pedirlo (o por el correo) -- **no hay todavía un endpoint para consultarla después** si la app no la guardó en ese momento; avisar si se necesita antes de integrar esta sección.
+
+**Cancelar una eliminación ya confirmada:** no implementado todavía (el cliente no confirmó si hace falta -- ver pendientes, sección 10).
 
 ---
 
@@ -384,9 +407,10 @@ Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o inco
 | Listar mis dispositivos | `GET /wind/devices/` | JWT |
 | Revocar un dispositivo | `POST /wind/devices/<id>/revoke/` | JWT |
 | Cambiar contraseña | `POST /api/v1/profile/password/` | JWT |
-| Olvidé mi contraseña | `POST /api/auth/password/forgot/` | -- |
+| Olvidé mi contraseña (agregar `origin:"app"` si aplica, ver 5.2) | `POST /api/auth/password/forgot/` | -- |
 | Confirmar reset de contraseña | `POST /api/auth/password/reset-confirm/` | -- |
-| Eliminar/cerrar cuenta | `POST /api/v1/profile/account/close/` | JWT |
+| Eliminar/cerrar cuenta (inmediato) | `POST /api/v1/profile/account/close/` | JWT |
+| Eliminar cuenta con demora -- pedir (nuevo, ver 5.4) | `POST /api/v1/profile/account/close/request/` | JWT |
 | Mi perfil / suscriptor | `GET /api/v1/profile/me/` | JWT |
 | Mis productos/smartcards | `GET /api/v1/profile/products/` | JWT |
 | Leer preferencias sincronizadas (parental + favoritos) | `GET /api/v1/preferences/?profileKey=...` | JWT |
@@ -422,10 +446,12 @@ Respuesta 201: `{"success": true}`. Errores: 401 (`X-App-Log-Key` ausente o inco
 
 **Todavía abiertos:**
 
-- **Password en texto plano** en el correo de bienvenida y en la respuesta de login social -- decisión de negocio ya aceptada, se re-lista solo porque sigue siendo una superficie de exposición real.
-- **Fingerprint de dispositivo evadible** rotando los headers que lo derivan (server-side, ya no lo declara el cliente, pero sigue sin ser una huella robusta) -- limitación estructural, sin una solución de bajo riesgo identificada.
-- **Site-key de reCAPTCHA para mobile**: todavía sin definir cuál usar en "olvidé mi contraseña" / "eliminar cuenta" desde iOS/Android.
-- **Brand `bromteck` en `appVideo`** sigue apuntando a `http://` en vez de `https://` -- error menor, deprioritizado a pedido del cliente: la prioridad del proyecto es `wind`, `bromteck` es una marca secundaria y no bloquea nada de lo anterior.
+- **`origin=app` de "olvidé mi contraseña" (sección 5.2) -- implementado en `appVideo` (2026-09-09).** `requestPasswordReset()` ya manda `origin: "app"`, y `LoginPage.jsx` ya le agrega `?origin=app` a la URL del QR de TV y al redirect de PC (`forgotPasswordUrlWithOrigin`). Sin acción pendiente de este lado.
+- **Eliminar cuenta con demora (sección 5.4) -- backend listo (2026-09-08/09), sin implementar en ningún cliente todavía.** `appVideo` sigue llamando al endpoint viejo de cierre inmediato (`CloseAccountPanel.jsx`/`accountSecurityService.js::closeAccount()`). Falta: la UI del nuevo flujo de eliminación (mockup del cliente -- advertencia, confirmación, pantalla "revisa tu correo") y apuntar `closeAccount()` al endpoint nuevo. Cancelar una eliminación ya confirmada tampoco está resuelto -- el cliente no confirmó si hace falta. Ver `docs/pendientes_integracion_apps/01_eliminar_cuenta.md`.
+- **Password en texto plano** en el correo de bienvenida y en la respuesta de login social -- decisión de negocio ya aceptada, se re-lista solo porque sigue siendo una superficie de exposición real. Ver nota de seguridad en `docs/pendientes_integracion_apps/05_login_social_tv.md`.
+- **Fingerprint de dispositivo evadible** rotando los headers que lo derivan (server-side, ya no lo declara el cliente, pero sigue sin ser una huella robusta) -- limitación estructural, sin una solución de bajo riesgo identificada; ya mitigado con un segundo límite por IP (ver `docs/pendientes_integracion_apps/04_fingerprint.md`).
+- **Site-key de reCAPTCHA para mobile**: todavía sin definir cuál usar en "olvidé mi contraseña" / "eliminar cuenta" desde iOS/Android nativo (el SDK web de reCAPTCHA v3 no aplica ahí). Ver `docs/pendientes_integracion_apps/08_recaptcha.md`.
+- **Brand `bromteck` en `appVideo`** -- el `backendBaseUrl` de login social ya se corrigió a `https://` (2026-08-28); sigue pendiente `login.udid.baseUrl`/`wsUrl`, todavía en `http://127.0.0.1` (URL de desarrollo, sin backend de producción conocido para este brand). Ver nota en `docs/pendientes_integracion_apps/06_vincular_dispositivo.md`.
 - ~~**`country`/`city` en `GET /wind/devices/` requieren un paso de despliegue manual en CADA servidor**~~ -- **resuelto (2026-09-03):** el `.mmdb` y `GEOIP_CITY_DB_PATH` ya se subieron/configuraron en el servidor real de producción, confirmado por el cliente.
-- **Formato del QR/código de la TV**: sigue sin estandarizar en ningún documento del backend -- lo define el equipo de `appVideo`; confirmar antes de programar el parseo en mobile.
+- ~~**Formato del QR/código de la TV sin estandarizar**~~ -- **resuelto (2026-09-03):** el QR ahora es una URL real y versionada (`/wind/l/v1/<udid>/`, ver sección 1.1.1). Sigue pendiente el lado mobile nativo (Universal Link/App Link para que el sistema operativo abra la app directo en vez del navegador) -- ver `docs/pendientes_integracion_apps/06_vincular_dispositivo.md`.
 - **Posible incidente de pérdida de datos** (`docs/limpiar tablas.txt` + `restaurar_tablas.py`): cerrado -- las bases de datos se restauraron después de varias migraciones, no requiere auditoría adicional.

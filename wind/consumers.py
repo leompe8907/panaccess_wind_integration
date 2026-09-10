@@ -10,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import close_old_connections
 
 from wind.services.udid_auth_service import authenticate_with_udid_service, FATAL_CODES
+from wind.utils.request_context import reset_current_client_ip, set_current_client_ip
 from wind.utils.websocket_utils import (
     generate_device_fingerprint,
     check_websocket_limits,
@@ -40,6 +41,12 @@ class AuthWaitWS(AsyncWebsocketConsumer):
     MAX_GLOBAL_CONNECTIONS = getattr(settings, "UDID_WS_MAX_GLOBAL", 1000)
 
     async def connect(self):
+        # IP de esta conexión disponible en contextvar durante toda su vida
+        # (ver wind.utils.request_context) -- para que un error de backend
+        # logueado en capas profundas (ej. PanAccess, disparado por
+        # `authenticate_with_udid_service`) quede asociado a esta IP.
+        self._client_ip_ctx_token = set_current_client_ip(get_client_ip_from_scope(self.scope))
+
         self.udid = None
         self.temp_token = None
         self.app_type = None
@@ -210,6 +217,7 @@ class AuthWaitWS(AsyncWebsocketConsumer):
         await self._finish()
 
     async def disconnect(self, code):
+        reset_current_client_ip(getattr(self, "_client_ip_ctx_token", None))
         await self._cleanup()
 
     async def _send_result(self, res: dict, status: str | None = None):

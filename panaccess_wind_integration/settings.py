@@ -122,6 +122,11 @@ AUTHENTICATION_BACKENDS = [
 # ============================================================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Deja la IP del cliente en un contextvar durante toda la request, para
+    # que `applogs.logging_handler.DiagnosticsLogHandler` pueda asociarla a
+    # cualquier error de backend logueado en capas más profundas (ver
+    # docs/IP_ERRORES_BACKEND_2026-09-10.md). Sin flag, siempre activo.
+    'wind.middleware.request_context_middleware.RequestContextMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -135,7 +140,7 @@ MIDDLEWARE = [
 
 if SYNC_ADMIN_IP_ALLOWLIST:
     MIDDLEWARE.insert(
-        1,
+        2,
         "wind.middleware.sync_admin_ip_middleware.SyncAdminIPRestrictionMiddleware",
     )
 
