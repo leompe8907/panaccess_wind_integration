@@ -193,6 +193,7 @@ REST_FRAMEWORK = {
         'device_session': ThrottleConfig.DEVICE_SESSION,
         'login': ThrottleConfig.LOGIN,
         'log_ingest': ThrottleConfig.LOG_INGEST,
+        'profile_password_otp': ThrottleConfig.PROFILE_PASSWORD_OTP,
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,

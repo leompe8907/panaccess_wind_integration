@@ -9,6 +9,8 @@ from rest_framework.response import Response
 
 from wind.api.profile.serializers import (
     ProfilePasswordSerializer,
+    ProfilePasswordOtpRequestSerializer,
+    ProfilePasswordOtpConfirmSerializer,
     ProfileCloseAccountSerializer,
     ProfileRequestAccountDeletionSerializer,
 )
@@ -30,7 +32,7 @@ from wind.services.subscriber_catalog import (
     build_subscriber_products_payload,
     resolve_subscriber_code_for_user,
 )
-from wind.throttles import ProfileThrottle
+from wind.throttles import ProfileThrottle, ProfilePasswordOtpThrottle
 
 from appConfig import FeatureConfig, ProfilePasswordLockoutConfig
 
@@ -256,6 +258,178 @@ def profile_password_view(request):
         # No devolver str(e) al cliente -- puede filtrar detalles internos
         # (ver auditoría). El detalle real ya queda en el log de arriba.
         logger.exception("Error en profile_password_view")
+        return Response(
+            {
+                "success": False,
+                "message": "Ocurrió un error inesperado al cambiar la contraseña. Intenta de nuevo.",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsOwnerSubscriber])
+@throttle_classes([ProfilePasswordOtpThrottle])
+def profile_password_otp_request_view(request):
+    """
+    Paso 1 del flujo nuevo de "cambiar contraseña con código OTP"
+    (2026-09-14, ver docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md). Coexiste
+    con profile_password_view (oldPass) -- no lo reemplaza, cada app llama
+    al que ya tiene implementado.
+
+    Manda un código de 6 dígitos al correo del usuario autenticado.
+    """
+    if not FeatureConfig.CHANGE_PASSWORD_OTP_ENABLED:
+        return Response(
+            {
+                "success": False,
+                "message": "El cambio de contraseña con código no está disponible en este momento.",
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ser = ProfilePasswordOtpRequestSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response({"success": False, "errors": ser.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    subscriber_code = ser.validated_data["code"]
+
+    from wind.services.password_change_otp import request_password_change_otp
+
+    result = request_password_change_otp(subscriber_code=subscriber_code, email=request.user.email or "")
+    if result.get("success"):
+        return Response(result)
+
+    http_status = status.HTTP_429_TOO_MANY_REQUESTS if result.get("code") == "otp_cooldown" else status.HTTP_400_BAD_REQUEST
+    return Response(result, status=http_status)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsOwnerSubscriber])
+@throttle_classes([ProfilePasswordOtpThrottle])
+def profile_password_otp_confirm_view(request):
+    """
+    Paso 2 del flujo de OTP: valida el código de 6 dígitos y, si es
+    correcto, aplica el cambio de contraseña (mismo camino de PanAccess +
+    sync_password_locally que profile_password_view -- por eso también
+    cierra sesión en todos los dispositivos, ver sync_password_locally).
+
+    El código se marca "consumido" recién después de que el cambio se
+    aplicó con éxito en PanAccess -- si PanAccess rechaza la contraseña,
+    el mismo código sigue sirviendo para reintentar con otra (mismo
+    criterio que confirm_password_reset/mark_reset_token_used).
+    """
+    if not FeatureConfig.CHANGE_PASSWORD_OTP_ENABLED:
+        return Response(
+            {
+                "success": False,
+                "message": "El cambio de contraseña con código no está disponible en este momento.",
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    from wind.utils.recaptcha import verify_recaptcha
+
+    recaptcha_ok, recaptcha_error = verify_recaptcha(
+        request.data.get("recaptcha_token"),
+        remote_ip=request.META.get("REMOTE_ADDR"),
+    )
+    if not recaptcha_ok:
+        return Response(
+            {
+                "success": False,
+                "error_type": "RecaptchaFailed",
+                "message": recaptcha_error or "Verificación reCAPTCHA fallida.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ser = ProfilePasswordOtpConfirmSerializer(data=request.data)
+    if not ser.is_valid():
+        payload = {"success": False, "errors": ser.errors}
+        if "newPass" in ser.errors:
+            payload["code"] = PASSWORD_POLICY_CODE
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+    subscriber_code = ser.validated_data["code"]
+    otp_code = ser.validated_data["otpCode"]
+    new_pass = ser.validated_data["newPass"]
+
+    from wind.services.password_change_otp import check_password_change_otp, consume_password_change_otp
+
+    check = check_password_change_otp(subscriber_code=subscriber_code, code=otp_code)
+    if not check.get("success"):
+        http_status = status.HTTP_429_TOO_MANY_REQUESTS if check.get("code") == "otp_locked" else status.HTTP_400_BAD_REQUEST
+        return Response(check, status=http_status)
+
+    otp_record = check["record"]
+
+    try:
+        reset_password_in_panaccess(subscriber_code, new_pass)
+        sync_password_locally(subscriber_code, request.user.email or "", new_pass)
+        consume_password_change_otp(otp_record)
+        return Response(
+            {
+                "success": True,
+                "message": "Contraseña actualizada correctamente. Se cerró sesión en todos tus dispositivos.",
+            }
+        )
+    except PanAccessConnectionError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessConnectionError", "code": "panaccess_unavailable", "message": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except PanAccessTimeoutError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessTimeoutError", "code": "panaccess_timeout", "message": str(e)},
+            status=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+    except (PanAccessAuthenticationError, PanAccessSessionError) as e:
+        return Response(
+            {"success": False, "error_type": type(e).__name__, "code": "panaccess_integration_error", "message": str(e)},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except PanAccessRateLimitError as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessRateLimitError", "code": "rate_limited", "message": str(e)},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+    except PanAccessAPIError as e:
+        # Código no consumido -- el usuario puede reintentar con otra
+        # contraseña sin pedir un código nuevo (ver docstring de la vista).
+        return Response(
+            {
+                "success": False,
+                "error_type": "PanAccessAPIError",
+                "code": "password_rejected_by_panaccess",
+                "panaccess_error_code": getattr(e, "error_code", None),
+                "message": str(e),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except PanAccessException as e:
+        return Response(
+            {"success": False, "error_type": "PanAccessException", "message": str(e)},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except Exception:
+        logger.exception("Error en profile_password_otp_confirm_view")
         return Response(
             {
                 "success": False,

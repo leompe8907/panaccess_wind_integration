@@ -541,6 +541,47 @@ class PasswordResetTokenUse(models.Model):
         return f"PasswordResetTokenUse({self.token_hash[:8]}...)"
 
 
+class PasswordChangeOtp(models.Model):
+    """
+    Código OTP de 6 dígitos para "cambiar contraseña" desde Mi Cuenta
+    (usuario ya autenticado), alternativa a verificar con `oldPass` -- ver
+    docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md.
+
+    No reemplaza al flujo de `oldPass` (`profile_password_view`): ambos
+    endpoints coexisten, cada cliente llama al que ya tiene implementado
+    (appVideo actualizado usa este, apps mobile viejas siguen con el de
+    `oldPass` sin romperse) -- ver `FeatureConfig.CHANGE_PASSWORD_OTP_ENABLED`
+    para el kill-switch del lado del backend.
+
+    Solo se guarda el hash del código (sha256 salado con el propio
+    subscriber_code), nunca el valor en texto plano -- mismo criterio que
+    `SubscriberLoginInfo.password_hash`. `consumed_at` se marca recién
+    después de que el cambio de contraseña se aplicó con éxito en
+    PanAccess (no al momento de validar el código) -- mismo criterio que
+    `mark_reset_token_used` en password_reset.py: si PanAccess rechaza la
+    nueva contraseña, el código sigue sirviendo para reintentar con otra,
+    en vez de obligar a pedir uno nuevo por correo.
+    """
+    subscriber_code = models.CharField(max_length=100, db_index=True)
+    code_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["subscriber_code", "consumed_at", "expires_at"],
+                name="wind_pwd_otp_lookup_idx",
+            ),
+        ]
+
+    def __str__(self):
+        state = "consumido" if self.consumed_at else "pendiente"
+        return f"PasswordChangeOtp({self.subscriber_code}, {state})"
+
+
 class UserSecurityProfile(models.Model):
     """
     Metadatos de seguridad por usuario que no viven en auth.User (no se

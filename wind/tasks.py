@@ -1230,6 +1230,37 @@ def send_password_reset_email_task(self, email, subject, text_body, html_body):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_password_change_otp_email_task(self, email, subject, text_body, html_body):
+    """
+    Envía el código OTP de "cambiar contraseña" desde Mi Cuenta (ver
+    wind/services/password_change_otp_email.py y
+    wind/services/password_change_otp.py::request_password_change_otp).
+    Mismo patrón de reintento que send_password_reset_email_task.
+    """
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    logger.info("Enviando email de código OTP de cambio de contraseña a %s", email)
+    try:
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=html_body,
+        )
+        logger.info("Email de código OTP enviado a %s", email)
+        return {"success": True, "email": email}
+    except Exception as exc:
+        logger.exception("Error al enviar email de código OTP a %s", email)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {"success": False, "error": str(exc), "email": email}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_account_deletion_confirmation_email_task(self, email, subject, text_body, html_body):
     """
     Envía el correo de confirmación de eliminación de cuenta (ver

@@ -978,6 +978,14 @@ class EmailConfig:
         _strip_env(os.getenv("EMAIL_PASSWORD_RESET_SUBJECT"))
         or "Restablecer contraseña — WindTV"
     )
+    # Código OTP de "cambiar contraseña" desde Mi Cuenta (2026-09-14) -- ver
+    # docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md. Reusa el mismo banner que
+    # "olvidé mi contraseña" por defecto (mismo criterio que
+    # ACCOUNT_DELETION_BANNER_IMAGE_URL más abajo).
+    PASSWORD_CHANGE_OTP_SUBJECT = (
+        _strip_env(os.getenv("EMAIL_PASSWORD_CHANGE_OTP_SUBJECT"))
+        or "Tu código de verificación de WindTV"
+    )
     # Banner (fotos + logo WindTV) del correo de "olvidé mi contraseña" --
     # es un <img> real, no un CSS background-image: así escala igual en
     # todos los clientes de correo (incluido Outlook de escritorio, que no
@@ -1090,6 +1098,11 @@ class ThrottleConfig:
     # para que un dispositivo en loop de errores no pueda escribir sin
     # límite.
     LOG_INGEST = _strip_env(os.getenv("DRF_THROTTLE_LOG_INGEST")) or "30/minute"
+    # Cambiar contraseña con OTP (2026-09-14): pedir/confirmar código --
+    # más bajo que PROFILE (120/minute) porque cada pedido de código manda
+    # un correo real; ver también PasswordChangeOtpConfig.REQUEST_COOLDOWN_SECONDS
+    # para el límite semántico por subscriber_code (este es por usuario/IP).
+    PROFILE_PASSWORD_OTP = _strip_env(os.getenv("DRF_THROTTLE_PROFILE_PASSWORD_OTP")) or "10/hour"
 
 
 class AppLogsConfig:
@@ -1177,6 +1190,23 @@ class ProfilePasswordLockoutConfig:
     MAX_ATTEMPTS = max(1, _env_int("PROFILE_PASSWORD_LOCKOUT_MAX_ATTEMPTS", 5))
     WINDOW_SECONDS = max(60, _env_int("PROFILE_PASSWORD_LOCKOUT_WINDOW_SECONDS", 300))
     LOCKOUT_SECONDS = max(60, _env_int("PROFILE_PASSWORD_LOCKOUT_DURATION_SECONDS", 900))
+
+
+class PasswordChangeOtpConfig:
+    """
+    Cambiar contraseña con código OTP por correo (2026-09-14) -- ver
+    docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md. Config separada de
+    ProfilePasswordLockoutConfig (esa es para el flujo de `oldPass`, este
+    es el flujo nuevo, coexisten).
+    """
+    CODE_LENGTH = 6
+    EXPIRY_MINUTES = max(1, _env_int("PASSWORD_CHANGE_OTP_EXPIRY_MINUTES", 15))
+    MAX_VERIFY_ATTEMPTS = max(1, _env_int("PASSWORD_CHANGE_OTP_MAX_ATTEMPTS", 5))
+    # Cooldown entre pedidos de código consecutivos (botón "Enviar código") --
+    # evita que alguien golpee el endpoint y sature la bandeja de entrada del
+    # usuario. No es el mismo límite que el throttle de DRF (ese es por
+    # IP/usuario a nivel de request; este es semántico, por subscriber_code).
+    REQUEST_COOLDOWN_SECONDS = max(0, _env_int("PASSWORD_CHANGE_OTP_REQUEST_COOLDOWN_SECONDS", 45))
 
 
 # ---------------------------------------------------------------------------
@@ -1313,6 +1343,15 @@ class FeatureConfig:
     # real; con esto, se pueden prender puntualmente por .env sin deploy
     # de código, en vez de estar siempre expuestas.
     DEBUG_TEST_PAGES_ENABLED = _env_bool("DEBUG_TEST_PAGES_ENABLED", False)
+    # Kill-switch puramente de backend (2026-09-14) para el flujo nuevo de
+    # "cambiar contraseña con código OTP" (docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md).
+    # No es un flag que el cliente consulte -- cada app llama directo al
+    # endpoint que ya conoce (oldPass, el de siempre, o el nuevo de OTP);
+    # esto es solo un freno de emergencia del lado del servidor si el
+    # endpoint nuevo da problemas en producción (mismo patrón que
+    # CREATE_SUBSCRIBER_PUBLIC_ENABLED). El endpoint de `oldPass` nunca se
+    # ve afectado por este flag, sigue funcionando siempre.
+    CHANGE_PASSWORD_OTP_ENABLED = _env_bool("CHANGE_PASSWORD_OTP_ENABLED", True)
 
 
 # ---------------------------------------------------------------------------

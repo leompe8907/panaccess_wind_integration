@@ -89,6 +89,17 @@ class DeviceSessionThrottle(UserRateThrottle):
     scope = "device_session"
 
 
+class ProfilePasswordOtpThrottle(UserRateThrottle):
+    """
+    Pedir/confirmar código OTP de "cambiar contraseña" (2026-09-14) --
+    separado de ProfileThrottle porque pedir código manda un correo real
+    (más caro que el resto de las acciones de /profile/) y porque conviene
+    poder ajustar su límite sin afectar al resto de los endpoints de perfil.
+    """
+
+    scope = "profile_password_otp"
+
+
 class LogIngestThrottle(AnonRateThrottle):
     """
     `POST /api/v1/logs/` (applogs) -- acepta requests sin JWT a propósito

@@ -28,6 +28,32 @@ class ProfilePasswordSerializer(serializers.Serializer):
         return value
 
 
+class ProfilePasswordOtpRequestSerializer(serializers.Serializer):
+    """Pedir el código OTP (paso 1 del flujo nuevo de cambiar contraseña)."""
+
+    code = serializers.CharField(max_length=100)
+
+
+class ProfilePasswordOtpConfirmSerializer(serializers.Serializer):
+    """Confirmar código + nueva contraseña (paso 2 del flujo de OTP)."""
+
+    code = serializers.CharField(max_length=100)
+    otpCode = serializers.CharField(max_length=6, min_length=6)
+    newPass = serializers.CharField(max_length=255, write_only=True)
+
+    def validate_otpCode(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("El código debe tener 6 dígitos numéricos.")
+        return value
+
+    def validate_newPass(self, value):
+        # Mismo criterio que ProfilePasswordSerializer.validate_newPass.
+        error = validate_password_policy(value)
+        if error:
+            raise serializers.ValidationError(error)
+        return value
+
+
 class ProfileRequestAccountDeletionSerializer(serializers.Serializer):
     """
     Nuevo flujo de eliminación (2026-09-08): a diferencia de
