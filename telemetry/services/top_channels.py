@@ -105,6 +105,12 @@ def _build_top_channels_custom_data() -> str:
         "rows": 1,
         "card_design": MostWatchedChannelsConfig.TOP_CHANNELS_CARD_DESIGN,
         "logo_index": "1",
+        # Campo propio de este bouquet sintético (2026-09-15) -- no forma
+        # parte del schema de bouquets reales de PanAccess, así que appVideo
+        # lo trata como opcional (ver bouquetLayoutConfig.js): si algún día
+        # un bouquet real de PanAccess también trae `background_color`, se
+        # aplicaría igual sin cambios extra.
+        "background_color": MostWatchedChannelsConfig.TOP_CHANNELS_BACKGROUND_COLOR,
     }
     return json.dumps({"layouts": {"mobile": layout, "tv": layout}})
 

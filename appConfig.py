@@ -716,14 +716,23 @@ class MostWatchedChannelsConfig:
     layouts.tv con type/rows/card_design/logo_index), para que appVideo lo
     renderice con el mismo componente que usa para bouquets reales.
 
-    Solo `card_design` es configurable por env hoy: es la única pieza que el
-    cliente todavía puede pedir cambiar sin que haga falta un deploy de
-    código (bouquetId/name/tipo de grilla quedan fijos en el código).
+    `card_design` y `background_color` son configurables por env: son las
+    piezas que el cliente puede pedir cambiar sin que haga falta un deploy
+    de código (bouquetId/name/tipo de grilla quedan fijos en el código).
     """
 
     TOP_CHANNELS_CARD_DESIGN = (
         _strip_env(os.getenv("TELEMETRY_TOP_CHANNELS_CARD_DESIGN"))
         or "service_layout_event_and_logo"
+    )
+
+    # Fondo de la fila/riel de "Más vistos" en appVideo (2026-09-15, a pedido
+    # del cliente). appVideo lo lee de `customData.layouts.<mobile|tv>.background_color`
+    # (ver bouquetLayoutConfig.js) -- si viene vacío, appVideo no aplica ningún
+    # fondo especial (se comporta como cualquier bouquet real sin este campo).
+    TOP_CHANNELS_BACKGROUND_COLOR = (
+        _strip_env(os.getenv("TELEMETRY_TOP_CHANNELS_BACKGROUND_COLOR"))
+        or "#012B4F"
     )
 
 
