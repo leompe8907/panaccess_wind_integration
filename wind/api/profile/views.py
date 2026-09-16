@@ -310,6 +310,23 @@ def profile_password_otp_request_view(request):
 
     subscriber_code = ser.validated_data["code"]
 
+    # Paso de confirmación estilo Netflix (2026-09-16): el usuario re-escribe
+    # su correo antes de pedir el código. Si no coincide con el de la
+    # cuenta autenticada, no generamos ni enviamos nada -- solo avisamos.
+    # Comparación normalizada (trim + case-insensitive): el correo real
+    # sigue siendo request.user.email, nunca el que escribió el usuario.
+    account_email = (request.user.email or "").strip().lower()
+    submitted_email = ser.validated_data["email"].strip().lower()
+    if not account_email or submitted_email != account_email:
+        return Response(
+            {
+                "success": False,
+                "code": "email_mismatch",
+                "message": "El correo no coincide con tu cuenta.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     from wind.services.password_change_otp import request_password_change_otp
 
     result = request_password_change_otp(subscriber_code=subscriber_code, email=request.user.email or "")

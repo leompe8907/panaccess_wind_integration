@@ -193,7 +193,9 @@ class PasswordChangeOtpEndpointsTestCase(APITestCase):
 
     @patch("wind.services.password_change_otp_email.enqueue_password_change_otp_email")
     def test_request_code_success(self, mock_enqueue):
-        response = self.client.post(self.REQUEST_URL, {"code": self.subscriber_code}, format="json")
+        response = self.client.post(
+            self.REQUEST_URL, {"code": self.subscriber_code, "email": self.email}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
@@ -201,18 +203,41 @@ class PasswordChangeOtpEndpointsTestCase(APITestCase):
         mock_enqueue.assert_called_once()
 
     def test_request_code_rejects_other_subscriber(self):
-        response = self.client.post(self.REQUEST_URL, {"code": "SOMEONE_ELSE"}, format="json")
+        response = self.client.post(
+            self.REQUEST_URL, {"code": "SOMEONE_ELSE", "email": self.email}, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @patch("appConfig.FeatureConfig.CHANGE_PASSWORD_OTP_ENABLED", False)
     def test_request_code_disabled_by_flag(self):
-        response = self.client.post(self.REQUEST_URL, {"code": self.subscriber_code}, format="json")
+        response = self.client.post(
+            self.REQUEST_URL, {"code": self.subscriber_code, "email": self.email}, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_request_code_rejects_mismatched_email(self):
+        """Paso de confirmación estilo Netflix (2026-09-16): si el correo
+        escrito no coincide con el de la cuenta autenticada, no debe
+        generarse ni encolarse ningún código."""
+        with patch("wind.services.password_change_otp_email.enqueue_password_change_otp_email") as mock_enqueue:
+            response = self.client.post(
+                self.REQUEST_URL,
+                {"code": self.subscriber_code, "email": "otro-correo@example.com"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["code"], "email_mismatch")
+        mock_enqueue.assert_not_called()
+        self.assertFalse(PasswordChangeOtp.objects.filter(subscriber_code=self.subscriber_code).exists())
 
     @patch("wind.api.profile.views.reset_password_in_panaccess")
     @patch("wind.services.password_change_otp_email.enqueue_password_change_otp_email")
     def test_confirm_success_changes_password_and_revokes_devices(self, mock_enqueue, mock_reset):
-        self.client.post(self.REQUEST_URL, {"code": self.subscriber_code}, format="json")
+        self.client.post(
+            self.REQUEST_URL, {"code": self.subscriber_code, "email": self.email}, format="json"
+        )
         code = mock_enqueue.call_args.kwargs["code"]
 
         with patch("wind.api.profile.views.sync_password_locally") as mock_sync:
@@ -233,7 +258,9 @@ class PasswordChangeOtpEndpointsTestCase(APITestCase):
     @patch("wind.api.profile.views.reset_password_in_panaccess")
     @patch("wind.services.password_change_otp_email.enqueue_password_change_otp_email")
     def test_confirm_wrong_code_rejected(self, mock_enqueue, mock_reset):
-        self.client.post(self.REQUEST_URL, {"code": self.subscriber_code}, format="json")
+        self.client.post(
+            self.REQUEST_URL, {"code": self.subscriber_code, "email": self.email}, format="json"
+        )
 
         response = self.client.post(
             self.CONFIRM_URL,
@@ -267,7 +294,9 @@ class PasswordChangeOtpEndpointsTestCase(APITestCase):
 
         mock_reset.side_effect = PanAccessAPIError("Password rejected", status_code=200, error_code=None)
 
-        self.client.post(self.REQUEST_URL, {"code": self.subscriber_code}, format="json")
+        self.client.post(
+            self.REQUEST_URL, {"code": self.subscriber_code, "email": self.email}, format="json"
+        )
         code = mock_enqueue.call_args.kwargs["code"]
 
         response = self.client.post(

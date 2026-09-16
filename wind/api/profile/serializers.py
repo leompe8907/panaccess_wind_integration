@@ -29,9 +29,19 @@ class ProfilePasswordSerializer(serializers.Serializer):
 
 
 class ProfilePasswordOtpRequestSerializer(serializers.Serializer):
-    """Pedir el código OTP (paso 1 del flujo nuevo de cambiar contraseña)."""
+    """
+    Pedir el código OTP (paso 1 del flujo nuevo de cambiar contraseña).
+
+    `email` (2026-09-16, a pedido del cliente -- imitar el patrón de
+    Netflix para acciones sensibles): el usuario debe re-escribir su
+    correo como paso de confirmación antes de recibir el código. La vista
+    (`profile_password_otp_request_view`) valida que coincida con
+    `request.user.email` -- si no coincide, no se genera ni se envía
+    ningún código (ver docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md).
+    """
 
     code = serializers.CharField(max_length=100)
+    email = serializers.EmailField()
 
 
 class ProfilePasswordOtpConfirmSerializer(serializers.Serializer):

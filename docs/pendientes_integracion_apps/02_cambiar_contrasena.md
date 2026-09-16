@@ -32,11 +32,13 @@ Dos llamadas en vez de una. **Kill-switch de backend:** `FeatureConfig.CHANGE_PA
 
 ### 1. Pedir el código
 
-`POST /api/v1/profile/password/otp/request-code/` (JWT), body `{"code": "<subscriber_code>"}` →
+`POST /api/v1/profile/password/otp/request-code/` (JWT), body `{"code": "<subscriber_code>", "email": "<correo escrito por el usuario>"}` →
 
 ```json
 {"success": true, "masked_email": "lil***@gmail.com", "expires_in_minutes": 15, "message": "Te enviamos un código de verificación a tu correo."}
 ```
+
+**`email` es obligatorio desde 2026-09-16** (antes no existía este campo). No es el destino del código -- el código siempre se manda al correo real que ya tiene la cuenta (`request.user.email`), la app nunca puede redirigirlo a otro lado. Es un paso de **confirmación estilo Netflix** para acciones sensibles: el usuario re-escribe su propio correo antes de continuar, y el backend valida que coincida (case-insensitive, trim) con el de la cuenta autenticada. Si no coincide, no se genera ni se envía ningún código.
 
 Manda un código de 6 dígitos al correo del usuario autenticado, válido 15 minutos, un solo uso. Pedir un código nuevo invalida cualquier código anterior sin usar.
 
@@ -44,6 +46,7 @@ Errores:
 
 | Status | `code` | Significado |
 |---|---|---|
+| 400 | `email_mismatch` | El correo escrito no coincide con el de la cuenta -- no se envió nada. (2026-09-16) |
 | 400 | `no_email` | La cuenta no tiene correo registrado. |
 | 429 | `otp_cooldown` | Se pidió otro código hace muy poco (~45s por defecto) -- incluye `wait_seconds`. |
 | 404 | -- | Flujo deshabilitado por `CHANGE_PASSWORD_OTP_ENABLED=false`. |
@@ -91,7 +94,7 @@ Implementado con el **flujo nuevo (OTP)**: `requestPasswordChangeOtp()`/`confirm
 Elegir uno de los dos flujos (no hace falta implementar los dos):
 
 **Opción recomendada -- flujo OTP (igual que appVideo hoy):**
-- Pantalla 1: botón "Enviar código" → `POST .../otp/request-code/`. Mostrar `masked_email` de la respuesta.
+- Pantalla 1: input de correo (el usuario re-escribe el suyo, paso de confirmación estilo Netflix) + botón "Enviar código" → `POST .../otp/request-code/` con `email`. Si responde `email_mismatch`, mostrar el error ahí mismo sin avanzar. Si tiene éxito, mostrar `masked_email` de la respuesta.
 - Pantalla 2: input de 6 dígitos → validar formato localmente, guardar en memoria, no llamar al backend todavía.
 - Pantalla 3: nueva contraseña + confirmar → recién acá `POST .../otp/confirm/` con el código guardado + la contraseña. Si el error es `otp_incorrect`/`otp_missing_or_expired`/`otp_locked`, volver a la pantalla 2 mostrando el mensaje; cualquier otro error se queda en la pantalla 3.
 - Pantalla 4: éxito + logout forzado (ver abajo).
