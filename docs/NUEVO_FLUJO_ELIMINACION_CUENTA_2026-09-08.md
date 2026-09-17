@@ -57,3 +57,32 @@ El mismo endpoint (`POST .../account/close/request/`) reenvía si se llama de nu
 - `manage.py check` OK.
 - Versión original (2026-09-08): 15 tests nuevos + los 3 existentes de `test_subscriber_closure.py` (para confirmar que el refactor de `close_subscriber_account` no cambió su comportamiento) + los 2 de `test_register_view_feature_flag.py`: 21/21 OK contra Postgres real (`pgserver`). El usuario confirmó 150/150 en su máquina tras este punto.
 - Corrección 2026-09-09: se reescribieron los tests afectados de `test_account_deletion_scheduled.py` (ahora 19, antes 15 -- se sumaron los casos `ACTIVE`+vencido y `ACTIVE`+futuro para `retry_partial_closures_task`) para reflejar que confirmar ya NO corta el acceso. Se corrió `wind.tests.test_account_deletion_scheduled` + `test_subscriber_closure` + `test_go_windtv_view` + `test_subscriber_sync_closure` + `test_auth` (35 tests): **32/32 OK**, los otros 3 son el error de conexión a Redis ya conocido del sandbox (sin Redis local ahí, no relacionado a este cambio) -- pendiente que el usuario corra `deploy\run_tests_local.bat` para la confirmación final de la suite completa con Redis real.
+
+## Addendum: confirmación de correo (paso 3) + fecha de corte en la respuesta + frontend de appVideo (2026-09-17)
+
+A pedido del cliente: hay casos reales de usuarios "curiosos" que eliminaban su cuenta sin querer. Se agregó una capa más de fricción, mismo patrón ya usado en cambio de contraseña (ver `docs/CAMBIO_CONTRASENA_OTP_2026-09-14.md`, addendum 2026-09-16): el usuario debe re-escribir el correo de su cuenta como paso intermedio, antes de que se mande el enlace de eliminación. Con esto, la UI queda con 3 capas de "¿estás seguro?" antes de que salga cualquier correo (checkbox, popup, correo escrito) más una cuarta -- el enlace en sí -- para la confirmación real.
+
+### Backend
+
+- `wind/api/profile/serializers.py::ProfileRequestAccountDeletionSerializer` -- ahora exige `email` además de `code`.
+- `wind/api/profile/views.py::profile_request_account_deletion_view` -- antes de llamar a `request_account_deletion`, compara `email` (normalizado: trim + lowercase) contra `request.user.email`. Si no coincide, responde `{"success": false, "code": "email_mismatch", ...}` con 400, sin crear ninguna `AccountDeletionRequest` ni encolar correo. Idéntico criterio al de `profile_password_otp_request_view`.
+- `wind/services/account_deletion.py::request_account_deletion()` -- la respuesta de éxito ahora incluye `scheduled_for` (la fecha de corte real, `ListOfSubscriber.lastExpiryTime`, en ISO 8601; `None` si el suscriptor nunca la sincronizó). Antes solo se devolvía en el error `closure_already_scheduled` o después de confirmar el enlace -- hacía falta acá porque la pantalla "revisa tu correo" del mockup muestra esa fecha *antes* de que el usuario confirme nada (es la fecha de vencimiento actual, no depende de la confirmación).
+- `wind/tests/test_account_deletion_scheduled.py` -- se actualizaron las llamadas existentes a `request-code/`... es decir a `account/close/request/` para incluir `email`; se agregaron `test_request_deletion_rejects_mismatched_email` y `test_response_includes_cutoff_date_when_known`.
+
+### Frontend (`D:\appVideo`)
+
+- `src/services/accountSecurityService.js::requestAccountDeletion(brandConfig, brand, { email, reason })` -- nueva función, apunta a `/api/v1/profile/account/close/request/`. `closeAccount()` (cierre inmediato, endpoint viejo) se deja intacta sin usar, por si hace falta revertir rápido.
+- `src/components/account/CloseAccountPanel.jsx` -- reescrito completo, calcado del mockup "Flujo | Mi cuenta - Eliminar cuenta": ya NO pide escribir la palabra "ELIMINAR" (flujo viejo). Pasos:
+  1. `warning` -- advertencia + checklist de efectos + aviso genérico de que la suscripción sigue activa hasta la fecha de corte + checkbox que habilita el botón.
+  2. Modal `ConfirmModal` "¿Estás seguro?".
+  3. `email` -- el usuario re-escribe su correo; al enviar, llama a `requestAccountDeletion`. Si el backend responde `email_mismatch` (u otro error mapeado), se muestra traducido, sin salir de este paso.
+  4. `check_email` -- muestra el correo enmascarado (`masked_email`) y la fecha de corte formateada (`scheduled_for`, si vino), con botones "Volver" (reinicia el flujo) y "Reenviar correo" (repite la misma llamada; cooldown de 20s solo del lado del cliente, el backend no lo limita en este endpoint aparte del throttle genérico).
+  - Mapa `DELETE_ERROR_I18N` + helper `translateDeletionError()`, mismo patrón que `OTP_ERROR_I18N`/`translateOtpError()` de `ChangePasswordPanel.jsx`, para `email_mismatch`, `already_closed`, `closure_already_scheduled`, `no_email_on_file`.
+- `src/styles/components/_account-security.scss` -- clases nuevas escopadas a este flujo: `.account-security-list` (checklist), `.account-security-checkbox-row`, `.account-security-icon--mail`.
+- `src/locales/{es,en,pt}.json` -- 3 claves existentes actualizadas (`deleteAccountConfirmTitle`, `deleteAccountConfirmMessage`, `deleteAccountWarning`, cuyo texto cambió con el nuevo diseño) + 24 claves nuevas, traducidas a los tres idiomas a la vez (mismo criterio que el addendum de cambio de contraseña, para no repetir el gap de es-only). `account` quedó en 119 claves, sincronizadas entre los tres archivos (mismo nombre de clave, verificado por script).
+- **No implementado en esta tanda (fuera del alcance pedido):** cancelar una eliminación ya agendada -- sigue sin existir ese endpoint (ver "Qué NO se implementó todavía" más arriba, sin cambios).
+
+### Cómo se verificó
+
+- Backend: `manage.py check` limpio + `wind.tests.test_account_deletion_scheduled` completo (17/17 OK) contra Postgres real (`pgserver`), mismo método que los addendums anteriores (`.env` parcheado temporalmente al socket de pgserver, restaurado byte a byte al terminar). También se corrieron `test_password_change_otp` y `test_subscriber_closure` para descartar regresiones cruzadas: sin cambios de resultado (el único fallo es el mismo pre-existente y ya documentado, `test_new_request_invalidates_previous_code`, no relacionado).
+- Frontend: sin `eslint`/build disponibles en el sandbox (pnpm no resuelve ahí) -- se validó sintaxis de `CloseAccountPanel.jsx` y `accountSecurityService.js` con `esbuild` (parseo JSX limpio) y el SCSS nuevo con `sass` (compila sin errores). Falta que el usuario corra el build real (`pnpm run build:wind` o equivalente) para confirmación final.

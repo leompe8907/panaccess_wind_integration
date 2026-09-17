@@ -145,7 +145,20 @@ def request_account_deletion(
     except Exception:
         logger.exception("No se pudo encolar email de confirmación de eliminación para %s", subscriber_code)
 
-    return {"success": True, "message": GENERIC_REQUEST_MESSAGE, "masked_email": _mask_email(email)}
+    # 2026-09-17: la pantalla "revisa tu correo" del mockup muestra la fecha
+    # de corte ANTES de que el usuario confirme el enlace (ya se sabe, es la
+    # fecha de vencimiento actual de la suscripción, no depende de la
+    # confirmación). Se incluye acá para que el frontend no tenga que pedirla
+    # aparte; puede venir None si el suscriptor nunca sincronizó
+    # lastExpiryTime desde PanAccess.
+    scheduled_for = subscriber.lastExpiryTime.isoformat() if subscriber and subscriber.lastExpiryTime else None
+
+    return {
+        "success": True,
+        "message": GENERIC_REQUEST_MESSAGE,
+        "masked_email": _mask_email(email),
+        "scheduled_for": scheduled_for,
+    }
 
 
 def _mask_email(email: str) -> str:

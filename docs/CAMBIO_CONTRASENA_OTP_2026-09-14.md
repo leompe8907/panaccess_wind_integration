@@ -65,6 +65,22 @@ Contexto del bug que lo disparó: el input de correo del paso "pedir código" ya
 
 **Nota de compatibilidad:** este cambio hace `email` un campo requerido en `request-code/` -- cualquier app mobile que ya haya integrado contra la versión anterior (sin `email`) empezará a recibir 400 (`{"email": ["This field is required."]}`) hasta que se actualice. Como ninguna app mobile tiene esto implementado todavía (ver sección "Qué debe implementar iOS/Android nativo" arriba), no hay impacto real hoy -- solo hay que asegurarse de que la implementación futura ya lo mande desde el principio.
 
+### Addendum: traducción de errores y de toda la sección "Mi Cuenta" en appVideo (2026-09-16)
+
+Disparado por la pregunta "en appvideo la respuesta soporta multiples idiomas?": se encontró que `ChangePasswordPanel.jsx` mostraba directamente el `message` que devuelve el backend (siempre en español) en vez de traducirlo, y que además **toda la sección `account` de i18next no existía en `en.json` ni en `pt.json`** -- no era un problema acotado a este flujo de OTP, sino que la pantalla completa de "Mi Cuenta" (dispositivos vinculados, eliminar cuenta, cambio de contraseña, etc.) se mostraba siempre en español sin importar el idioma configurado en la app, porque cada `t('account.xxx', { defaultValue: '...' })` caía siempre al `defaultValue` en español al no existir la clave en el recurso cargado.
+
+A pedido del cliente se resolvió con el alcance completo: mapear los errores de este flujo a mensajes traducidos, y traducir toda la sección `account` a inglés y portugués (no solo las claves nuevas de OTP).
+
+- `src/components/account/ChangePasswordPanel.jsx`:
+  - Nuevo objeto `OTP_ERROR_I18N` (código de error del backend -> `{key, defaultValue}`) y helper `translateOtpError(t, code, fallbackMessage)`, cubriendo `email_mismatch`, `no_email`, `otp_cooldown`, `otp_email_failed`, `otp_incorrect`, `otp_missing_or_expired`, `otp_locked`, `password_policy_violation`, `password_rejected_by_panaccess`, `panaccess_integration_error`, `panaccess_unavailable`, `panaccess_timeout`.
+  - `handleSendCode` y `handleSubmitNewPassword` ahora traducen el error antes de mostrarlo, en vez de mostrar el `message` crudo del backend.
+  - `changeOtpVerifyHint` (antes un template literal de JS usado como `defaultValue`, sin interpolación real de i18next) se separó en dos claves nuevas con interpolación correcta: `changeOtpVerifyHintWithEmail` (`{{email}}`, `{{count}}`) y `changeOtpVerifyHintNoEmail` (`{{count}}`).
+  - **Bug preexistente encontrado y corregido de paso:** el `catch` de `handleSubmitNewPassword` comprobaba `OTP_STEP_ERROR_CODES.has(err?.code)`, pero `parseJsonResponse` (en `deviceAuthService.js`) nunca setea `err.code` -- el código del backend viaja en `err.data.code`. Esto significaba que la lógica de "volver a la pantalla de verificación cuando el código OTP es inválido/expiró/se bloqueó" nunca se disparaba en producción, sin importar el idioma. Corregido usando `err?.data?.code` de forma consistente en ambos `catch`.
+- `src/locales/es.json` -- la sección `account` pasó de 62 a 95 claves: se agregaron las claves que antes solo existían como `defaultValue` inline (dispositivos vinculados, mostrar/ocultar contraseña, ir a Wind TV, textos del flujo OTP) más las 12 nuevas de mapeo de errores.
+- `src/locales/en.json` y `src/locales/pt.json` -- **no tenían clave `account` en absoluto**. Se agregó el bloque completo (95 claves, traducción íntegra a inglés y portugués respectivamente), en la misma posición estructural que en `es.json` (después de `sidebar`, antes de `osms`).
+- Verificado: las tres archivos son JSON válido (`json.load`) y las 95 claves de `account` coinciden exactamente entre `es.json`, `en.json` y `pt.json` (mismos nombres de clave en los tres).
+- No se pudo correr `eslint`/build de appVideo en el sandbox (node_modules de pnpm no resuelve ahí) -- verificación de sintaxis fue manual; falta que el cliente corra `pnpm run build:wind` (o el build que use) para confirmar que compila.
+
 ## Cómo se verificó
 
 Implementación original (2026-09-14): revisada a mano línea por línea (el sandbox de shell no estaba disponible en ese momento), sin correr tests.

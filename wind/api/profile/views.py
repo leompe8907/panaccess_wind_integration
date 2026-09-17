@@ -563,6 +563,22 @@ def profile_request_account_deletion_view(request):
     code = ser.validated_data["code"].strip()
     reason = (ser.validated_data.get("reason") or "").strip() or "user_app_delete_request"
 
+    # 2026-09-17: paso adicional de confirmación a pedido del cliente (evitar
+    # eliminaciones por usuarios "curiosos"). Mismo patrón que
+    # profile_password_otp_request_view: el correo re-escrito debe coincidir
+    # con el de la cuenta autenticada, si no, no se genera ni se encola nada.
+    account_email = (request.user.email or "").strip().lower()
+    submitted_email = ser.validated_data["email"].strip().lower()
+    if not account_email or submitted_email != account_email:
+        return Response(
+            {
+                "success": False,
+                "code": "email_mismatch",
+                "message": "El correo no coincide con tu cuenta.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     from wind.services.account_deletion import request_account_deletion
 
     try:

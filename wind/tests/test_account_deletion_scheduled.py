@@ -285,13 +285,52 @@ class RequestAccountDeletionEndpointTestCase(APITestCase):
 
     @patch("wind.services.account_deletion_email.enqueue_account_deletion_confirmation_email")
     def test_authenticated_owner_can_request_deletion(self, mock_enqueue):
-        response = self.client.post(self.URL, {"code": "DELAPI1"}, format="json")
+        response = self.client.post(
+            self.URL, {"code": "DELAPI1", "email": self.user.email}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
         self.assertTrue(AccountDeletionRequest.objects.filter(subscriber_code="DELAPI1").exists())
 
+    @patch("wind.services.account_deletion_email.enqueue_account_deletion_confirmation_email")
+    def test_response_includes_cutoff_date_when_known(self, mock_enqueue):
+        expiry = timezone.now() + timedelta(days=7)
+        self.sub.lastExpiryTime = expiry
+        self.sub.save(update_fields=["lastExpiryTime"])
+
+        response = self.client.post(
+            self.URL, {"code": "DELAPI1", "email": self.user.email}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["scheduled_for"], expiry.isoformat())
+
     def test_rejects_code_for_another_subscriber(self):
-        response = self.client.post(self.URL, {"code": "SOMEONE_ELSE"}, format="json")
+        response = self.client.post(
+            self.URL, {"code": "SOMEONE_ELSE", "email": self.user.email}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_request_deletion_rejects_mismatched_email(self):
+        """
+        Paso de confirmación adicional (2026-09-17, a pedido del cliente --
+        casos de usuarios "curiosos" que eliminaban su cuenta sin querer):
+        si el correo escrito no coincide con el de la cuenta autenticada, no
+        debe crearse ninguna AccountDeletionRequest ni encolarse correo.
+        """
+        with patch(
+            "wind.services.account_deletion_email.enqueue_account_deletion_confirmation_email"
+        ) as mock_enqueue:
+            response = self.client.post(
+                self.URL,
+                {"code": "DELAPI1", "email": "otro-correo@example.com"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["code"], "email_mismatch")
+        mock_enqueue.assert_not_called()
+        self.assertFalse(AccountDeletionRequest.objects.filter(subscriber_code="DELAPI1").exists())

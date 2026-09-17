@@ -71,9 +71,18 @@ class ProfileRequestAccountDeletionSerializer(serializers.Serializer):
     acá no se pide escribir el código para confirmar -- la confirmación
     real es el enlace que llega por correo. La fricción ("¿estás seguro?")
     la maneja la UI antes de llamar a este endpoint.
+
+    `email` (2026-09-17, a pedido del cliente -- casos de usuarios
+    "curiosos" que eliminaban su cuenta sin querer): paso adicional de
+    confirmación, mismo patrón que ProfilePasswordOtpRequestSerializer.
+    El usuario re-escribe su correo antes de disparar el envío del enlace
+    de eliminación; la vista (`profile_request_account_deletion_view`)
+    valida que coincida con `request.user.email` -- si no coincide, no se
+    crea ninguna `AccountDeletionRequest` ni se encola correo.
     """
 
     code = serializers.CharField(max_length=100)
+    email = serializers.EmailField()
     reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
 
