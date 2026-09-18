@@ -430,6 +430,16 @@ CELERY_TASK_ROUTES = {
     'wind.tasks.send_welcome_credentials_email_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.send_password_reset_email_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.send_verification_email_task': {'queue': _PIPELINE_QUEUE},
+    # 2026-09-18: mismo problema que las de arriba -- estas dos se agregaron
+    # DESPUÉS de la corrección original (cambio de contraseña con OTP,
+    # 2026-09-14, y confirmación de eliminar cuenta, 2026-09-08) y quedaron
+    # sin ruta, cayendo en la cola default de Celery ("celery") que ningún
+    # worker de este deploy escucha -- se detectó porque los correos de OTP
+    # nunca llegaban aunque el envío directo (send_mail) y los 3 workers
+    # (compare/pipeline/fullsync) estaban sanos. Ver docs/... addendum
+    # 2026-09-18 para el diagnóstico completo.
+    'wind.tasks.send_password_change_otp_email_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.send_account_deletion_confirmation_email_task': {'queue': _PIPELINE_QUEUE},
     'telemetry.tasks.ingest_ott_telemetry_task': {'queue': _TELEMETRY_QUEUE},
     'telemetry.tasks.aggregate_ott_channels_task': {'queue': _TELEMETRY_QUEUE},
 }
