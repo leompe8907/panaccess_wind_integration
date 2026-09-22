@@ -440,6 +440,14 @@ CELERY_TASK_ROUTES = {
     # 2026-09-18 para el diagnóstico completo.
     'wind.tasks.send_password_change_otp_email_task': {'queue': _PIPELINE_QUEUE},
     'wind.tasks.send_account_deletion_confirmation_email_task': {'queue': _PIPELINE_QUEUE},
+    # 2026-09-22: mismo hueco, cuarta y quinta vez -- estas dos tareas de
+    # notificación (avisos, no flujos que el usuario esté esperando
+    # activamente) tampoco tenían ruta y caían en la cola default "celery"
+    # sin worker. Encontradas en la auditoría completa del backend
+    # (docs/AUDITORIA_DECISIONES_Y_PENDIENTES.md sección 20 y su recaída
+    # documentada el 2026-09-18).
+    'wind.tasks.send_password_changed_email_task': {'queue': _PIPELINE_QUEUE},
+    'wind.tasks.send_account_closed_email_task': {'queue': _PIPELINE_QUEUE},
     'telemetry.tasks.ingest_ott_telemetry_task': {'queue': _TELEMETRY_QUEUE},
     'telemetry.tasks.aggregate_ott_channels_task': {'queue': _TELEMETRY_QUEUE},
 }

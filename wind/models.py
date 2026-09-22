@@ -382,7 +382,12 @@ class SubscriberEmailRegistry(models.Model):
     Control de correos registrados para evitar múltiples registros.
     """
     email = models.EmailField(unique=True, db_index=True)
-    subscriber_code = models.CharField(max_length=100, null=True, blank=True)
+    # db_index=True agregado 2026-09-22 (auditoría): se filtra por este
+    # campo en cada cierre/reintento de cierre de cuenta
+    # (wind/services/subscriber_closure.py) y en la resolución de código de
+    # suscriptor durante login (wind/services/subscriber_auth.py) -- sin
+    # índice, esas consultas hacían seq scan sobre toda la tabla.
+    subscriber_code = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     document = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)
@@ -419,7 +424,10 @@ class SubscriberDocumentRegistry(models.Model):
     Control de documentos de identidad registrados.
     """
     document = models.CharField(max_length=50, unique=True, db_index=True)
-    subscriber_code = models.CharField(max_length=100, null=True, blank=True)
+    # db_index=True agregado 2026-09-22 (auditoría): mismo motivo que
+    # SubscriberEmailRegistry.subscriber_code de arriba -- se filtra por
+    # este campo en cada cierre de cuenta.
+    subscriber_code = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     email = models.EmailField(null=True, blank=True)
     has_purchased = models.BooleanField(default=False)
     purchased_at = models.DateTimeField(null=True, blank=True)

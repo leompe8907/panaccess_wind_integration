@@ -99,6 +99,29 @@ class PanAccessSocialAccountAdapterTestCase(TestCase):
 
         self.assertEqual(sociallogin.user.pk, existing.pk)
 
+    def test_does_not_merge_with_inactive_local_user(self):
+        """
+        2026-09-22 (auditoría): un email reciclado de una cuenta cerrada
+        (User.is_active=False, pero el registro no se borra -- ver
+        _allows_reregistration en wind/utils/email_validation.py) NO debe
+        reenganchar el login social a ese User viejo. El login social no
+        pasa por authenticate()/ModelBackend (a diferencia del login
+        normal), así que sin este filtro no había ninguna otra capa que
+        rechazara is_active=False -- terminaba emitiendo un JWT válido para
+        la cuenta cerrada.
+        """
+        closed = User.objects.create_user(
+            username="closed_account", email="closed@example.com", password="x", is_active=False
+        )
+        sociallogin = _make_sociallogin(email="closed@example.com", verified=True)
+        new_user_pk_before = sociallogin.user.pk  # None, todavía no se guardó
+
+        with patch("wind.adapters.ensure_subscriber_for_social_email", return_value="WND0102"):
+            self.adapter.pre_social_login(request=None, sociallogin=sociallogin)
+
+        self.assertNotEqual(sociallogin.user.pk, closed.pk)
+        self.assertEqual(sociallogin.user.pk, new_user_pk_before)
+
     @patch(
         "wind.adapters.ensure_subscriber_for_social_email",
         side_effect=SocialLoginSubscriberNotFound("user3@example.com"),

@@ -6,6 +6,7 @@ SERVICES=(
     panaccess-celery-worker-pipeline.service
     panaccess-celery-worker-full.service
     panaccess-celery-worker-compare.service
+    panaccess-celery-worker-telemetry.service
     panaccess-celery-beat.service
 )
 

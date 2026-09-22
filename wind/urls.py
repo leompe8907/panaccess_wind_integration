@@ -1,4 +1,6 @@
 from django.urls import path
+
+from appConfig import FeatureConfig
 from wind.functions import (
     panaccess_session_status_view,
     singleton,
@@ -46,7 +48,6 @@ urlpatterns = [
     # Landing del QR de pareo (hallazgo #34) -- ver link_device_view() para el detalle.
     path('l/v1/<str:udid>/', link_device_view, name='link_device'),
     path('dashboard/', dashboard_view, name='dashboard'),
-    path('subscriber-test/', subscriber_test_view, name='subscriber_test'),
 
     # Autenticación Social vía REST API (Token de Google a JWT Django)
     path('auth/google/', GoogleLoginView.as_view(), name='google_login_api'),
@@ -54,12 +55,6 @@ urlpatterns = [
     # Autenticación Social vía REST API (Token de Facebook a JWT Django)
     path('auth/facebook/', FacebookLoginView.as_view(), name='facebook_login_api'),
 
-    # Página de prueba: Iniciar sesión con Google (nativo HTML)
-    path('login-test/', login_test_view, name='login_test'),
-    
-    # Página de prueba: Iniciar sesión con Facebook (SDK JS)
-    path('login-test-facebook/', login_facebook_test_view, name='login_test_facebook'),
-    
     # Registro web (formulario usable)
     path('register/', register_view, name='register_web'),
     path('go/windtv/', go_windtv_view, name='go_windtv'),
@@ -118,3 +113,18 @@ urlpatterns = [
     path('devices/', DeviceSessionListView.as_view(), name='device-session-list'),
     path('devices/<int:device_id>/revoke/', DeviceSessionRevokeView.as_view(), name='device-session-revoke'),
 ]
+
+# 2026-09-22 (auditoría, Bajo #20): estas 3 páginas de prueba (HTML plano,
+# sin autenticación) quedaban registradas incondicionalmente, alcanzables en
+# producción para cualquiera que supiera la URL. `FeatureConfig.DEBUG_TEST_PAGES_ENABLED`
+# ya existía en appConfig.py con exactamente este propósito (default False,
+# activable por .env sin deploy de código) pero nunca se conectó acá --
+# a propósito NO se ata a `settings.DEBUG` (ver el comentario en
+# appConfig.py: a veces soporte/staff necesita estas páginas en producción
+# real para troubleshooting, y con DEBUG eso exigiría un deploy aparte).
+if FeatureConfig.DEBUG_TEST_PAGES_ENABLED:
+    urlpatterns += [
+        path('subscriber-test/', subscriber_test_view, name='subscriber_test'),
+        path('login-test/', login_test_view, name='login_test'),
+        path('login-test-facebook/', login_facebook_test_view, name='login_test_facebook'),
+    ]

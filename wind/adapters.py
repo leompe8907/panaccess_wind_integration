@@ -96,7 +96,21 @@ class PanAccessSocialAccountAdapter(DefaultSocialAccountAdapter):
                 "Verifica tu correo con el proveedor e intenta de nuevo."
             )
 
-        existing_local_user = get_user_model().objects.filter(email__iexact=user_email).first()
+        # is_active=True agregado 2026-09-22 (auditoría): sin este filtro,
+        # un email reciclado de una cuenta cerrada (el User queda
+        # is_active=False, pero el registro no se borra -- ver
+        # _allows_reregistration en wind/utils/email_validation.py, que sí
+        # permite re-registrar ese mismo correo para un suscriptor nuevo)
+        # reenganchaba el login social al User viejo e inactivo en vez de
+        # crear uno nuevo. El login social NO pasa por authenticate()/
+        # ModelBackend (a diferencia del login normal, ver
+        # PanAccessLoginSerializer.validate_auth_user_status), así que nada
+        # más en el pipeline rechazaba is_active=False -- terminaba emitiendo
+        # un JWT válido para la cuenta cerrada. Con el filtro, simplemente no
+        # se encuentra: sociallogin.user sigue siendo el objeto nuevo que
+        # allauth ya armó, y save_user() de más abajo crea una cuenta nueva
+        # con normalidad, mismo comportamiento que un email jamás registrado.
+        existing_local_user = get_user_model().objects.filter(email__iexact=user_email, is_active=True).first()
         if existing_local_user and sociallogin.user and sociallogin.user.pk != existing_local_user.pk:
             sociallogin.user = existing_local_user
 

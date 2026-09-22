@@ -5,7 +5,7 @@ from datetime import timedelta
 import base64
 from urllib.parse import quote
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import render
@@ -143,16 +143,14 @@ class RequestUDIDManualView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            udid = self.generate_unique_udid()
-
-            auth_request = UDIDAuthRequest.objects.create(
-                udid=udid,
+            auth_request = self.create_auth_request_with_unique_udid(
                 status='pending',
                 client_ip=client_ip,
                 user_agent=user_agent,
                 device_fingerprint=device_fingerprint,
                 device_public_key=device_public_key,
             )
+            udid = auth_request.udid
 
             auth_request.refresh_from_db()
             # El cupo de este device_fingerprint ya quedó reservado en el
@@ -210,6 +208,36 @@ class RequestUDIDManualView(APIView):
             udid = secrets.token_hex(4)
             if not UDIDAuthRequest.objects.filter(udid=udid).exists():
                 return udid
+
+    # 2026-09-22 (auditoría): `generate_unique_udid()` de arriba solo
+    # confirma que el UDID está libre con un `.exists()` -- entre ese
+    # chequeo y el `.create()` del caller hay una ventana real (aunque
+    # angosta, 32 bits de entropía) donde otra request concurrente podría
+    # tomar el mismo valor primero. Antes, esa colisión llegaba como
+    # `IntegrityError` sin manejar hasta el `except Exception` genérico del
+    # `get()` de más arriba, que la convertía en un 500 "Error interno del
+    # servidor" -- funcionalmente no rompía nada grave (el cliente puede
+    # reintentar la request entera), pero es mejor que el backend mismo
+    # reintente con un UDID nuevo de forma transparente en vez de fallar la
+    # request por una colisión de baja probabilidad que no tiene nada que
+    # ver con lo que pidió el cliente.
+    def create_auth_request_with_unique_udid(self, *, max_attempts=5, **fields):
+        last_exc = None
+        for _attempt in range(max_attempts):
+            udid = self.generate_unique_udid()
+            try:
+                return UDIDAuthRequest.objects.create(udid=udid, **fields)
+            except IntegrityError as exc:
+                last_exc = exc
+                logger.warning(
+                    "create_auth_request_with_unique_udid: colisión de UDID %s, reintentando (%s)",
+                    udid, exc,
+                )
+        # Agotados los reintentos -- prácticamente imposible con 32 bits de
+        # entropía salvo un bug real en otro lado; se deja escalar al
+        # `except Exception` del caller (mismo 500 genérico de antes) en vez
+        # de esconder el problema.
+        raise last_exc
 
 
 class ValidateAndAssociateUDIDView(APIView):

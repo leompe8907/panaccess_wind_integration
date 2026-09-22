@@ -1101,6 +1101,32 @@ def _alert_closure_exhausted(subscriber_code: str, attempts: int, to_address: st
         logger.exception("No se pudo encolar la alerta de cierre agotado para %s", subscriber_code)
 
 
+def _alert_task_exhausted(task_name, subject, exc):
+    """
+    2026-09-22 (auditoría completa del backend): cuando una tarea agotaba
+    sus reintentos, el bloque `except self.MaxRetriesExceededError` de más
+    abajo devolvía un dict `{"success": False, ...}` en vez de dejar escapar
+    la excepción -- Celery marcaba la tarea como SUCCESS igual (nunca
+    FAILURE), así que la integración de Sentry (CeleryIntegration, ver
+    `panaccess_wind_integration/settings.py`) nunca se enteraba de una falla
+    real y definitiva (ej. un correo de reset de contraseña que nunca llegó
+    a salir, o un refresh de perfil que nunca se completó). Nadie se
+    enteraba salvo que un usuario se quejara -- ver
+    docs/AUDITORIA_DECISIONES_Y_PENDIENTES.md sección 20 y su recaída.
+
+    No cambia el contrato de retorno de ninguna tarea (nada lee ese dict
+    hoy) -- solo agrega la visibilidad que faltaba. `subject` es el dato que
+    identifica sobre qué actuaba la tarea (un email, un subscriber_code).
+    """
+    logger.error("%s agotó reintentos para %s -- no se completó: %s", task_name, subject, exc)
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_exception(exc)
+    except Exception:
+        pass
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_welcome_credentials_email_task(self, email, subject, text_body, html_body):
     """
@@ -1126,6 +1152,7 @@ def send_welcome_credentials_email_task(self, email, subject, text_body, html_bo
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1156,6 +1183,7 @@ def send_password_changed_email_task(self, email, subject, text_body, html_body)
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1186,6 +1214,7 @@ def send_account_closed_email_task(self, email, subject, text_body, html_body):
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1226,6 +1255,7 @@ def send_password_reset_email_task(self, email, subject, text_body, html_body):
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1257,6 +1287,7 @@ def send_password_change_otp_email_task(self, email, subject, text_body, html_bo
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1288,6 +1319,7 @@ def send_account_deletion_confirmation_email_task(self, email, subject, text_bod
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
 
 
@@ -1344,6 +1376,7 @@ def refresh_subscriber_profile_task(self, subscriber_code, target_sns=None):
             try:
                 raise self.retry(exc=exc)
             except self.MaxRetriesExceededError:
+                _alert_task_exhausted(self.name, subscriber_code, exc)
                 return {"success": False, "subscriber_code": subscriber_code, "error": str(exc)}
 
 
@@ -1376,4 +1409,5 @@ def send_verification_email_task(self, email, subject, body, html_body=None):
         try:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
+            _alert_task_exhausted(self.name, email, exc)
             return {"success": False, "error": str(exc), "email": email}
