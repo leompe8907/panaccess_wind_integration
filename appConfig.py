@@ -1037,23 +1037,56 @@ class EmailConfig:
     OPS_ALERT_ADDRESS = _strip_env(os.getenv("EMAIL_OPS_ALERT_ADDRESS")) or SUPPORT_ADDRESS
     SUPPORT_PHONE = _strip_env(os.getenv("EMAIL_SUPPORT_PHONE")) or "809.200.3000"
     TERMS_URL = _strip_env(os.getenv("EMAIL_TERMS_URL")) or ""
-    GOOGLE_PLAY_URL = _strip_env(os.getenv("WIND_APP_GOOGLE_PLAY_URL")) or ""
     APP_STORE_URL = _strip_env(os.getenv("WIND_APP_APP_STORE_URL")) or ""
     SOCIAL_PASSWORD_MESSAGE = "Cuenta social no usa contraseña."
 
     # Destino final para el redirector inteligente /go/windtv/ (ver
-    # wind.views.go_windtv_view): a dónde va el usuario en web o en iOS
-    # (la app de iOS todavía no está publicada -- mientras tanto se trata
-    # igual que web).
+    # wind.views.go_windtv_view): a dónde va el usuario en web, Android o
+    # iOS. La app de iOS ya está registrada del lado de la app
+    # (esquema windtv://open + Universal Link applinks:backend.wind.do,
+    # ver docs/ABRIR_APP_DESDE_BACKEND_WIND.md) pero todavía no está
+    # publicada en la App Store -- por eso WINDTV_IOS_APP_STORE_URL
+    # arranca vacía (cae a la web mientras tanto).
     WINDTV_WEB_URL = _strip_env(os.getenv("WINDTV_WEB_URL")) or "https://windtv.wind.do/"
     # applicationId real del build de producción (app/build.gradle, flavor
-    # wind_mobile) -- confirmado por el equipo de Android. OJO: es distinto
-    # del package usado en WIND_APP_GOOGLE_PLAY_URL de momento
-    # (com.wind.windtv) -- pendiente de aclarar cuál es el correcto para el
-    # botón de Google Play de welcome_credentials/credentials.html.
+    # wind_mobile) -- confirmado por el equipo de Android.
     WINDTV_ANDROID_PACKAGE = (
         _strip_env(os.getenv("WINDTV_ANDROID_PACKAGE")) or "com.wind.android.streaming"
     )
+    # 2026-09-24: WIND_APP_GOOGLE_PLAY_URL venía configurada en el .env de
+    # producción apuntando al package viejo "com.wind.windtv" (Bajo #39 de
+    # AUDITORIA_CONSOLIDADA_2026-08-24.md; confirmado por el pedido del
+    # equipo de apps en docs/ABRIR_APP_DESDE_BACKEND_WIND.md que el real es
+    # WINDTV_ANDROID_PACKAGE). Si no hay override explícito por env, ahora
+    # se deriva de WINDTV_ANDROID_PACKAGE -- mismo patrón que ya arma
+    # go_windtv_view para el fallback del intent:// -- así los dos nunca
+    # pueden volver a desincronizarse. Si el .env sigue trayendo el valor
+    # viejo, sigue ganando ese override hasta que se corrija ahí.
+    GOOGLE_PLAY_URL = (
+        _strip_env(os.getenv("WIND_APP_GOOGLE_PLAY_URL"))
+        or f"https://play.google.com/store/apps/details?id={WINDTV_ANDROID_PACKAGE}"
+    )
+    # SHA-256 del certificado de firma de Play (Play Console -> la app ->
+    # Integridad de la app -> Firma de apps), para assetlinks.json -- sin
+    # esto Android no verifica el App Link y el enlace https:// nunca abre
+    # la app directo (sigue funcionando por el esquema windtv://open vía
+    # intent://, que no depende de este archivo). Placeholder hasta que el
+    # equipo de Android lo confirme; ver deploy/well-known/assetlinks.json.
+    WINDTV_ANDROID_SHA256 = _strip_env(os.getenv("WINDTV_ANDROID_SHA256")) or ""
+
+    # --- iOS: pedido 2026-09-24 (docs/ABRIR_APP_DESDE_BACKEND_WIND.md) ---
+    # Esquema propio para el botón "Abrir WindTV" en la página intermedia
+    # de go_windtv_view (Safari no abre un Universal Link si la navegación
+    # viene de una redirección automática -- hace falta que el usuario
+    # toque un enlace a este esquema).
+    WINDTV_IOS_SCHEME = _strip_env(os.getenv("WINDTV_IOS_SCHEME")) or "windtv"
+    WINDTV_IOS_BUNDLE_ID = (
+        _strip_env(os.getenv("WINDTV_IOS_BUNDLE_ID")) or "com.windtelecom.windtv"
+    )
+    WINDTV_IOS_TEAM_ID = _strip_env(os.getenv("WINDTV_IOS_TEAM_ID")) or "TXH7LJ7B2S"
+    # Vacía hasta que la app se publique -- go_windtv.html cae a la web en
+    # ese caso. Cuando publiquen: "https://apps.apple.com/app/id<ID>".
+    WINDTV_IOS_APP_STORE_URL = _strip_env(os.getenv("WINDTV_IOS_APP_STORE_URL")) or ""
 
     @classmethod
     def account_verification(cls, *, debug: bool) -> str:

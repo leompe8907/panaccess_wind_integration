@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TXH7LJ7B2S.com.windtelecom.windtv"],
+        "components": [
+          { "/": "/wind/go/windtv/*", "comment": "Ir a WindTV" },
+          { "/": "/wind/l/v1/*", "comment": "QR para vincular una TV" }
+        ]
+      }
+    ]
+  }
+}

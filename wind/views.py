@@ -1129,17 +1129,38 @@ def register_view(request):
 def go_windtv_view(request):
     """
     Redirector inteligente "Ir a WindTV" (botón de correos como
-    password_changed.html, ver EmailConfig.PORTAL_LOGIN_URL):
+    password_changed.html, ver EmailConfig.PORTAL_LOGIN_URL, y el final de
+    reset-password.html cuando se pide con origin=app):
 
-    - Android: intenta abrir la app instalada (com.wind.android.streaming,
-      confirmado por el equipo de Android) vía Intent URL apuntando a su
-      launcher; si no está instalada, Chrome cae automáticamente al
-      `browser_fallback_url` (ficha de Play Store).
-    - iOS: la app todavía no está publicada (en desarrollo) -- se trata
-      igual que web por ahora. Cuando lance, agregar aquí el mismo patrón
-      con Bundle ID (com.windtelecom.windtv, ya confirmado) + App Store ID
-      + Universal Link/scheme una vez el equipo de iOS los defina.
-    - Cualquier otro caso (desktop, etc.): directo a la web de WindTV.
+    - Android (teléfono y tablet): intenta abrir la app instalada
+      (com.wind.android.streaming, confirmado por el equipo de Android)
+      vía Intent URL apuntando a su launcher; si no está instalada, Chrome
+      cae automáticamente al `browser_fallback_url` (ficha de Play Store).
+      Sin cambios respecto a la versión anterior.
+    - iPhone, iPad, iPod: la app YA está registrada del lado de iOS
+      (esquema windtv://open + Universal Link applinks:backend.wind.do),
+      pero Safari NO abre un Universal Link si la navegación viene de una
+      redirección automática (que es justo este caso -- un 302 hacia acá)
+      ni tampoco un `windtv://` a ciegas si la app no está instalada (tira
+      error "la dirección no es válida"). Por eso, a diferencia de
+      Android, acá no se redirige: se renderiza una página con un botón
+      que el usuario tiene que tocar (ver wind/go_windtv.html) -- ahí
+      Safari sí pregunta "¿Abrir en WindTV?" y abre la app.
+    - Cualquier otro caso (desktop, etc.): directo a la web de WindTV,
+      igual que siempre.
+
+    2026-09-24 (docs/ABRIR_APP_DESDE_BACKEND_WIND.md): el equipo de
+    iOS/Android reportó que la app de iOS nunca se abría -- antes, todo lo
+    que no fuera Android cadía directo a la web sin distinguir iPhone/iPad.
+    Nota importante: desde iPadOS 13, Safari en iPad manda un User-Agent
+    de escritorio ("Macintosh; Intel Mac OS X...") -- un iPad es
+    indistinguible de una Mac mirando solo el header User-Agent del lado
+    del servidor. Por eso la distinción real iPad-vs-Mac se hace en el
+    navegador con JavaScript (pantalla táctil sobre un UA de Mac, ver el
+    script de go_windtv.html) -- acá en el servidor alcanza con enviar a
+    la página intermedia a cualquier User-Agent que no sea Android; esa
+    página decide sola si de verdad es iOS o si es una compu (en cuyo caso
+    hace `location.replace` a la web sin que el usuario vea nada).
 
     No requiere sesión ni parámetros -- es un simple router por
     User-Agent, pensado para ponerse detrás de un solo link estable
@@ -1149,7 +1170,7 @@ def go_windtv_view(request):
     `HttpResponseRedirect`, que valida el esquema contra
     `allowed_schemes = ["http", "https", "ftp"]` (`HttpResponseRedirectBase`
     de Django) y rechaza cualquier otro con `DisallowedRedirect` -- por eso
-    el hallazgo de logs de esta semana "Unsafe redirect to URL with
+    el hallazgo de logs de esa semana "Unsafe redirect to URL with
     protocol 'intent'" (el esquema `intent://` nunca iba a pasar esa
     validación). Nunca funcionó en producción: cualquier usuario Android
     que tocara este link recibía un 500 en vez de abrir la app o caer al
@@ -1175,8 +1196,18 @@ def go_windtv_view(request):
         response["Location"] = intent_url
         return response
 
-    # iOS (sin app publicada todavía) y cualquier otra plataforma -> web.
-    return HttpResponseRedirect(EmailConfig.WINDTV_WEB_URL)
+    # iPhone, iPod, iPad (que se presenta como Mac) y computadoras: la
+    # página decide -- ve wind/go_windtv.html. El JS ahí redirige de
+    # inmediato a la web si detecta que no es iOS de verdad.
+    return render(
+        request,
+        "wind/go_windtv.html",
+        {
+            "ios_app_url": f"{EmailConfig.WINDTV_IOS_SCHEME}://open",
+            "app_store_url": EmailConfig.WINDTV_IOS_APP_STORE_URL,
+            "web_url": EmailConfig.WINDTV_WEB_URL,
+        },
+    )
 
 
 def _credentials_page_context(**extra):

@@ -1,0 +1,91 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ir a WindTV | Wind</title>
+    <link rel="stylesheet" href="{% static 'wind/css/app.css' %}?v=7" />
+  </head>
+  <body class="app-body">
+    <div class="app-wrap">
+      <div class="app-card">
+        <header class="app-header">
+          <div class="app-brand">
+            <div class="app-logo" aria-hidden="true"></div>
+            <div>
+              <h1>WindTV</h1>
+              <p>Ir a la aplicación</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="app-content">
+          <div class="app-panel" id="ios" hidden>
+            <p style="margin: 0 0 20px; color: #c8d6e5; text-align: center;">
+              Tocá el botón para abrir WindTV.
+            </p>
+            <p style="text-align: center; margin: 0;">
+              <a class="app-btn primary" id="open-app" href="{{ ios_app_url }}">Abrir WindTV</a>
+            </p>
+            {% if app_store_url %}
+            <p style="text-align: center; margin: 16px 0 0">
+              <a class="app-link" href="{{ app_store_url }}">Descargar en la App Store</a>
+            </p>
+            {% endif %}
+            <p style="text-align: center; margin: 8px 0 0">
+              <a class="app-link" href="{{ web_url }}">Usar la versión web</a>
+            </p>
+          </div>
+          <noscript>
+            <div class="app-panel">
+              <p style="text-align: center; margin: 0;">
+                <a class="app-link" href="{{ web_url }}">Ir a WindTV</a>
+              </p>
+            </div>
+          </noscript>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var ua = navigator.userAgent;
+        // iPhone e iPod se distinguen por User-Agent. El iPad (iPadOS 13+)
+        // manda un User-Agent de escritorio ("Macintosh...") -- se lo
+        // reconoce por tener pantalla táctil, algo que una Mac real no
+        // tiene (maxTouchPoints = 0 en Safari/Chrome de macOS).
+        var isIOS =
+          /iPhone|iPad|iPod/i.test(ua) ||
+          (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
+        if (!isIOS) {
+          // Computadora (o cualquier caso no reconocido como iOS): directo
+          // a la web, sin que el usuario llegue a ver esta página.
+          window.location.replace("{{ web_url }}");
+          return;
+        }
+
+        var iosPanel = document.getElementById("ios");
+        iosPanel.hidden = false;
+
+        // A propósito NO se dispara "windtv://open" solo al cargar la
+        // página: si la app no está instalada, Safari muestra un error
+        // ("la dirección no es válida") en vez de simplemente no hacer
+        // nada. Hace falta que el usuario toque el botón -- ahí Safari
+        // pregunta "¿Abrir en WindTV?" antes de intentarlo.
+        document.getElementById("open-app").addEventListener("click", function () {
+          // Si la app abre, la pestaña queda oculta (document.hidden) y
+          // este timeout ya no importa. Si no abre (no está instalada),
+          // seguimos en la página después de 1.5s -> App Store, o la web
+          // mientras la app no esté publicada.
+          setTimeout(function () {
+            if (!document.hidden) {
+              window.location.href = "{{ app_store_url|default:web_url }}";
+            }
+          }, 1500);
+        });
+      })();
+    </script>
+  </body>
+</html>
